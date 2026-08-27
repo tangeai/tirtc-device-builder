@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+build/
+sdkconfig
+sdkconfig.old
+*.elf
+*.bin
+*.map
+
+.DS_Store
+.idea/
+.vscode/
+*.log

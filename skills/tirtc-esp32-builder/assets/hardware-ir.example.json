@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "board": {
+    "id": "example_esp32s3_media_board",
+    "vendor": "Example Vendor",
+    "model": "ESP32-S3 Media Board",
+    "hardware_revision": "unspecified"
+  },
+  "sources": [
+    {
+      "id": "board-materials",
+      "kind": "user-supplied-materials",
+      "location": "user-supplied://board-materials",
+      "revision": "unspecified"
+    }
+  ],
+  "soc": {
+    "target": "esp32s3",
+    "module": "ESP32-S3-WROOM-1-N16R8",
+    "flash_mb": 16,
+    "psram_mb": 8,
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "toolchain": {
+    "framework": "esp-idf",
+    "framework_version": "5.5.x",
+    "verification": "extracted",
+    "tirtc": {
+      "platform": "espressif-esp32s3",
+      "version": "2.3.0",
+      "sdk_path": "device-sim/sdk/espressif-esp32s3/2.3.0",
+      "build_contract": "manifest/build-contract.env"
+    },
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "camera": {
+    "present": null,
+    "sensor": null,
+    "interface": null,
+    "h264": {
+      "available": null,
+      "output_format": null,
+      "key_frame_control": null,
+      "verification": "extracted"
+    },
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "audio_input": {
+    "present": null,
+    "interface": null,
+    "codecs": [],
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "audio_output": {
+    "present": null,
+    "interface": null,
+    "codecs": [],
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "features": {
+    "requested": [
+      "h5_live_audio",
+      "h5_live_video",
+      "h5_talkback",
+      "ai_talk"
+    ]
+  }
+}

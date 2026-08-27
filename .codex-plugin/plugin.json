@@ -1,0 +1,36 @@
+{
+  "name": "tirtc-device-builder",
+  "version": "0.1.0",
+  "description": "Codex workflows for building and validating TiRTC device firmware across supported chip platforms.",
+  "author": {
+    "name": "TangeAI",
+    "url": "https://github.com/tangeai"
+  },
+  "homepage": "https://github.com/tangeai/tirtc-device-builder",
+  "repository": "https://github.com/tangeai/tirtc-device-builder",
+  "license": "Apache-2.0",
+  "keywords": [
+    "tirtc",
+    "esp32",
+    "esp-idf",
+    "embedded",
+    "ai-intercom"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "TiRTC Device Builder",
+    "shortDescription": "Build and validate TiRTC device firmware.",
+    "longDescription": "Turn board models, schematics, BSPs, and peripheral examples into evidence-backed TiRTC device projects with environment checks, build, flash, and verification reports.",
+    "developerName": "TangeAI",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Analyze my ESP32 board and generate a TiRTC project.",
+      "Check ESP-IDF and build my TiRTC ESP32 firmware.",
+      "Assess whether this board can support H5 live view and AI intercom."
+    ]
+  }
+}

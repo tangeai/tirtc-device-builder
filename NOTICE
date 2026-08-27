@@ -1,0 +1,7 @@
+TiRTC Device Builder
+Copyright 2026 TangeAI
+
+This distribution contains Codex workflow instructions and helper scripts only.
+It does not include the TiRTC SDK, ESP-IDF, ThingConnect source tree, vendor
+BSPs, board documentation, credentials, or media captured from users or
+devices. Those dependencies remain subject to their own licenses and terms.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TiRTC ESP32 Builder"
+  short_description: "从开发板资料生成并验证 TiRTC ESP32 固件"
+  default_prompt: "Use $tirtc-esp32-builder to analyze my ESP32 board materials and build a TiRTC H5 live-view and AI intercom project."
