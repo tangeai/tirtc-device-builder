@@ -155,6 +155,8 @@ def validate_npm_package(errors: list[str]) -> None:
                 error(errors, f"npm {lifecycle} lifecycle script is not allowed")
         if scripts.get("prepack") != "npm test":
             error(errors, "npm prepack must run the complete test suite")
+        if scripts.get("pack:esp32-kit") != "node scripts/pack-esp32-kit.js":
+            error(errors, "npm pack:esp32-kit script is required")
 
 
 def validate_skills(errors: list[str]) -> None:
