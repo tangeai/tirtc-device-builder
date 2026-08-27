@@ -7,11 +7,9 @@ Keep platform workflows in separate directories under `skills/`. A platform Skil
 Before submitting changes, run:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-  -s skills/tirtc-esp32-builder/scripts \
-  -p 'test_*.py'
-
-python3 scripts/validate_package.py
+npm ci --ignore-scripts
+npm test
+npm pack --dry-run
 ```
 
 Do not commit precompiled SDK archives, firmware binaries, credentials, private board packages, copyrighted vendor documentation without redistribution permission, or user media.

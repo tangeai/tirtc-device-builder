@@ -1,0 +1,3 @@
+**/__pycache__/
+**/*.py[cod]
+skills/**/scripts/test_*.py

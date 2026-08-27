@@ -1,0 +1,56 @@
+{
+  "name": "tirtc-device-builder",
+  "version": "0.2.0",
+  "description": "Install and run TiRTC device-development skills for Codex.",
+  "license": "MIT",
+  "author": {
+    "name": "TangeAI",
+    "url": "https://github.com/tangeai"
+  },
+  "type": "module",
+  "bin": {
+    "tirtc-device-builder": "bin/tirtc-device-builder.js"
+  },
+  "files": [
+    ".codex-plugin/",
+    "bin/",
+    "skills/",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tangeai/tirtc-device-builder.git"
+  },
+  "homepage": "https://github.com/tangeai/tirtc-device-builder#readme",
+  "bugs": {
+    "url": "https://github.com/tangeai/tirtc-device-builder/issues"
+  },
+  "keywords": [
+    "codex",
+    "skill",
+    "tirtc",
+    "esp32",
+    "esp-idf",
+    "embedded",
+    "ai-intercom"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "npm run test:node && npm run test:python && npm run validate && npm run validate:tarball && npm run test:package",
+    "test:node": "node --test test/*.test.js",
+    "test:python": "python3 -m unittest discover -s skills/tirtc-esp32-builder/scripts -p 'test_*.py'",
+    "validate": "python3 scripts/validate_package.py",
+    "validate:tarball": "node scripts/validate-tarball.js",
+    "test:package": "node scripts/test-packed-package.js",
+    "prepack": "npm test"
+  }
+}

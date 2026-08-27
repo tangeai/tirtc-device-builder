@@ -16,7 +16,50 @@ ESP32 Skill 使用公开的 [ThingConnect 示例仓库](https://github.com/tange
 
 模板工程提供配网、绑定、MQTT、TiRTC、H5 和 AI 会话骨架。具体开发板仍需接入摄像头、H.264 编码器、麦克风、扬声器、Codec、I2S 和按键。工程编译成功不等于 Web 已经出图或 AI 对讲已通过实机验收。
 
-## 安装
+## npm 安装（推荐）
+
+查看当前支持的平台：
+
+```bash
+npx tirtc-device-builder@latest list
+```
+
+安装 ESP32 Skill：
+
+```bash
+npx tirtc-device-builder@latest install esp32
+```
+
+默认安装到 `${CODEX_HOME:-~/.codex}/skills/tirtc-esp32-builder`。安装器不会使用
+`postinstall` 修改用户目录；只有显式执行 `install` 才会写入。目标已经存在时默认退出，
+需要确认丢弃本地改动后才能使用：
+
+```bash
+npx tirtc-device-builder@latest install esp32 --force
+```
+
+自定义 Skill 根目录：
+
+```bash
+npx tirtc-device-builder@latest install esp32 \
+  --skills-dir /absolute/path/to/skills
+```
+
+安装完成后启动新的 Codex 会话，Skill 调用名为：
+
+```text
+$tirtc-esp32-builder
+```
+
+也可以不安装，直接运行打包在 npm 中的 ESP-IDF 环境诊断：
+
+```bash
+npx tirtc-device-builder@latest doctor esp32 \
+  --thing-connect-root /absolute/path/tirtc-server-example/thing-connect \
+  --require-workspace
+```
+
+## 从 GitHub 安装
 
 在 Codex 对话中使用内置安装器：
 
@@ -24,7 +67,7 @@ ESP32 Skill 使用公开的 [ThingConnect 示例仓库](https://github.com/tange
 $skill-installer
 
 安装：
-https://github.com/tangeai/tirtc-device-builder/tree/v0.1.0/skills/tirtc-esp32-builder
+https://github.com/tangeai/tirtc-device-builder/tree/v0.2.0/skills/tirtc-esp32-builder
 ```
 
 Linux/macOS 也可以使用安装器脚本：
@@ -32,14 +75,8 @@ Linux/macOS 也可以使用安装器脚本：
 ```bash
 python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
   --repo tangeai/tirtc-device-builder \
-  --ref v0.1.0 \
+  --ref v0.2.0 \
   --path skills/tirtc-esp32-builder
-```
-
-安装后启动新的 Codex 会话。Skill 调用名为：
-
-```text
-$tirtc-esp32-builder
 ```
 
 仓库根目录同时包含 `.codex-plugin/plugin.json`，可以作为 skills-only Plugin 提交到 ChatGPT/Codex Plugin Directory。GitHub 直接安装不依赖 Plugin Directory 审核。
@@ -110,15 +147,18 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/doctor.py \
 
 `doctor.py` 检查 Python、Git、CMake、Ninja、`idf.py`、目标工具链、ThingConnect 工作区、TiRTC SDK 构建契约和串口权限。检查本身不安装软件、不修改 shell 配置，也不烧录设备。
 
+npm CLI 的 `doctor esp32` 调用同一个脚本，参数和退出码保持一致。
+
 ## 开发与验证
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-  -s skills/tirtc-esp32-builder/scripts \
-  -p 'test_*.py'
-
-python3 scripts/validate_package.py
+npm ci --ignore-scripts
+npm test
+npm pack --dry-run
 ```
+
+`npm pack --dry-run` 展示实际进入公开 tarball 的文件；发布前必须确认其中没有
+SDK 二进制、凭证、板卡私有资料、构建产物或用户媒体。
 
 本地安装了 Codex 系统校验器时，还可以运行：
 

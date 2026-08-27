@@ -51,3 +51,7 @@ sdkconfig.old
 .idea/
 .vscode/
 *.log
+*.tgz
+
+# Maintainer-local documentation
+/docs/

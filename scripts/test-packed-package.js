@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+
+function run(command, args, options = {}) {
+  const environment = {
+    ...process.env,
+    PYTHONDONTWRITEBYTECODE: "1",
+    ...options.env,
+  };
+  for (const key of Object.keys(environment)) {
+    if (key.toLowerCase() === "npm_config_dry_run") {
+      delete environment[key];
+    }
+  }
+  environment.npm_config_dry_run = "false";
+
+  const result = spawnSync(command, args, {
+    cwd: options.cwd ?? ROOT,
+    encoding: "utf8",
+    env: environment,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      command +
+        " failed with exit " +
+        result.status +
+        "\n" +
+        result.stdout +
+        result.stderr,
+    );
+  }
+  return result;
+}
+
+const temporary = mkdtempSync(join(tmpdir(), "tirtc-packed-package-"));
+try {
+  const packed = run(npmCommand, [
+    "pack",
+    "--json",
+    "--ignore-scripts",
+    "--pack-destination",
+    temporary,
+  ]);
+  const manifests = JSON.parse(packed.stdout);
+  assert.equal(manifests.length, 1);
+
+  const tarball = join(temporary, manifests[0].filename);
+  const consumer = join(temporary, "consumer");
+  mkdirSync(consumer, { recursive: true });
+  run(
+    npmCommand,
+    [
+      "install",
+      "--prefix",
+      consumer,
+      tarball,
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "--offline",
+    ],
+    { cwd: temporary },
+  );
+
+  const installedPackage = join(
+    consumer,
+    "node_modules",
+    "tirtc-device-builder",
+  );
+  const cli = join(installedPackage, "bin", "tirtc-device-builder.js");
+  const packageMetadata = JSON.parse(
+    readFileSync(join(installedPackage, "package.json"), "utf8"),
+  );
+  const version = run(process.execPath, [cli, "--version"]);
+  assert.equal(version.stdout.trim(), packageMetadata.version);
+
+  const platforms = run(process.execPath, [cli, "list"]);
+  assert.match(platforms.stdout, /esp32\s+tirtc-esp32-builder/);
+
+  const skillsDir = join(temporary, "skills");
+  run(process.execPath, [
+    cli,
+    "install",
+    "esp32",
+    "--skills-dir",
+    skillsDir,
+  ]);
+  assert.equal(
+    existsSync(join(skillsDir, "tirtc-esp32-builder", "SKILL.md")),
+    true,
+  );
+
+  const doctor = run(process.execPath, [cli, "doctor", "esp32", "--help"]);
+  assert.match(doctor.stdout, /--expected-idf/);
+  assert.match(doctor.stdout, /--thing-connect-root/);
+
+  console.log(
+    "Packed package smoke test passed (" + packageMetadata.version + ")",
+  );
+} finally {
+  rmSync(temporary, { force: true, recursive: true });
+}

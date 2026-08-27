@@ -1,0 +1,55 @@
+name: Publish npm package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org/"
+          package-manager-cache: false
+
+      - name: Verify release tag
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          test "${GITHUB_REF_NAME}" = "${expected}"
+
+      - run: npm ci --ignore-scripts
+
+      - name: Check whether the version already exists
+        id: registry
+        run: |
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          set +e
+          view_output="$(npm view "${package_name}@${package_version}" version 2>&1)"
+          view_status=$?
+          set -e
+          if [ "${view_status}" -eq 0 ]; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+          elif printf '%s\n' "${view_output}" | grep -q "npm error code E404"; then
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          else
+            printf '%s\n' "${view_output}" >&2
+            exit "${view_status}"
+          fi
+
+      - name: Publish with npm trusted publishing
+        if: steps.registry.outputs.exists != 'true'
+        run: npm publish

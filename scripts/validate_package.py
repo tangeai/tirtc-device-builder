@@ -11,6 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_MANIFEST = ROOT / ".codex-plugin" / "plugin.json"
+NPM_MANIFEST = ROOT / "package.json"
+PACKAGE_NAME = "tirtc-device-builder"
 SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
@@ -70,8 +72,8 @@ def parse_skill_frontmatter(path: Path, errors: list[str]) -> dict[str, str]:
 def validate_plugin(errors: list[str]) -> None:
     manifest = load_json(PLUGIN_MANIFEST, errors)
     name = manifest.get("name")
-    if name != ROOT.name:
-        error(errors, "plugin name must match the repository root directory")
+    if name != PACKAGE_NAME:
+        error(errors, f"plugin name must be {PACKAGE_NAME}")
     version = manifest.get("version")
     if not isinstance(version, str) or SEMVER.fullmatch(version) is None:
         error(errors, "plugin version must use semantic versioning")
@@ -95,6 +97,64 @@ def validate_plugin(errors: list[str]) -> None:
     ):
         if not interface.get(field):
             error(errors, f"plugin interface.{field} is required")
+
+
+def validate_npm_package(errors: list[str]) -> None:
+    package = load_json(NPM_MANIFEST, errors)
+    plugin = load_json(PLUGIN_MANIFEST, errors)
+
+    if package.get("name") != PACKAGE_NAME:
+        error(errors, f"npm package name must be {PACKAGE_NAME}")
+    version = package.get("version")
+    if not isinstance(version, str) or SEMVER.fullmatch(version) is None:
+        error(errors, "npm package version must use semantic versioning")
+    if version != plugin.get("version"):
+        error(errors, "npm package and plugin versions must match")
+    if package.get("private") is True:
+        error(errors, "npm package must not be private")
+
+    binary = package.get("bin")
+    if not isinstance(binary, dict) or binary.get(PACKAGE_NAME) != (
+        "bin/tirtc-device-builder.js"
+    ):
+        error(errors, "npm bin must expose bin/tirtc-device-builder.js")
+    cli = ROOT / "bin" / "tirtc-device-builder.js"
+    if not cli.is_file():
+        error(errors, "missing npm CLI")
+    elif cli.stat().st_mode & 0o111 == 0:
+        error(errors, "npm CLI must be executable")
+
+    packaged_files = package.get("files")
+    required_files = {
+        ".codex-plugin/",
+        "bin/",
+        "skills/",
+        "LICENSE",
+        "NOTICE",
+    }
+    if not isinstance(packaged_files, list) or not required_files.issubset(
+        set(packaged_files)
+    ):
+        error(errors, "npm files whitelist is missing required plugin content")
+
+    publish_config = package.get("publishConfig")
+    if not isinstance(publish_config, dict):
+        error(errors, "npm publishConfig is required")
+    else:
+        if publish_config.get("access") != "public":
+            error(errors, "npm package must publish with public access")
+        if publish_config.get("registry") != "https://registry.npmjs.org/":
+            error(errors, "npm package must publish to the official npm registry")
+
+    scripts = package.get("scripts")
+    if not isinstance(scripts, dict):
+        error(errors, "npm scripts are required")
+    else:
+        for lifecycle in ("preinstall", "install", "postinstall"):
+            if lifecycle in scripts:
+                error(errors, f"npm {lifecycle} lifecycle script is not allowed")
+        if scripts.get("prepack") != "npm test":
+            error(errors, "npm prepack must run the complete test suite")
 
 
 def validate_skills(errors: list[str]) -> None:
@@ -130,6 +190,8 @@ def validate_skills(errors: list[str]) -> None:
 
 def validate_repository_files(errors: list[str]) -> None:
     required = (
+        "package.json",
+        "package-lock.json",
         "README.md",
         "LICENSE",
         "NOTICE",
@@ -146,7 +208,14 @@ def validate_repository_files(errors: list[str]) -> None:
         relative = path.relative_to(ROOT)
         if path.suffix.lower() in FORBIDDEN_SUFFIXES:
             error(errors, f"forbidden binary or credential file: {relative}")
-        if path.suffix.lower() in {".md", ".py", ".json", ".yaml", ".yml"}:
+        if path.suffix.lower() in {
+            ".js",
+            ".json",
+            ".md",
+            ".py",
+            ".yaml",
+            ".yml",
+        }:
             text = path.read_text(encoding="utf-8")
             if SCAFFOLD_MARKER in text:
                 error(errors, f"unfinished scaffold placeholder in {relative}")
@@ -157,6 +226,7 @@ def validate_repository_files(errors: list[str]) -> None:
 def main() -> int:
     errors: list[str] = []
     validate_plugin(errors)
+    validate_npm_package(errors)
     validate_skills(errors)
     validate_repository_files(errors)
     if errors:
