@@ -8,7 +8,7 @@
   },
   "homepage": "https://github.com/tangeai/tirtc-device-builder",
   "repository": "https://github.com/tangeai/tirtc-device-builder",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "keywords": [
     "tirtc",
     "esp32",

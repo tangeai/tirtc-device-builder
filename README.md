@@ -145,4 +145,4 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 
 不要在 Issue、日志或报告中提交设备密钥、Wi-Fi 密码、MQTT/WHIP token、证书或用户音视频。安全问题按 [SECURITY.md](SECURITY.md) 私下报告。
 
-本仓库源码使用 Apache-2.0，见 [LICENSE](LICENSE)。ThingConnect、TiRTC SDK、ESP-IDF、厂商 BSP、芯片资料和其他第三方内容使用各自的许可证；本仓库许可证不会替代它们。
+本仓库源码使用 MIT License，见 [LICENSE](LICENSE)。ThingConnect、TiRTC SDK、ESP-IDF、厂商 BSP、芯片资料和其他第三方内容使用各自的许可证；本仓库许可证不会替代它们。
