@@ -2,6 +2,16 @@
 
 This project follows Semantic Versioning.
 
+## 0.3.0
+
+- Add reproducible packaging for a minimal, checksummed ESP32-S3 Device Kit release asset.
+- Download, verify, cache, and reuse the pinned Device Kit instead of cloning the full ThingConnect source repository during automatic setup.
+- Add a read-only `setup esp32` check that reports the smallest next action.
+- Add `setup esp32 --install` for resumable user-space installation of the Codex Skill, versioned ESP32 Device Kit, ESP-IDF 5.5.4, and ESP32-S3 tools.
+- Reuse valid existing workspaces and ESP-IDF installations without overwriting them.
+- Keep system package installation and persistent shell-profile changes outside automatic setup.
+- Save a path-only managed configuration and environment helper for later Skill runs.
+
 ## 0.2.0
 
 - Publish the repository as the `tirtc-device-builder` npm package.

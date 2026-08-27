@@ -204,7 +204,7 @@ def resolve_sdk_dir(
         if bundled.is_dir():
             return bundled, "generated project"
     if thing_connect_root is not None:
-        return thing_connect_root / DEFAULT_SDK_RELATIVE_PATH, "ThingConnect workspace"
+        return thing_connect_root / DEFAULT_SDK_RELATIVE_PATH, "Device Kit or legacy workspace"
     return None, "not found"
 
 
@@ -272,7 +272,7 @@ def diagnose(args: argparse.Namespace) -> dict[str, Any]:
     )
     checks.append(
         check(
-            "ThingConnect workspace",
+            "ESP32 Device Kit",
             workspace_status,
             (
                 f"{thing_connect_root} ({thing_connect_source})"
@@ -286,7 +286,7 @@ def diagnose(args: argparse.Namespace) -> dict[str, Any]:
     )
     if args.require_workspace and thing_connect_root is None:
         next_actions.append(
-            "Clone the public ThingConnect repository or pass its absolute path with "
+            "Run setup esp32 --install or pass an existing Device Kit path with "
             "--thing-connect-root."
         )
 
@@ -414,7 +414,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--require-workspace",
         action="store_true",
-        help="fail when a ThingConnect workspace with the ESP32 generator is unavailable",
+        help="fail when a Device Kit or legacy workspace with the ESP32 generator is unavailable",
     )
     parser.add_argument("--sdk-dir", type=Path)
     parser.add_argument("--project", type=Path)

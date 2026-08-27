@@ -1,5 +1,14 @@
 # TiRTC ESP32 Builder 使用说明
 
+## 一键准备
+
+```bash
+npx tirtc-device-builder@latest setup esp32
+npx tirtc-device-builder@latest setup esp32 --install
+```
+
+第一条命令只检查；第二条命令自动安装用户目录内缺失的 Skill、带校验的 ESP32 Device Kit、ESP-IDF 5.5.4 和 ESP32-S3 工具链，最后复跑 Doctor。它不执行 `sudo`，也不修改 shell 配置。安装完成后新开 Codex 会话即可调用 Skill。
+
 安装后可在 Codex 中显式调用：
 
 ```text
@@ -14,25 +23,21 @@ $tirtc-esp32-builder
 - 产品页或资料链接：...
 - 原理图：/absolute/path/board-schematic.pdf
 - BSP 或示例工程：/absolute/path/vendor-bsp
-- ThingConnect：/absolute/path/tirtc-server-example/thing-connect
 - 输出目录：/absolute/path/my-tirtc-device
 
 先完成能力分析；具备条件后生成并编译。只有我明确指定串口时才烧录。
 ```
 
-## ThingConnect 工作区
+## ESP32 Device Kit
 
-这个 Skill 不复制 ThingConnect 源码和 TiRTC 静态库。首次使用可以准备公开仓库：
+一键安装会下载固定版本的最小资源包并校验 SHA-256，不需要克隆 ThingConnect 服务端仓库。安装路径由下面的文件记录：
 
 ```bash
-git clone https://github.com/tangeai/tirtc-server-example.git \
-  /absolute/path/tirtc-server-example
-
-export TIRTC_THING_CONNECT_ROOT=\
-/absolute/path/tirtc-server-example/thing-connect
+source ~/.tirtc-device-builder/env.sh
+printf '%s\n' "$TIRTC_THING_CONNECT_ROOT"
 ```
 
-也可以在调用 Skill 时直接给出 ThingConnect 绝对路径，不需要设置持久环境变量。
+已有完整 ThingConnect 工作区仍可通过 `--thing-connect-root` 显式复用，主要用于维护模板或协议时的开发场景。
 
 ## 常见输入方式
 
@@ -45,7 +50,7 @@ $tirtc-esp32-builder 分析 <厂商> <型号> <硬件版本>，目标是 H5 实�
 提供本地资料：
 
 ```text
-$tirtc-esp32-builder 使用原理图 /path/board.pdf、BSP /path/vendor-project 和 ThingConnect /path/tirtc-server-example/thing-connect，为该板生成 TiRTC H5/AI ESP-IDF 工程并编译。
+$tirtc-esp32-builder 使用原理图 /path/board.pdf、BSP /path/vendor-project 和一键安装的 Device Kit，为该板生成 TiRTC H5/AI ESP-IDF 工程并编译。
 ```
 
 完整实机流程：
@@ -64,7 +69,7 @@ $tirtc-esp32-builder 使用 /path/hardware-ir.json 生成工程，编译后烧�
 python3 <skill-dir>/scripts/doctor.py \
   --expected-idf 5.5 \
   --target esp32s3 \
-  --thing-connect-root /absolute/path/tirtc-server-example/thing-connect \
+  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.0.0 \
   --require-workspace
 ```
 

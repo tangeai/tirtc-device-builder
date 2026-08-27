@@ -12,6 +12,7 @@ import {
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runEsp32Setup } from "./setup-esp32.js";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE = JSON.parse(
@@ -35,6 +36,7 @@ function printHelp() {
 Usage:
   tirtc-device-builder list
   tirtc-device-builder install <platform> [--skills-dir <path>] [--force]
+  tirtc-device-builder setup <platform> [setup options]
   tirtc-device-builder doctor <platform> [doctor options]
   tirtc-device-builder --version
 
@@ -43,11 +45,14 @@ Platforms:
 
 Examples:
   npx tirtc-device-builder install esp32
+  npx tirtc-device-builder setup esp32
+  npx tirtc-device-builder setup esp32 --install
   npx tirtc-device-builder install esp32 --skills-dir /absolute/path/skills
   npx tirtc-device-builder doctor esp32 --project /absolute/path/project
 
 Install defaults to ${"$"}{CODEX_HOME:-~/.codex}/skills. Existing skills are
-preserved unless --force is explicitly supplied.`);
+preserved unless --force is explicitly supplied. Setup checks are read-only;
+setup --install installs missing user-space components without running sudo.`);
 }
 
 function fail(message) {
@@ -187,7 +192,7 @@ function main(args) {
   }
 
   const [command, identifier, ...rest] = args;
-  if (command !== "install" && command !== "doctor") {
+  if (command !== "install" && command !== "doctor" && command !== "setup") {
     return fail(`unknown command: ${command}; run with --help`);
   }
   if (!identifier) {
@@ -200,6 +205,18 @@ function main(args) {
 
   if (command === "doctor") {
     return runDoctor(platform, rest);
+  }
+  if (command === "setup") {
+    if (platform.name !== "esp32") {
+      return fail(`setup is not available for platform: ${platform.name}`);
+    }
+    return runEsp32Setup(rest, {
+      cliPath: fileURLToPath(import.meta.url),
+      defaultSkillsDir: defaultSkillsDir(),
+      packageRoot: PACKAGE_ROOT,
+      packageVersion: PACKAGE.version,
+      platform,
+    });
   }
 
   try {

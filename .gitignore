@@ -52,6 +52,7 @@ sdkconfig.old
 .vscode/
 *.log
 *.tgz
+/dist/
 
 # Maintainer-local documentation
 /docs/

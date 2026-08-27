@@ -112,3 +112,45 @@ test("doctor delegates to the packaged Python helper", () => {
   assert.match(result.stdout, /--expected-idf/);
   assert.match(result.stdout, /--thing-connect-root/);
 });
+
+test("setup help documents check and automatic installation", () => {
+  const result = run(["setup", "esp32", "--help"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /setup esp32 --install/);
+  assert.match(result.stdout, /--kit-archive/);
+  assert.match(result.stdout, /does not run sudo or edit shell profiles/);
+});
+
+test("setup check is read-only and reports the automatic next action", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const root = join(directory, "managed");
+    const skillsDir = join(directory, "skills");
+    const result = run([
+      "setup",
+      "esp32",
+      "--root",
+      root,
+      "--skills-dir",
+      skillsDir,
+      "--thing-connect-root",
+      join(directory, "missing-thing-connect"),
+      "--idf-dir",
+      join(directory, "missing-idf"),
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /OVERALL: NEEDS_SETUP/);
+    assert.match(
+      result.stdout,
+      /npx tirtc-device-builder@latest setup esp32 --install/,
+    );
+    assert.equal(existsSync(root), false);
+    assert.equal(existsSync(skillsDir), false);
+  });
+});
+
+test("setup only replaces an installed Skill with explicit install intent", () => {
+  const result = run(["setup", "esp32", "--force-skill"]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /--force-skill requires --install/);
+});

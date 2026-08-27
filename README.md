@@ -12,11 +12,101 @@ TiRTC Device Builder 是一个面向设备开发者的 Codex Plugin 仓库。它
 
 ## 能力边界
 
-ESP32 Skill 使用公开的 [ThingConnect 示例仓库](https://github.com/tangeai/tirtc-server-example) 作为协议、模板、生成器和 TiRTC ESP32 SDK 的事实源。这个仓库不复制服务端源码、预编译 TiRTC SDK、设备凭证或媒体样本。
+ESP32 开发资源以独立、带版本和 SHA-256 的 Device Kit 发布。Kit 的事实源是公开的 [ThingConnect 示例仓库](https://github.com/tangeai/tirtc-server-example)，但普通开发者不需要克隆该服务端仓库。Device Kit 不包含设备凭证、板卡 BSP 或用户媒体。
+
+## 维护者：发布最小 ESP32 资源包
+
+最小资源包只包含工程生成器、`esp32-h5-ai` 模板、`platform_client`、`runtime_config`、`wifi_manager`、TiRTC ESP32-S3 SDK 2.3.0 和相关设备协议文档。打包命令会检查白名单资源、记录源码提交、生成确定性压缩包和 SHA-256：
+
+```bash
+cd /home/workspace/tirtc-device-builder
+
+npm run pack:esp32-kit -- \
+  --source /home/workspace/tirtc-server-example/thing-connect \
+  --kit-version 1.0.0
+```
+
+输出文件位于 `dist/`：
+
+```text
+tirtc-esp32s3-kit-1.0.0.tar.gz
+tirtc-esp32s3-kit-1.0.0.tar.gz.sha256
+```
+
+从 `dist/` 目录校验附件：
+
+```bash
+cd /home/workspace/tirtc-device-builder/dist
+sha256sum -c tirtc-esp32s3-kit-1.0.0.tar.gz.sha256
+```
+
+发布前使用独立标签，并把两个文件作为 GitHub Release 附件上传：
+
+```bash
+git tag -a kit-esp32s3-v1.0.0 -m "TiRTC ESP32-S3 Device Kit 1.0.0"
+git push origin kit-esp32s3-v1.0.0
+
+gh release create kit-esp32s3-v1.0.0 \
+  dist/tirtc-esp32s3-kit-1.0.0.tar.gz \
+  dist/tirtc-esp32s3-kit-1.0.0.tar.gz.sha256 \
+  --repo tangeai/tirtc-device-builder \
+  --verify-tag \
+  --latest=false \
+  --title "TiRTC ESP32-S3 Device Kit 1.0.0" \
+  --notes "ESP-IDF 5.5.x；TiRTC SDK 2.3.0；包含 H5/AI 工程生成资源。"
+```
 
 模板工程提供配网、绑定、MQTT、TiRTC、H5 和 AI 会话骨架。具体开发板仍需接入摄像头、H.264 编码器、麦克风、扬声器、Codec、I2S 和按键。工程编译成功不等于 Web 已经出图或 AI 对讲已通过实机验收。
 
-## 新人从零开始：一次跑通 ESP32-S3 H5/AI
+## 推荐：一键检查和安装
+
+新人先执行一条只读命令：
+
+```bash
+npx tirtc-device-builder@latest setup esp32
+```
+
+环境完整时它直接运行 Doctor 并输出 `SETUP: READY`。存在缺失项时，它会显示具体状态和下一条命令：
+
+```bash
+npx tirtc-device-builder@latest setup esp32 --install
+```
+
+`--install` 自动完成：
+
+- 安装 `tirtc-esp32-builder` 到 Codex Skill 目录；
+- 下载并校验 ESP32 Device Kit 1.0.0，缓存后供多个工程复用；
+- 复用已激活的 ESP-IDF 5.5.x，缺失时安装固定版本 ESP-IDF 5.5.4；
+- 安装 Espressif 管理的 ESP32-S3 工具链；
+- 生成只包含路径的 `config.json` 和 `env.sh`；
+- 自动激活安装环境并重新运行 Doctor。
+
+默认托管目录是 `~/.tirtc-device-builder`。自动安装不执行 `sudo`、不修改 `.bashrc` 或 `.zshrc`、不覆盖已有但内容不完整的目录。缺少 Git、Python 或其他系统依赖时，它会停止并给出可复制的系统安装命令；修复后重复同一条 `--install` 命令即可从断点继续。
+
+需要自定义位置时：
+
+```bash
+npx tirtc-device-builder@latest setup esp32 --install \
+  --root /absolute/path/tirtc-dev
+```
+
+安装完成后启动新的 Codex 会话，只需输入板卡和目标：
+
+```text
+$tirtc-esp32-builder
+
+开发板：<厂商> <完整型号> <PCB 版本>
+板卡资料：/absolute/path/board-materials
+输出工程：/absolute/path/my-esp32-device
+目标：H5 实时音视频、H5 对讲、AI 双向对讲
+
+使用一键安装产生的托管环境。先分析资料并生成 Hardware IR，
+达到 READY_TO_PORT 后生成和编译；本轮不烧录。
+```
+
+到这里，新人只需要“执行 `setup --install` → 重启 Codex → 输入板卡需求”。下面保留完整流程，供自定义目录、手动安装和故障排查使用。
+
+## 完整手动流程和排障
 
 推荐先跑通“安装 → 环境 → 板卡分析 → 生成 → 编译”，确认报告无误后再单独授权烧录和实机验收。整个过程使用同一份板卡事实，避免在代码生成阶段猜测引脚、器件或媒体能力。
 
@@ -45,7 +135,7 @@ TIRTC_PORTING_REPORT.md
 | ESP-IDF | 5.5.x |
 | TiRTC SDK | `espressif-esp32s3/2.3.0` |
 | 业务 | H5 实时音视频、H5 对讲、AI 双向语音 |
-| 工程生成 | 需要一次本地 ThingConnect 工作区 |
+| 工程生成 | 使用本地缓存的 ESP32 Device Kit 1.0.0 |
 | 烧录 | 必须明确给出串口并授权 |
 
 “板上有摄像头”不等于可以输出 H5 视频。H5 视频还需要可用的 H.264 Annex-B 编码输出、SPS/PPS、IDR 和关键帧请求控制；对讲还需要完整的麦克风采集、G.711 A-law 8 kHz 编码、下行解码、I2S/Codec/功放和扬声器路径。
@@ -58,16 +148,17 @@ TIRTC_PORTING_REPORT.md
 
 ```bash
 export TIRTC_WORKSPACE=/home/your-user/workspace
-export TIRTC_THING_CONNECT_ROOT="$TIRTC_WORKSPACE/tirtc-server-example/thing-connect"
 export TIRTC_BOARD_DOCS="$TIRTC_WORKSPACE/board-materials"
 export TIRTC_PROJECT_DIR="$TIRTC_WORKSPACE/my-esp32-device"
+
+source ~/.tirtc-device-builder/env.sh
 ```
 
 逐项确认：
 
 ```bash
 printf 'workspace: %s\n' "$TIRTC_WORKSPACE"
-printf 'ThingConnect: %s\n' "$TIRTC_THING_CONNECT_ROOT"
+printf 'ESP32 Device Kit: %s\n' "$TIRTC_THING_CONNECT_ROOT"
 printf 'board docs: %s\n' "$TIRTC_BOARD_DOCS"
 printf 'output project: %s\n' "$TIRTC_PROJECT_DIR"
 ```
@@ -130,14 +221,14 @@ npm config set registry https://registry.npmjs.org/
 
 ```bash
 npm view tirtc-device-builder version
-npx tirtc-device-builder@0.2.0 list
-npx tirtc-device-builder@0.2.0 install esp32
+npx tirtc-device-builder@latest list
+npx tirtc-device-builder@latest install esp32
 ```
 
 成功时最后会看到类似输出：
 
 ```text
-Installed tirtc-esp32-builder 0.2.0 to /home/.../.codex/skills/tirtc-esp32-builder
+Installed tirtc-esp32-builder <version> to /home/.../.codex/skills/tirtc-esp32-builder
 Start a new Codex session, then invoke $tirtc-esp32-builder.
 ```
 
@@ -146,13 +237,13 @@ Start a new Codex session, then invoke $tirtc-esp32-builder.
 如果目标目录已经存在，安装器会保护已有内容并退出。先确认目录中的本地修改是否需要保留；只有确定要替换时才执行：
 
 ```bash
-npx tirtc-device-builder@0.2.0 install esp32 --force
+npx tirtc-device-builder@latest install esp32 --force
 ```
 
 自定义 Skill 根目录时使用绝对路径：
 
 ```bash
-npx tirtc-device-builder@0.2.0 install esp32 \
+npx tirtc-device-builder@latest install esp32 \
   --skills-dir /absolute/path/to/skills
 ```
 
@@ -162,7 +253,7 @@ npx tirtc-device-builder@0.2.0 install esp32 \
 $skill-installer
 
 安装：
-https://github.com/tangeai/tirtc-device-builder/tree/v0.2.0/skills/tirtc-esp32-builder
+https://github.com/tangeai/tirtc-device-builder/tree/v0.3.0/skills/tirtc-esp32-builder
 ```
 
 Linux/macOS 也可以执行：
@@ -170,27 +261,33 @@ Linux/macOS 也可以执行：
 ```bash
 python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
   --repo tangeai/tirtc-device-builder \
-  --ref v0.2.0 \
+  --ref v0.3.0 \
   --path skills/tirtc-esp32-builder
 ```
 
 仓库根目录还包含 `.codex-plugin/plugin.json`，可作为 skills-only Plugin 使用。直接从 npm 或 GitHub 安装不依赖 Plugin Directory 审核。
 
-### 第 4 步：准备 ThingConnect 工作区
+### 第 4 步：准备 ESP32 Device Kit
 
-当前 Skill 不复制 ThingConnect 服务端源码和 TiRTC 预编译库。生成新工程时，以下内容来自公开的 ThingConnect 仓库：
+Device Kit 包含生成新工程需要的最小资源：
 
 - ESP32-S3 H5/AI 工程生成器；
 - 起步模板和平台公共组件；
 - TiRTC ESP32-S3 SDK 头文件、静态库和构建契约；
 - H5、AI、设备接入和会话协议文档。
 
-只需准备一次，后续多个工程可以共用同一工作区：
+一键安装会下载固定 Release、校验 SHA-256，并缓存到 `~/.tirtc-device-builder/kits/esp32s3/1.0.0/`。不需要克隆 `tirtc-server-example`：
 
 ```bash
-mkdir -p "$TIRTC_WORKSPACE"
-git clone https://github.com/tangeai/tirtc-server-example.git \
-  "$TIRTC_WORKSPACE/tirtc-server-example"
+npx tirtc-device-builder@latest setup esp32 --install
+source ~/.tirtc-device-builder/env.sh
+```
+
+维护者刚生成 Release、附件还没有上传时，可以使用本地包完成同样的安装验证：
+
+```bash
+npx tirtc-device-builder@latest setup esp32 --install \
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.0.0.tar.gz
 ```
 
 验证关键文件：
@@ -202,13 +299,13 @@ ls -l "$TIRTC_THING_CONNECT_ROOT/device-sim/sdk/espressif-esp32s3/2.3.0/lib/libT
 ls -l "$TIRTC_THING_CONNECT_ROOT/device-sim/sdk/espressif-esp32s3/2.3.0/manifest/build-contract.env"
 ```
 
-四条命令都应显示真实文件。记录当前源码版本，便于报告和复现：
+四条命令都应显示真实文件。资源来源版本记录在 Kit 清单中：
 
 ```bash
-git -C "$TIRTC_WORKSPACE/tirtc-server-example" rev-parse HEAD
+python3 -m json.tool "$TIRTC_THING_CONNECT_ROOT/manifest.json"
 ```
 
-生成器会把必要模块和 TiRTC SDK 复制到新工程的 `third_party/tirtc/`，所以已生成的工程可以移动并独立编译。安装 Skill、列出平台、分析本地板卡资料，以及诊断一个已经自带 SDK 的生成工程，不要求每次重新拉取 ThingConnect。
+生成器会把必要模块和 TiRTC SDK 复制到新工程的 `third_party/tirtc/`，所以已生成的工程可以移动并独立编译。一个已校验的 Kit 缓存可以供多个工程使用。
 
 ### 第 5 步：检查或安装 ESP-IDF 5.5.x
 
@@ -259,7 +356,7 @@ command -v xtensa-esp32s3-elf-gcc
 不安装 Skill 也可以通过 npm CLI 调用同一个检查脚本：
 
 ```bash
-npx tirtc-device-builder@0.2.0 doctor esp32 \
+npx tirtc-device-builder@latest doctor esp32 \
   --expected-idf 5.5 \
   --target esp32s3 \
   --thing-connect-root "$TIRTC_THING_CONNECT_ROOT" \
@@ -283,7 +380,7 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/doctor.py \
 | Python、Git | `PASS` |
 | `idf.py` | `PASS`，版本为 5.5.x |
 | target compiler | `PASS`，找到 ESP32-S3 编译器 |
-| ThingConnect workspace | `PASS` |
+| ESP32 Device Kit | `PASS` |
 | TiRTC SDK | `PASS` |
 | serial discovery | 还未接板时允许 `WARN` |
 | OVERALL | `PASS` |
@@ -294,7 +391,7 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/doctor.py \
 
 - `idf.py not found`：当前终端没有激活 ESP-IDF，先执行 `source <idf-dir>/export.sh`。
 - `target compiler ... not found`：ESP-IDF 环境未激活，或安装时没有包含 `esp32s3`。
-- `ThingConnect workspace ... not found`：传入的路径必须是仓库根目录或其 `thing-connect/` 子目录，并且其中存在生成器。
+- `ESP32 Device Kit ... not found`：先执行一键安装，或传入 Kit 根目录；兼容路径也可以是完整仓库根目录或其 `thing-connect/` 子目录。
 - `TiRTC SDK ... missing`：检查仓库是否拉取完整，以及 SDK 的头文件、静态库和 `manifest/build-contract.env` 是否存在。
 - `serial discovery: no serial device detected`：生成和编译阶段可以继续；烧录前必须解决。
 
@@ -324,7 +421,7 @@ FAIL TiRTC build contract [required]: no sdkconfig or sdkconfig.defaults in ...
 - BOM：/absolute/path/board-materials/<file>
 - BSP/厂商示例：/absolute/path/vendor-bsp
 - 摄像头/Codec/功放数据手册：/absolute/path/board-materials/<files>
-- ThingConnect：/absolute/path/tirtc-server-example/thing-connect
+- Device Kit：使用 `setup esp32 --install` 生成的托管环境
 
 目标：
 - H5 实时视频和音频
@@ -554,7 +651,7 @@ AI 验收：
 - [ ] 板卡厂商、完整型号、模组、PCB 版本一致。
 - [ ] 原理图/BOM/BSP/数据手册路径均为绝对路径且可读。
 - [ ] Node.js 版本不低于 18，Skill 已安装并重启 Codex。
-- [ ] ThingConnect 生成器、TiRTC 头文件、静态库和构建契约存在。
+- [ ] ESP32 Device Kit 的生成器、TiRTC 头文件、静态库和构建契约存在。
 - [ ] 当前终端已激活 ESP-IDF 5.5.x 和 ESP32-S3 工具链。
 - [ ] 生成前 Doctor 的 `OVERALL` 为 `PASS`。
 - [ ] 所有请求能力均为 `READY_TO_PORT` 或 `HIL_VERIFIED`。

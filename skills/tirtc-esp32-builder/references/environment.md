@@ -1,5 +1,26 @@
 # ESP-IDF environment
 
+## Managed one-command setup
+
+Prefer the packaged setup entrypoint for a new machine:
+
+```bash
+npx tirtc-device-builder@latest setup esp32
+npx tirtc-device-builder@latest setup esp32 --install
+```
+
+The first command is read-only. The second command is explicit authorization to install missing user-space components at the printed destinations. Its default root is `~/.tirtc-device-builder`; it downloads and verifies the pinned ESP32 Device Kit, installs the Skill, clones or reuses ESP-IDF 5.5.4, runs Espressif's `install.sh esp32s3`, writes `config.json` and `env.sh`, and reruns the Doctor inside the activated environment.
+
+The automatic branch never runs `sudo` or modifies a persistent shell profile. When system dependencies are missing, report its exact blocker and let the user perform the displayed system action. Existing incomplete directories are preserved as blockers. Rerunning the same command resumes completed stages.
+
+When `<setup-root>/env.sh` exists, use it only as an activation prefix for the current command:
+
+```bash
+bash -lc '. "<setup-root>/env.sh" && python3 "<skill-dir>/scripts/doctor.py" --expected-idf 5.5 --target esp32s3 --require-workspace'
+```
+
+The helper contains paths, not device or network credentials. Read `<setup-root>/config.json` when exact managed paths are needed; the environment helper does not authorize unrelated downloads, shell-profile changes, flashing, or credential writes.
+
 Run the doctor before generation, build, flash, or monitor:
 
 ```bash
@@ -11,18 +32,18 @@ python3 <skill-dir>/scripts/doctor.py \
 
 Add `--project <generated-project>` after generation so the doctor can compare `sdkconfig` or `sdkconfig.defaults` with the TiRTC SDK build contract. Use `--json` when the result will be included in another report.
 
-## ThingConnect workspace
+## ESP32 Device Kit
 
-This distributable skill does not bundle the ThingConnect source tree or TiRTC static library. Resolve the public ThingConnect workspace in this order:
+The automatic setup downloads a versioned minimal Kit instead of cloning the ThingConnect server repository. Resolve the generation root in this order:
 
 1. an explicit `--thing-connect-root <path>`;
 2. `TIRTC_THING_CONNECT_ROOT`;
 3. an ancestor of the project or current directory containing `device-sim/scripts/create_esp32_project.py`;
 4. an ancestor whose `thing-connect/` child contains that generator.
 
-The public source is `https://github.com/tangeai/tirtc-server-example`. Clone it only into an explicit destination. The root accepted by the doctor may be either the repository root or its `thing-connect/` child.
+The default managed root is `<setup-root>/kits/esp32s3/<kit-version>`. The public ThingConnect workspace remains an optional legacy/development input; the doctor accepts either a Device Kit root, a repository root, or its `thing-connect/` child.
 
-SDK resolution is independent after generation: an explicit `--sdk-dir` wins, followed by `<project>/third_party/tirtc`, then the SDK packaged in the resolved ThingConnect workspace. The generated project path therefore remains diagnosable after it is moved away from the source repository.
+SDK resolution is independent after generation: an explicit `--sdk-dir` wins, followed by `<project>/third_party/tirtc`, then the SDK packaged in the resolved Device Kit or legacy workspace. The generated project remains diagnosable after it is moved away from the Kit.
 
 ## Required checks
 

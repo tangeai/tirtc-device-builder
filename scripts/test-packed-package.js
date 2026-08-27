@@ -112,6 +112,17 @@ try {
   assert.match(doctor.stdout, /--expected-idf/);
   assert.match(doctor.stdout, /--thing-connect-root/);
 
+  const setup = run(process.execPath, [cli, "setup", "esp32", "--help"]);
+  assert.match(setup.stdout, /setup esp32 --install/);
+  assert.equal(
+    existsSync(join(installedPackage, "bin", "setup-esp32.js")),
+    true,
+  );
+  assert.equal(
+    existsSync(join(installedPackage, "bin", "install-esp32-kit.js")),
+    true,
+  );
+
   console.log(
     "Packed package smoke test passed (" + packageMetadata.version + ")",
   );
