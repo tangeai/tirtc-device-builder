@@ -2,7 +2,7 @@
 
 This project follows Semantic Versioning.
 
-## Unreleased
+## 0.6.0
 
 - Add project-local audio and video semantic contracts that verify codec clock tables, I2S/TDM topology, selected video framing, dependency locks, scheduler isolation, sensor policy, and memory/backpressure before an artifact can reach `BUILD_VERIFIED`.
 - Require build assessment hashes to match `build_evidence.artifacts[]`, and propagate requested-feature failures to the project gate without downgrading an existing `BLOCKED` result.

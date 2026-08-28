@@ -891,8 +891,8 @@ gh release create kit-esp32s3-v1.0.0 \
 
 ```bash
 npm test
-git tag -a v0.5.0 -m "v0.5.0"
-git push origin v0.5.0
+git tag -a v0.6.0 -m "v0.6.0"
+git push origin v0.6.0
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。
