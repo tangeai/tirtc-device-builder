@@ -1,6 +1,6 @@
 # TiRTC Device Builder
 
-TiRTC Device Builder 帮助设备开发者把一块 ESP32-S3 开发板接入 TiRTC。你可以只给出开发板型号，也可以提供原理图、BSP、引脚表和外设示例。安装后的 Codex Skill 会检查开发环境，整理硬件事实，生成独立的 ESP-IDF 工程，完成板级移植和编译，并在获得明确授权后烧录、验证 H5 实时查看、H5 对讲和 AI 对讲。
+TiRTC Device Builder 用于把 ESP32-S3 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Codex Skill 会先检查环境、整理有依据的硬件事实，再生成独立的 ESP-IDF 工程并完成板级移植和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
 
 当前仓库提供一个 Skill：
 
@@ -8,7 +8,7 @@ TiRTC Device Builder 帮助设备开发者把一块 ESP32-S3 开发板接入 TiR
 |---|---|---|
 | `tirtc-esp32-builder` | ESP32-S3、ESP-IDF 5.5.x | 环境检查、Hardware IR、工程生成、板级媒体移植、编译、烧录和分层验收 |
 
-普通使用者不需要克隆 `tirtc-server-example`，也不需要登录 npm。生成工程需要的模板、协议文档和 TiRTC SDK 已放进独立的 ESP32 Device Kit，由安装命令自动下载并校验。
+开发者不需要克隆 `tirtc-server-example`，也不用登录 npm。工程模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装命令会自动下载并校验。
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
@@ -16,7 +16,7 @@ TiRTC Device Builder 帮助设备开发者把一块 ESP32-S3 开发板接入 TiR
 
 文档导航：
 
-- [新用户 5 分钟开始](#先看结果新用户这样开始)
+- [新用户快速开始](#新用户快速开始)
 - [准备板卡资料](#准备板卡资料)
 - [依赖和支持范围](#依赖和支持范围)
 - [安装方式和默认目录](#安装方式和目录)
@@ -24,7 +24,7 @@ TiRTC Device Builder 帮助设备开发者把一块 ESP32-S3 开发板接入 TiR
 - [烧录和实机验收](#烧录和验收)
 - [常见问题](#常见问题)
 
-## 先看结果：新用户这样开始
+## 新用户快速开始
 
 ### 1. 确认 Node.js
 
@@ -37,7 +37,7 @@ npm --version
 
 `node --version` 应输出 `v18.x` 或更高版本。如果终端提示找不到 `node` 或 `npm`，先从 [Node.js 官方下载页](https://nodejs.org/en/download) 安装受支持版本，再打开一个新终端。
 
-### 2. 一条命令准备开发环境
+### 2. 安装并检查开发环境
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install
@@ -52,7 +52,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install
 - 写入只包含本地路径的 `config.json` 和 `env.sh`；
 - 激活托管环境并运行 Doctor。
 
-安装器只写当前用户有权限的目录，不执行 `sudo`，也不修改 `.bashrc`、`.zshrc` 等 shell 配置。缺少系统软件时，它会停下来并给出处理方法；补齐后重复同一条命令即可继续。
+安装器只写入当前用户有权限的目录，不执行 `sudo`，也不修改 `.bashrc`、`.zshrc` 等 shell 配置。如果缺少系统软件，它会停下来说明缺少什么；补齐后重新执行同一条命令即可继续。
 
 安装成功时，输出末尾应包含：
 
@@ -70,7 +70,7 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 
 ### 4. 把板卡和目标告诉 Codex
 
-有完整板卡资料时，复制下面的提示词并替换尖括号内容。路径使用绝对路径；未知项写“未知”，不要让 Skill 猜。完整版本见 [通用开发者接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
+资料较完整时，复制下面的提示词并替换尖括号内容。路径请使用绝对路径；不确定的内容直接写“未知”，交给 Skill 列出待确认项。更完整的版本见[通用开发者接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
 
 ```text
 请使用 $tirtc-esp32-builder 完成这块开发板的 TiRTC 移植。
@@ -128,11 +128,11 @@ H5 对讲和 AI 双向对讲。
 本轮不生成工程、不烧录。
 ```
 
-只有型号时，Skill 可以调查和列出缺失资料，但不会猜测 GPIO、器件或媒体能力。要进入可靠的代码移植，通常还需要准确的板卡版本、原理图和可工作的 BSP 或外设示例。
+只有型号时，Skill 会先调查公开资料并列出缺口，不会猜测 GPIO、器件或媒体能力。要进入代码移植，通常还需要准确的板卡版本、原理图，以及能在实物上运行的 BSP 或外设示例。
 
-## 这个 Skill 能做什么
+## 工作范围
 
-它处理的是一条完整的设备开发路径：
+整个流程从板卡资料核对开始，以分层验收报告结束：
 
 ```text
 开发板型号、原理图、BSP、数据手册
@@ -153,7 +153,7 @@ H5 对讲和 AI 双向对讲。
             TIRTC_PORTING_REPORT.md
 ```
 
-具体包括：
+Skill 负责：
 
 - 检查 Node.js 之外的 ESP-IDF、编译器、TiRTC SDK、工程配置和串口；
 - 从原理图、BSP、数据手册和实测示例中提取有来源的硬件事实；
@@ -166,9 +166,9 @@ H5 对讲和 AI 双向对讲。
 - 分别验证启动、上线、本地媒体、H5、AI 和稳定性；
 - 输出 `TIRTC_PORTING_REPORT.md`，每一层都标成 `PASS`、`FAIL` 或 `SKIP`。
 
-### 它不会替你猜硬件
+### Skill 不猜硬件
 
-模板工程包含配网、绑定、MQTT、TiRTC、H5 和 AI 会话骨架，不包含所有开发板的产品驱动。开发板仍需具备并正确接入：
+模板工程提供配网、绑定、MQTT、TiRTC、H5 和 AI 会话骨架，但不会内置所有开发板的产品驱动。每块开发板仍要根据自身资料接入：
 
 - 摄像头和所选 MJPEG/H.264/H.265 完整媒体路径；
 - 麦克风采集路径；
@@ -176,13 +176,13 @@ H5 对讲和 AI 双向对讲。
 - 板级电源、时钟、复位和使能控制；
 - 需要用于 AI 会话的实体按键或其他触发方式。
 
-工程编译成功只说明构建层通过。没有浏览器画面、实体扬声器声音和双向 AI 音频的实测证据，就不能写成“Web 已出图”或“AI 对讲已完成”。
+编译成功只代表构建层通过。只有拿到浏览器画面、实体扬声器声音和双向 AI 音频的实测证据，报告才能把对应能力标为 `PASS`。
 
 ## 准备板卡资料
 
-资料是否准确，直接决定移植能走多远。建议为每块板、每个 PCB 版本单独建目录，不要把相似型号的文档混在一起。
+板卡资料要和手上的实物版本对应。建议为每块板、每个 PCB 版本单独建目录，避免混入相似型号的文档。
 
-一个便于检查的目录可以这样组织：
+建议按下面的结构整理：
 
 ```text
 board-materials/
@@ -251,7 +251,7 @@ board-materials/
 | 数据手册 | 器件寄存器、时序、电气限制和版本差异 | 推荐 |
 | 实测小工程 | 证明摄像头、录音、播放或编码确实在该 PCB 版本工作 | 强烈推荐 |
 
-给 BSP 时，请同时提供可复现的 commit、tag 或压缩包版本，以及它使用的 ESP-IDF 版本。只给一个会持续变化的仓库首页，后续很难解释代码为什么和实物不一致。
+提供 BSP 时，请同时注明可复现的 commit、tag 或压缩包版本，以及它使用的 ESP-IDF 版本。只有一个持续变化的仓库首页，后续很难追溯代码与实物不一致的原因。
 
 不要放进资料包的内容包括 Wi-Fi 密码、设备密钥、MQTT/WHIP token、证书、生产配置和真实用户音视频。
 
@@ -271,7 +271,7 @@ board-materials/
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
 
-当前生成器只支持 ESP32-S3。Flash 或 PSRAM 不是 16 MB / 8 MB 时，需要重新评估 `sdkconfig.defaults`、分区表、DMA 和媒体缓存预算。Skill 不会因为芯片名称接近，就把其他目标当成 ESP32-S3 处理。
+当前生成器只支持 ESP32-S3。Flash 或 PSRAM 不是 16 MB / 8 MB 时，需要重新评估 `sdkconfig.defaults`、分区表、DMA 和媒体缓存预算。名称相近的芯片不会被自动当作 ESP32-S3 处理。
 
 ### 本机软件
 
@@ -301,11 +301,11 @@ sudo apt-get install -y git python3 python3-venv bash tar
 - GitHub Release，用于下载 ESP32 Device Kit；
 - Espressif 的 GitHub 仓库和工具下载地址，用于安装 ESP-IDF 与工具链。
 
-完成 H5 和 AI 端到端验收时，还需要可访问的 ThingConnect 服务、可用账号、设备绑定条件、浏览器和外网。缺少其中一项时，工程仍可生成和编译，但对应验收层必须记录为 `SKIP`。
+H5 和 AI 的端到端验收还需要可访问的 ThingConnect 服务、可用账号、设备绑定条件、浏览器和外网。缺少其中一项，不影响工程生成和编译，但对应验收层要记录为 `SKIP`。
 
 ### 媒体约束
 
-H5 视频必须先从当前前端/服务合同选择一种 profile。MJPEG 需要完整 JPEG 帧；H.264/H.265 需要合同规定的 Annex-B access unit、参数集和刷新/关键帧控制。板上只有摄像头 Sensor，不代表浏览器一定能出图。
+H5 视频要先从前端和服务端支持的合同中选择一种 profile。MJPEG 提交完整 JPEG 帧；H.264/H.265 按合同提交 Annex-B access unit、参数集，并实现刷新或关键帧控制。板上有摄像头 Sensor，只能证明图像有来源，不能证明浏览器一定能持续出图。
 
 当前音频基线使用 G.711 A-law、8 kHz、单声道。对讲还要有可靠的下行队列、A-law 解码、Codec/I2S/功放播放和会话停止清理。没有可用的全双工和 AEC 证据时，应按半双工设计 AI 对讲。
 
@@ -326,11 +326,11 @@ npm install --global tirtc-device-builder@latest
 tirtc-device-builder setup esp32 --install
 ```
 
-正确的 npm 命令是 `npm install`，没有 `npm --install` 这种写法。
+安装命令是 `npm install`，不要写成 `npm --install`。
 
-仅执行 `npm install --global tirtc-device-builder` 只会安装 CLI。随后仍需显式运行 `setup esp32 --install`，因为后者会写 Codex Skill 目录、下载 Device Kit，并可能安装 ESP-IDF。npm 包没有 `preinstall`、`install` 或 `postinstall` 生命周期脚本，不会在用户没有看到目标路径时悄悄改动开发环境。
+只执行 `npm install --global tirtc-device-builder` 会安装 CLI，不会准备完整开发环境。随后还要运行 `setup esp32 --install`，由它安装 Codex Skill、下载 Device Kit，并在需要时安装 ESP-IDF。npm 包没有 `preinstall`、`install` 或 `postinstall` 生命周期脚本，因此不会在安装 CLI 时改动这些目录。
 
-普通用户不用执行 `npm login`。`npm login` 只和包维护者发布新版本有关。
+安装公开包不需要执行 `npm login`；这个命令只和维护者发布新版本有关。
 
 ### 只安装 Skill
 
@@ -354,7 +354,7 @@ npx --yes tirtc-device-builder@latest install esp32
 | 安装记录 | `~/.tirtc-device-builder/config.json` |
 | 环境入口 | `~/.tirtc-device-builder/env.sh` |
 
-每个新终端可以这样激活托管环境：
+新开终端后，用下面的命令激活托管环境：
 
 ```bash
 source ~/.tirtc-device-builder/env.sh
@@ -400,13 +400,13 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 
 ### 更新已安装的 Skill
 
-普通安装会保护已经存在的 Skill，避免覆盖本地修改。确认不需要保留本地改动后，可用最新 npm 包替换：
+默认安装不会覆盖已有 Skill，以免丢失本地修改。确认这些修改不需要保留后，可用最新 npm 包替换：
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
 ```
 
-这只替换 Skill；已验证的同版本 Device Kit 和 ESP-IDF 会被复用。替换前如有自己的脚本或规则，请先备份。
+该命令只替换 Skill；同版本且已通过校验的 Device Kit 和 ESP-IDF 会继续复用。自定义脚本或规则请提前备份。
 
 ## 常用检查和开发命令
 
@@ -464,7 +464,7 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/doctor.py \
 
 ### 检查 Hardware IR
 
-一般由 Codex 运行下面的工具，开发者可以手工复核：
+下面的工具通常由 Codex 调用，开发者也可以手工复核：
 
 ```bash
 python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py init \
@@ -498,7 +498,7 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
 
 ### 生成和编译
 
-推荐直接让 Skill 生成、实现并编译。需要人工复现时，先激活环境，并确保输出目录还不存在：
+建议让 Skill 完成生成、适配和编译。需要人工复现时，先激活环境，并确认输出目录尚不存在：
 
 ```bash
 source ~/.tirtc-device-builder/env.sh
@@ -527,7 +527,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-生成器会把 TiRTC SDK 复制到工程的 `third_party/tirtc/`，生成后的工程可以脱离 `tirtc-server-example` 使用。换一台机器编译时，仍需准备兼容的 ESP-IDF 5.5.x 工具链。
+生成器会把 TiRTC SDK 复制到工程的 `third_party/tirtc/`。此后工程不再依赖 `tirtc-server-example`，但换机编译仍需准备兼容的 ESP-IDF 5.5.x 工具链。
 
 检查尚未完成的产品适配点：
 
@@ -579,19 +579,19 @@ idf.py -p /dev/ttyACM0 flash monitor
 
 ### Wi-Fi 凭证和设备绑定
 
-Skill 不假设每块板都支持 SoftAP，也不要求开发者把 SSID/密码写死。Hardware IR 应从 BSP 和产品要求中选择一条可用路径：SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。
+SoftAP 是可选方案，不是接入前提。Hardware IR 要根据 BSP 的实际能力和产品要求，选择 SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。SSID 和密码不应写死在源码中。
 
-选中的方法必须满足：凭证不进入 Git/源码/报告；存在清除或重配入口；该 PCB/BSP 有证据支持。没有 SoftAP 但支持工厂 NVS 的设备仍可接入。把明文密码提交到工程会被 v2 门禁判为 `BLOCKED`。
+无论选择哪种方法，都要有当前 PCB/BSP 的支持证据，凭证不能进入 Git、源码或报告，并且要保留清除或重配入口。没有 SoftAP、但支持工厂 NVS 注入的设备同样可以接入。只要工程提交了明文密码，Hardware IR v2 门禁就会判为 `BLOCKED`。
 
-Wi-Fi 和 ThingConnect 绑定是两个独立状态机。绑定可选择验证码、工厂预绑定、开发凭证或平台合同允许的 custom 流程，应分别验证：
+Wi-Fi 配网和 ThingConnect 设备绑定是两套独立流程。绑定可以选择验证码、工厂预绑定、开发凭证，或平台合同允许的 custom 方案。验收时要分开检查：
 
-1. 无 Wi-Fi 凭证时进入所选配网/注入流程。
-2. 已联网但无设备绑定时，进入所选绑定流程；选择验证码时才显示验证码。
-3. NVS 已有绑定时，明确记录复用/跳过初始绑定，而不是误判为绑定流程缺失。
+1. 没有 Wi-Fi 凭证时，设备进入选定的配网或注入流程。
+2. 已联网但尚未绑定时，设备进入选定的绑定流程；只有验证码方案需要显示验证码。
+3. NVS 已保存绑定时，日志应明确说明复用已有绑定并跳过首次绑定，不能据此判断“绑定流程缺失”。
 4. 分别验证只清设备绑定和只清 Wi-Fi 凭证的入口。
 5. `status` 确认 platform、MQTT、TiRTC 和 runtime 状态。
 
-具体命令和 UI 由生成工程及所选方法定义，不能从另一块板复制。生产凭证、设备 secret 和 token 不能写进源码、脚本、Hardware IR、报告或 Git。
+具体命令和 UI 由生成工程及所选方案决定，不能直接照搬另一块板。生产凭证、设备 secret 和 token 不得写入源码、脚本、Hardware IR、报告或 Git。
 
 ### 验证 H5 实时查看和对讲
 
@@ -601,7 +601,7 @@ Wi-Fi 和 ThingConnect 绑定是两个独立状态机。绑定可选择验证码
 4. 发起 H5 对讲，确认 stream 14 下行计数增长，实体扬声器可以听到声音。
 5. 触发浏览器重连或刷新请求，确认 MJPEG 提交下一张完整 JPEG，或 H.264/H.265 产生合同要求的刷新/关键帧，画面能够恢复。
 
-视频、声音和重连分别保留证据。浏览器偶尔显示一帧，不等于持续实时查看已经通过。
+视频、声音和重连要分别保留证据。浏览器偶尔出现一帧，不能算作持续实时查看通过。
 
 ### 验证 AI 对讲
 
@@ -616,7 +616,7 @@ Wi-Fi 和 ThingConnect 绑定是两个独立状态机。绑定可选择验证码
 
 ### 分层验收
 
-每一层都需要独立证据。缺少硬件、账号、浏览器、服务或网络时，写 `SKIP` 并说明补测条件。
+每一层都要有独立证据。缺少硬件、账号、浏览器、服务或网络时，写 `SKIP`，并注明后续补测条件。
 
 | 层级 | 通过条件 |
 |---|---|
@@ -682,7 +682,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install
 
 ### 输出 `OVERALL: NEEDS_SETUP`
 
-这是只读检查在提示环境不完整。按输出给出的下一条命令安装：
+这表示只读检查发现环境尚未准备完整。按输出提示执行安装：
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install
@@ -690,7 +690,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install
 
 ### 提示缺少 `python3`、`git`、`bash` 或 `tar`
 
-安装器不会运行 `sudo`。用当前系统的包管理器补齐这些命令，再重复 `setup esp32 --install`。安装过程可以续跑，已完成的项目会被复用。
+安装器不会运行 `sudo`。请用当前系统的包管理器补齐这些命令，再执行 `setup esp32 --install`。安装可以续跑，已经完成的部分会被复用。
 
 ### `idf.py not found`
 
@@ -730,7 +730,7 @@ ls -l ~/.codex/skills/tirtc-esp32-builder/SKILL.md
 
 ### 已有 Skill，安装器拒绝覆盖
 
-这是对本地修改的保护。确认可以替换后执行：
+安装器检测到本地已有 Skill，因此没有直接覆盖。确认可以替换后执行：
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
@@ -747,11 +747,11 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
   --kit-archive /absolute/path/tirtc-esp32s3-kit-1.0.0.tar.gz
 ```
 
-安装器会做 SHA-256 和内部文件清单校验。出现校验不一致时不要绕过，应重新取得官方 Release 附件。
+安装器会校验 SHA-256 和内部文件清单。如果校验不一致，请重新获取官方 Release 附件，不要跳过校验。
 
 ### 提示 `refusing to overwrite incomplete directory`
 
-目标路径已经存在，但不是完整的 Device Kit 或 ESP-IDF。安装器不会删除或覆盖它。先检查并备份该目录，再改用新的 `--root` 或 `--idf-dir` 路径。
+目标路径已经存在，但不是完整的 Device Kit 或 ESP-IDF。安装器不会删除或覆盖该目录。请先检查并备份，再改用新的 `--root` 或 `--idf-dir` 路径。
 
 ### Doctor 报 `no sdkconfig or sdkconfig.defaults`
 
@@ -773,11 +773,11 @@ WSL 默认不一定能看到 USB 设备。按 [Microsoft WSL USB 连接说明](h
 
 ### Hardware IR 一直是 `NEEDS_CONFIRMATION`
 
-查看每个未知项的来源要求。最常缺的是准确 PCB 版本、摄像头数据格式、所选视频 profile 的完整输出路径、Codec 时钟、功放使能脚、配网方法和可工作的厂商示例。补资料比从相似开发板复制管脚更可靠。
+先查看各个未知项要求什么来源。常见缺口包括准确的 PCB 版本、摄像头数据格式、所选视频 profile 的完整输出路径、Codec 时钟、功放使能脚、配网方法和可工作的厂商示例。不要从相似开发板复制管脚来填补这些信息。
 
 ### 工程能编译，浏览器没有画面
 
-重点检查摄像头输出是否真正进入所选视频路径。MJPEG 必须逐次提交完整 JPEG；H.264/H.265 必须符合合同规定的 Annex-B、参数集和刷新帧行为。还要确认持续发送计数、丢弃和队列水位。Sensor 的 JPEG、RGB 或裸 YUV 能力本身不等于完整 H5 路径。
+先确认摄像头输出是否真正进入选定的视频路径。MJPEG 要逐次提交完整 JPEG；H.264/H.265 要符合合同规定的 Annex-B、参数集和刷新帧行为。同时检查持续发送计数、丢帧和队列水位。Sensor 能输出 JPEG、RGB 或裸 YUV，不等于 H5 视频链路已经打通。
 
 ### 工程能编译，但 H5 或 AI 没有声音
 
@@ -798,7 +798,7 @@ npx --yes tirtc-device-builder@latest setup esp32
 
 也可以在 WSL 中完成整个流程，但烧录前要先把 USB 设备连接到 WSL。
 
-## 常见疑问
+## 使用边界
 
 ### 必须克隆 `tirtc-server-example` 吗？
 
@@ -808,17 +808,17 @@ npx --yes tirtc-device-builder@latest setup esp32
 
 ### 为什么推荐 `npx`，不是安装一个 npm 包就结束？
 
-`npx` 适合运行一次性的安装器和诊断命令，每次都能明确选择 `@latest`。全局 `npm install` 同样可用，但它只负责安装 CLI。
+`npx` 适合运行低频的安装和诊断命令，也可以明确选择 `@latest`。全局 `npm install` 同样可用，但只负责安装 CLI。
 
-Skill、Device Kit 和 ESP-IDF 会写到 npm 包目录之外，还可能占用较多磁盘和下载时间，所以必须由 `setup esp32 --install` 这一条显式命令完成。这样用户能先看到安装计划、目标目录和失败原因，卸载或升级 CLI 也不会意外删除开发环境。
+Skill、Device Kit 和 ESP-IDF 会写到 npm 包目录之外，也可能占用较多磁盘和下载时间，因此统一由显式命令 `setup esp32 --install` 安装。开发者可以提前看到安装计划和目标目录；以后卸载或升级 CLI，也不会误删开发环境。
 
 ### 只给开发板型号能不能自动完成全部代码？
 
-可以先开始分析，不能保证直接完成硬件移植。型号足以定位候选资料，但 GPIO、器件版本、所选视频 profile、音频时钟和配网能力必须有可信来源。资料不足时，Skill 会给出最小补充清单，不会用相似板型填空。
+可以先分析，但不能保证直接完成硬件移植。型号足以定位候选资料；GPIO、器件版本、所选视频 profile、音频时钟和配网能力仍需可信来源。资料不足时，Skill 会给出最小补充清单，不会拿相似板型的数据填空。
 
 ### 能接入已有 ESP-IDF 工程吗？
 
-可以。把现有工程路径、目标芯片、ESP-IDF 版本、BSP 和已验证外设示例交给 Skill。它会先检查组件、配置、SDK 构建契约和媒体 seam，再决定复用哪些板级代码。
+可以。把现有工程路径、目标芯片、ESP-IDF 版本、BSP 和已验证的外设示例交给 Skill。它会先检查组件、配置、SDK 构建合同和媒体接入边界，再决定复用哪些板级代码。
 
 ### 生成的工程可以移走吗？
 
@@ -826,11 +826,11 @@ Skill、Device Kit 和 ESP-IDF 会写到 npm 包目录之外，还可能占用�
 
 ### 能支持 ESP32 之外的芯片吗？
 
-仓库结构允许每个平台拥有独立 Skill，但当前公开版本只实现 ESP32-S3。泰芯或其他平台应作为新的 `skills/<platform-skill>/` 加入，分别维护 SDK、工具链、板级 adapter 和验收约束。
+仓库允许每个平台使用独立 Skill，但当前公开版本只实现 ESP32-S3。泰芯或其他平台需要新增 `skills/<platform-skill>/`，并分别维护 SDK、工具链、板级 adapter 和验收约束。
 
 ## 给仓库维护者
 
-普通开发者不需要执行本节命令。
+以下命令只供仓库维护者使用。
 
 ### 本地验证
 
@@ -897,15 +897,15 @@ gh release create kit-esp32s3-v1.0.0 \
 
 ```bash
 npm test
-git tag -a v0.3.0 -m "v0.3.0"
-git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0"
+git push origin v0.4.0
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。
 
 ### 增加新平台
 
-每个平台放在独立的 `skills/<platform-skill>/` 目录，并明确：
+每个平台放在独立的 `skills/<platform-skill>/` 目录，并写清楚：
 
 - 芯片、SDK、工具链和不适用范围；
 - Hardware IR 需要的事实和来源；
@@ -913,7 +913,7 @@ git push origin v0.3.0
 - 编译、启动、上线、媒体、业务和稳定性验收；
 - 下载、工具链安装、串口烧录和凭证写入的授权边界。
 
-只有两个以上平台出现相同不变量时再抽取共享逻辑，避免形成只转发参数的公共层。
+等两个以上平台出现相同且稳定的约束后，再提取共享逻辑，避免公共层只做参数转发。
 
 ## 安全与许可证
 
