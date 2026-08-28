@@ -13,8 +13,11 @@ $tirtc-esp32-builder
 - 厂商、完整型号、PCB/硬件版本：<填写>
 - 资料与手中实物是否对应：<是/否/未知>
 
+工作区：
+- 根目录：<本机路径；以下本地路径均相对此目录>
+
 资料：
-- <原理图、BSP/厂商示例、数据手册、产品页等本地绝对路径或固定链接；一行一个>
+- <原理图、BSP/厂商示例、数据手册、产品页等工作区相对路径或固定链接；一行一个>
 
 目标：
 - <例如：H5 实时视频和声音、H5 语音对讲、AI 双向语音对讲>
@@ -26,14 +29,14 @@ $tirtc-esp32-builder
 - 设备绑定：<选择一种，或写“根据平台合同选择”>
 
 工程：
-- 输出目录或现有工程：<绝对路径>
+- 输出目录或现有工程：<工作区相对路径；Skill 在报告中记录解析后的绝对路径>
 
 执行要求：
 1. 先运行 Device Kit Doctor，读完全部资料，再生成 Hardware IR v2。没有证据的器件、GPIO 和媒体能力保持未知。
 2. 把每个未知项标为 source_resolvable、implementation_resolvable、build_resolvable、hil_resolvable 或 user_blocked。先通过资料和固定版本源码解决 source_resolvable；只有 user_blocked 会阻止开始 adapter 开发。
 3. READY_TO_PORT 表示硬件身份、连接、媒体合同和资源设计已经有证据，足以开始实现；它不要求最终 ELF 或实机数据。可通过实现或构建解决的项目必须继续生成 compile-safe adapter、锁定依赖、运行门禁并编译。
-4. 移植前核对媒体合同、板级资源、静态内存预算、配网和绑定状态。构建后只把源代码、锁定依赖、编译或 post-link 门禁实际证明的事实升级为 build_verified。
-5. 记录 BIN/ELF 路径、大小和 SHA-256，运行 build 阶段评估并输出 TIRTC_PORTING_REPORT.md。编译结果必须与 L2-L7 实机验收分开。
+4. 移植前核对媒体合同、板级资源、静态内存预算、配网和绑定状态。音频工程必须生成项目内 `board-audio-contract.json`，在依赖解析后核验每个 codec 的 `(MCLK, sample rate)` 表、I2S mode/controller、TDM slot/物理信号和共享 GPIO handoff；视频工程必须生成项目内 `board-video-contract.json`，核验锁定 camera 组件、传感器白名单、Wi-Fi/camera CPU 隔离、完整帧边界、frame buffers、TiRTC send buffer 和 backpressure。两个门禁都要接入普通 `idf.py build`。`resolved=true`、`pipeline_safe=true` 或编译成功不能替代门禁。
+5. 记录 BIN/ELF 路径、大小和 SHA-256，将所评估的 SHA 写入 Hardware IR 的 `build_evidence.artifacts[]`，再使用 `--project` 运行 build 阶段评估并输出 TIRTC_PORTING_REPORT.md。区分 `COMPILE_PASS`、请求能力 `BUILD_VERIFIED` 和 L2-L7 实机验收。
 6. 本轮不访问串口、不烧录、不擦除 NVS；因此缺少启动、浏览器、实体声音和运行时资源数据时，把相应 L2-L7 标为 SKIP，不得阻止 L0/L1。
 7. Wi-Fi 密码、设备密钥、token、私钥和用户音视频不能写入工程或报告。
 ```

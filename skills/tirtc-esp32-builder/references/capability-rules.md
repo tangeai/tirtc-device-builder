@@ -36,7 +36,7 @@ The intake phase requires:
 - one evidenced binding method—verification code, factory-bound identity, development credentials, or documented custom flow—plus stored-binding behavior and reset control;
 - feature-specific I2S/GPIO ownership plans, channel/TDM mapping, realtime camera policy, and a static startup/media memory budget.
 
-At intake, `corroborated` on these fields means the design is resolved from authoritative sources and is safe to implement. After compilation, promote a field to `build_verified` only when the generated source, component lock, compile result, or post-link gate establishes it. The build phase requires an exact artifact SHA-256 and returns `BUILD_VERIFIED`. Runtime measurements never need to be invented to pass intake or build.
+At intake, `corroborated` on these fields means the design is resolved from authoritative sources and is safe to implement. After compilation, promote a field to `build_verified` only when the generated source, component lock, semantic gate, compile result, or post-link gate establishes it. Build assessment reruns the applicable project-relative [audio contract](audio-contract.md) and [video contract](video-contract.md); self-declared `resolved=true`, `pipeline_safe=true`, or memory-budget booleans cannot replace them. The build phase requires an exact artifact SHA-256 and returns `BUILD_VERIFIED` only when every requested feature passes. Runtime measurements never need to be invented to pass intake or build.
 
 SoftAP is one Wi-Fi option, not a universal requirement. BLE, SmartConfig, factory NVS, development configuration, or a documented custom method can satisfy intake when the selected path is evidenced. Committed plaintext credentials are always `BLOCKED`.
 

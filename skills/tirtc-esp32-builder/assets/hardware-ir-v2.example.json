@@ -75,6 +75,8 @@
       "controller_and_gpio_ownership_resolved": null,
       "verification": "extracted"
     },
+    "audio_semantic_contract": "board-audio-contract.json",
+    "video_semantic_contract": "board-video-contract.json",
     "audio_channel_mapping": {
       "required": null,
       "resolved": null,
@@ -109,6 +111,9 @@
     "source_refs": [
       "board-materials"
     ]
+  },
+  "build_evidence": {
+    "artifacts": []
   },
   "runtime_evidence": [],
   "features": {

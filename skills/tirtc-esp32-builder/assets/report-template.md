@@ -28,6 +28,17 @@
 | H5 talkback |  |  |
 | AI intercom |  |  |
 
+## Semantic build gates
+
+- Audio contract path/SHA-256: `{{AUDIO_CONTRACT}}`
+- Codec clock-table result: `{{AUDIO_CLOCK_GATE}}`
+- I2S mode/controller/slot/handoff result: `{{AUDIO_TOPOLOGY_GATE}}`
+- Video contract path/SHA-256: `{{VIDEO_CONTRACT}}`
+- Camera lock/PID/CPU/frame/backpressure result: `{{VIDEO_GATE}}`
+- Final ELF I2C driver-family result: `{{I2C_ELF_GATE}}`
+- Build artifact present in Hardware IR evidence: `{{BUILD_ARTIFACT_BINDING}}`
+- Compiler result versus requested-feature result: `{{COMPILE_VS_CAPABILITY}}`
+
 ## Acceptance
 
 | Level | PASS/FAIL/SKIP | Command and evidence |

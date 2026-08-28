@@ -45,6 +45,14 @@ The default managed root is `<setup-root>/kits/esp32s3/<kit-version>`. The publi
 
 SDK resolution is independent after generation: an explicit `--sdk-dir` wins, followed by `<project>/third_party/tirtc`, then the SDK packaged in the resolved Device Kit or legacy workspace. The generated project remains diagnosable after it is moved away from the Kit.
 
+Before copying a generated project to another machine, run:
+
+```bash
+python3 <skill-dir>/scripts/project_portability.py <generated-project> --export
+```
+
+Copy source inputs only. Never export `build/`: CMake caches absolute source, toolchain, and Python paths from the originating machine. `managed_components/` may be regenerated from the committed `dependencies.lock`; the bundled `third_party/tirtc` SDK and its build contract must remain in the source package. CMake must invoke shell gates through `bash <script>` so the build does not depend on archive- or filesystem-specific executable bits.
+
 ## Required checks
 
 - `python3`, `git`, `idf.py`, and the target compiler are available in the active shell;

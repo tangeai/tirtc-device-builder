@@ -8,7 +8,7 @@ Use [the report template](../assets/report-template.md) and preserve separate `P
 |---|---|
 | L-1 Environment | ESP-IDF version, target compiler, TiRTC SDK, build contract, and requested serial access pass doctor checks |
 | L0 Generate | Project and Hardware IR exist; no existing output was overwritten |
-| L1 Build | Hardware IR valid, SDK contract checked, `idf.py build` succeeds, artifacts recorded |
+| L1 Build | Hardware IR valid, SDK contract and requested-feature semantic gates pass, `idf.py build` succeeds, artifacts recorded |
 | L2 Boot | Exact chip/port resolved, flash succeeds, firmware boots without panic |
 | L3 Online | Wi-Fi provisioning, binding, MQTT, and TiRTC reach ready state |
 | L4 Media | Camera/microphone/speaker local paths work and counters/measurements are captured |
@@ -16,7 +16,9 @@ Use [the report template](../assets/report-template.md) and preserve separate `P
 | L6 AI | Token, WHIP, `start_session`, bidirectional audio, stop, and H5 recovery work |
 | L7 Stability | Requested weak-network, repeated-session, resource, and soak criteria pass |
 
-Run and record the intake assessment before L0, the build assessment with the exact artifact SHA-256 at L1, and the HIL assessment only when matching runtime evidence exists. Missing serial or browser access is a `SKIP` for the affected L2-L7 levels, not an L0/L1 failure.
+Run and record the intake assessment before L0, the build assessment with `--project` and the exact artifact SHA-256 at L1, and the HIL assessment only when matching runtime evidence exists. The L1 hash must already appear in `build_evidence.artifacts[]`; a syntactically valid unrecorded hash is a failure. Missing serial or browser access is a `SKIP` for the affected L2-L7 levels, not an L0/L1 failure.
+
+Keep `COMPILE_PASS` separate from `BUILD_VERIFIED`. When the compiler succeeds but a requested audio or video semantic gate fails or is missing, record the compiler result and report the feature and project as blocked. H5 image display is L5 evidence, never an inference from L1.
 
 ## Evidence
 

@@ -11,6 +11,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from audio_contract import verify_contract as verify_audio_contract
+from video_contract import verify_contract as verify_video_contract
+
 
 FEATURES = {
     "h5_live_audio",
@@ -18,6 +21,8 @@ FEATURES = {
     "h5_talkback",
     "ai_talk",
 }
+AUDIO_FEATURES = {"h5_live_audio", "h5_talkback", "ai_talk"}
+VIDEO_FEATURES = {"h5_live_video"}
 VERIFICATION_LEVELS = {
     "extracted": 1,
     "corroborated": 2,
@@ -220,6 +225,26 @@ def validate_hardware_resources(
     validate_verification(
         i2s.get("verification"), "hardware_resources.i2s.verification", errors
     )
+    audio_contract = resources.get("audio_semantic_contract")
+    nullable_string(
+        audio_contract,
+        "hardware_resources.audio_semantic_contract",
+        errors,
+    )
+    if isinstance(audio_contract, str) and Path(audio_contract).is_absolute():
+        errors.append(
+            "hardware_resources.audio_semantic_contract must be project-relative"
+        )
+    video_contract = resources.get("video_semantic_contract")
+    nullable_string(
+        video_contract,
+        "hardware_resources.video_semantic_contract",
+        errors,
+    )
+    if isinstance(video_contract, str) and Path(video_contract).is_absolute():
+        errors.append(
+            "hardware_resources.video_semantic_contract must be project-relative"
+        )
 
     mapping_section = mapping(
         resources.get("audio_channel_mapping"),
@@ -396,6 +421,27 @@ def validate_runtime_evidence(
         validate_source_refs(record, prefix, source_ids, errors)
 
 
+def validate_build_evidence(data: dict[str, Any], errors: list[str]) -> None:
+    if "build_evidence" not in data:
+        return
+    evidence = mapping(data.get("build_evidence"), "build_evidence", errors)
+    artifacts = evidence.get("artifacts")
+    if not isinstance(artifacts, list):
+        errors.append("build_evidence.artifacts must be an array")
+        return
+    for index, item in enumerate(artifacts):
+        prefix = f"build_evidence.artifacts[{index}]"
+        record = mapping(item, prefix, errors)
+        path_value = record.get("path")
+        nonempty_string(path_value, f"{prefix}.path", errors)
+        if isinstance(path_value, str) and Path(path_value).is_absolute():
+            errors.append(f"{prefix}.path must be project-relative")
+        positive_int(record.get("size_bytes"), f"{prefix}.size_bytes", errors)
+        sha = record.get("sha256")
+        if not isinstance(sha, str) or not SHA256_RE.fullmatch(sha):
+            errors.append(f"{prefix}.sha256 must be a 64-character SHA-256")
+
+
 def validate_ir(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     schema_version = data.get("schema_version")
@@ -483,6 +529,7 @@ def validate_ir(data: dict[str, Any]) -> list[str]:
     if schema_version == 2:
         validate_hardware_resources(data, source_ids, errors)
         validate_onboarding(data, source_ids, errors)
+        validate_build_evidence(data, errors)
         validate_runtime_evidence(data, source_ids, errors)
     return errors
 
@@ -818,6 +865,24 @@ def combine_requirements(
     return {"status": status, "reasons": reasons}
 
 
+def constrain_project_gate(
+    project_gate: dict[str, Any], feature_assessments: dict[str, dict[str, Any]]
+) -> None:
+    """Prevent a project-level pass while a requested feature is unresolved."""
+    feature_states = {item["status"] for item in feature_assessments.values()}
+    if "BLOCKED" in feature_states:
+        project_gate["status"] = "BLOCKED"
+        project_gate["reasons"].append("at least one requested feature is blocked")
+    elif (
+        "NEEDS_CONFIRMATION" in feature_states
+        and project_gate["status"] != "BLOCKED"
+    ):
+        project_gate["status"] = "NEEDS_CONFIRMATION"
+        project_gate["reasons"].append(
+            "at least one requested feature still needs confirmation"
+        )
+
+
 def project_requirements(data: dict[str, Any]) -> list[Requirement]:
     requirements: list[Requirement] = []
     revision = data["board"]["hardware_revision"].strip().lower()
@@ -887,11 +952,40 @@ def matching_runtime_evidence(
     return None
 
 
-def artifact_requirement(artifact_sha256: str | None) -> Requirement:
+def matching_build_artifact(
+    data: dict[str, Any], artifact_sha256: str | None
+) -> dict[str, Any] | None:
+    if artifact_sha256 is None:
+        return None
+    normalized = artifact_sha256.lower()
+    build_evidence = data.get("build_evidence", {})
+    if not isinstance(build_evidence, dict):
+        return None
+    artifacts = build_evidence.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        return None
+    for record in artifacts:
+        if (
+            isinstance(record, dict)
+            and str(record.get("sha256", "")).lower() == normalized
+        ):
+            return record
+    return None
+
+
+def artifact_requirement(
+    data: dict[str, Any], artifact_sha256: str | None
+) -> Requirement:
     if artifact_sha256 is None:
         return "NEEDS_CONFIRMATION", "exact build artifact SHA-256 is missing", 0
     if not SHA256_RE.fullmatch(artifact_sha256):
         return "BLOCKED", "build artifact SHA-256 is invalid", 0
+    if matching_build_artifact(data, artifact_sha256) is None:
+        return (
+            "BLOCKED",
+            f"artifact {artifact_sha256} is not present in build_evidence.artifacts",
+            0,
+        )
     return (
         "SATISFIED",
         f"build evidence is bound to artifact {artifact_sha256}",
@@ -903,6 +997,8 @@ def assess_ir(
     data: dict[str, Any],
     artifact_sha256: str | None = None,
     phase: str | None = None,
+    audio_gate: Requirement | None = None,
+    video_gate: Requirement | None = None,
 ) -> dict[str, Any]:
     selected_phase = phase or ("hil" if artifact_sha256 else "intake")
     if selected_phase not in ASSESSMENT_PHASES:
@@ -947,7 +1043,7 @@ def assess_ir(
         resources = {}
 
     if selected_phase in {"build", "hil"}:
-        project.append(artifact_requirement(artifact_sha256))
+        project.append(artifact_requirement(data, artifact_sha256))
 
     for feature in requested:
         if schema_version == 1:
@@ -1010,6 +1106,24 @@ def assess_ir(
                 audio_mapping_requirement(resources, minimum_verification),
                 memory_requirement(resources, minimum_verification),
             ]
+        if feature in AUDIO_FEATURES and selected_phase in {"build", "hil"}:
+            requirements.append(
+                audio_gate
+                or (
+                    "NEEDS_CONFIRMATION",
+                    "audio semantic gate was not executed for this project",
+                    0,
+                )
+            )
+        if feature in VIDEO_FEATURES and selected_phase in {"build", "hil"}:
+            requirements.append(
+                video_gate
+                or (
+                    "NEEDS_CONFIRMATION",
+                    "video semantic gate was not executed for this project",
+                    0,
+                )
+            )
         result[feature] = combine_requirements(
             requirements, success_status=success_status
         )
@@ -1019,6 +1133,7 @@ def assess_ir(
         success_status=success_status,
         legacy_hil_from_levels=(schema_version == 1 and selected_phase == "intake"),
     )
+    build_artifact = matching_build_artifact(data, artifact_sha256)
     evidence = matching_runtime_evidence(data, artifact_sha256)
     if schema_version == 2 and selected_phase == "hil":
         evidence_features = set(evidence.get("features", [])) if evidence else set()
@@ -1046,6 +1161,8 @@ def assess_ir(
                 f"all requested features have matching artifact evidence for {artifact_sha256}"
             )
 
+    constrain_project_gate(project_gate, result)
+
     assessment: dict[str, Any] = {
         "schema_version": schema_version,
         "phase": selected_phase,
@@ -1059,7 +1176,8 @@ def assess_ir(
         assessment["selected_wifi_method"] = selected_wifi
         assessment["selected_binding_method"] = selected_binding
         assessment["artifact_sha256"] = artifact_sha256
-        assessment["artifact_evidence_matched"] = evidence is not None
+        assessment["build_artifact_evidence_matched"] = build_artifact is not None
+        assessment["runtime_artifact_evidence_matched"] = evidence is not None
     return assessment
 
 
@@ -1110,15 +1228,111 @@ def command_assess(args: argparse.Namespace) -> int:
     ):
         print("error: --artifact-sha256 must be a 64-character SHA-256", file=sys.stderr)
         return 2
+    selected_phase = args.phase or (
+        "hil" if args.artifact_sha256 is not None else "intake"
+    )
+    project = (args.project or args.path.parent).expanduser().resolve()
+    audio_gate: Requirement | None = None
+    audio_gate_result: dict[str, Any] | None = None
+    if (
+        data.get("schema_version") == 2
+        and selected_phase in {"build", "hil"}
+        and AUDIO_FEATURES.intersection(data["features"]["requested"])
+    ):
+        relative_contract = data["hardware_resources"].get(
+            "audio_semantic_contract"
+        )
+        if not isinstance(relative_contract, str) or not relative_contract:
+            audio_gate = (
+                "NEEDS_CONFIRMATION",
+                "hardware_resources.audio_semantic_contract is missing",
+                0,
+            )
+            audio_gate_result = {
+                "ok": False,
+                "errors": ["audio semantic contract is missing"],
+            }
+        else:
+            contract = (project / relative_contract).resolve()
+            if project != contract and project not in contract.parents:
+                audio_gate_result = {
+                    "ok": False,
+                    "errors": ["audio semantic contract escapes project root"],
+                }
+            else:
+                audio_gate_result = verify_audio_contract(contract, project)
+            if audio_gate_result["ok"]:
+                audio_gate = (
+                    "SATISFIED",
+                    "audio semantic gate passed: "
+                    + str(audio_gate_result.get("summary", "verified")),
+                    VERIFICATION_LEVELS["build_verified"],
+                )
+            else:
+                audio_gate = (
+                    "BLOCKED",
+                    "audio semantic gate failed: "
+                    + "; ".join(audio_gate_result.get("errors", [])),
+                    0,
+                )
+    video_gate: Requirement | None = None
+    video_gate_result: dict[str, Any] | None = None
+    if (
+        data.get("schema_version") == 2
+        and selected_phase in {"build", "hil"}
+        and VIDEO_FEATURES.intersection(data["features"]["requested"])
+    ):
+        relative_contract = data["hardware_resources"].get(
+            "video_semantic_contract"
+        )
+        if not isinstance(relative_contract, str) or not relative_contract:
+            video_gate = (
+                "NEEDS_CONFIRMATION",
+                "hardware_resources.video_semantic_contract is missing",
+                0,
+            )
+            video_gate_result = {
+                "ok": False,
+                "errors": ["video semantic contract is missing"],
+            }
+        else:
+            contract = (project / relative_contract).resolve()
+            if project != contract and project not in contract.parents:
+                video_gate_result = {
+                    "ok": False,
+                    "errors": ["video semantic contract escapes project root"],
+                }
+            else:
+                video_gate_result = verify_video_contract(contract, project)
+            if video_gate_result["ok"]:
+                video_gate = (
+                    "SATISFIED",
+                    "video semantic gate passed: "
+                    + str(video_gate_result.get("summary", "verified")),
+                    VERIFICATION_LEVELS["build_verified"],
+                )
+            else:
+                video_gate = (
+                    "BLOCKED",
+                    "video semantic gate failed: "
+                    + "; ".join(video_gate_result.get("errors", [])),
+                    0,
+                )
     try:
         assessment = assess_ir(
             data,
             artifact_sha256=args.artifact_sha256,
-            phase=args.phase,
+            phase=selected_phase,
+            audio_gate=audio_gate,
+            video_gate=video_gate,
         )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    if audio_gate_result is not None:
+        assessment["audio_semantic_gate"] = audio_gate_result
+    if video_gate_result is not None:
+        assessment["video_semantic_gate"] = video_gate_result
     print(json.dumps(assessment, ensure_ascii=False, indent=2))
     if args.strict:
         statuses = {item["status"] for item in assessment["features"].values()}
@@ -1160,6 +1374,11 @@ def parse_args() -> argparse.Namespace:
     assess_parser.add_argument(
         "--artifact-sha256",
         help="bind build or HIL assessment to this exact firmware artifact",
+    )
+    assess_parser.add_argument(
+        "--project",
+        type=Path,
+        help="generated project root; defaults to the Hardware IR directory",
     )
     assess_parser.set_defaults(handler=command_assess)
     return parser.parse_args()

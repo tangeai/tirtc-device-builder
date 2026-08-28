@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "evidence": [
+    "lckfb-schematic-v1.0.1",
+    "lckfb-camera-example",
+    "locked-esp32-camera-source",
+    "managed-device-kit-contract"
+  ],
+  "dependencies": {
+    "espressif/esp32-camera": "2.1.7",
+    "idf": "5.5.4"
+  },
+  "scheduler": {
+    "wifi_core": 0,
+    "camera_core": 1,
+    "config_files": [
+      "sdkconfig.defaults",
+      "sdkconfig"
+    ],
+    "wifi_config_files": [
+      "sdkconfig"
+    ]
+  },
+  "camera": {
+    "codec": "mjpeg",
+    "stream_id": 11,
+    "media": "TIRTC_VIDEO_JPEG",
+    "complete_jpeg_per_send": true,
+    "frame_buffers": 2,
+    "accepted_sensor_pids": [
+      155,
+      8517
+    ],
+    "unknown_sensor_policy": "reject"
+  },
+  "memory": {
+    "max_send_buffer_bytes": 262144,
+    "max_complete_jpeg_bytes": 196608,
+    "video_backpressure_bytes": 196608
+  },
+  "implementation_assertions": [
+    {
+      "file": "main/app_main.c",
+      "contains": [],
+      "contains_compact": [
+        ".max_send_buffer_bytes=256U*1024U"
+      ],
+      "absent": [],
+      "absent_compact": [
+        ".max_send_buffer_bytes=1024U*1024U"
+      ]
+    },
+    {
+      "file": "components/starter_media/src/starter_media.c",
+      "contains": [],
+      "contains_compact": [
+        "#defineVIDEO_BACKPRESSURE_BYTES(192U*1024U)",
+        "#defineVIDEO_MAX_COMPLETE_JPEG_BYTES(192U*1024U)",
+        "starter_tirtc_send_buffer_used()>VIDEO_BACKPRESSURE_BYTES",
+        "jpeg_length>VIDEO_MAX_COMPLETE_JPEG_BYTES",
+        "starter_tirtc_send_mjpeg((uint32_t)now_ms,jpeg,jpeg_length)>=0",
+        ".pixel_format=PIXFORMAT_RGB565",
+        ".fb_count=2",
+        "frame2jpg(frame,CAMERA_JPEG_QUALITY,&jpeg,&jpeg_length)"
+      ],
+      "absent": [],
+      "absent_compact": []
+    },
+    {
+      "file": "components/starter_media/include/starter_media_camera_policy.h",
+      "contains": [],
+      "contains_compact": [
+        "returnpid==GC0308_PID||pid==GC2145_PID;"
+      ],
+      "absent": [],
+      "absent_compact": []
+    },
+    {
+      "file": "components/starter_tirtc/src/starter_tirtc.c",
+      "contains": [],
+      "contains_compact": [
+        ".stream_id=H5_VIDEO_STREAM",
+        ".media=TIRTC_VIDEO_JPEG",
+        "jpeg[0]!=0xffU",
+        "jpeg[1]!=0xd8U",
+        "jpeg[length-2U]!=0xffU",
+        "jpeg[length-1U]!=0xd9U",
+        "returnTiRtcSendVideoStream(connection,&frame,data);"
+      ],
+      "absent": [],
+      "absent_compact": []
+    }
+  ]
+}

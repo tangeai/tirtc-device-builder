@@ -37,10 +37,13 @@ The IR contains:
 - camera identity evidence plus `video_profiles[]` and `selected_video_profile`;
 - audio input/output paths;
 - `hardware_resources` for I2C, I2S/GPIO ownership, audio channel mapping, camera realtime policy, and memory budget;
+- project-relative `hardware_resources.audio_semantic_contract` for every project requesting audio;
+- project-relative `hardware_resources.video_semantic_contract` for every project requesting video;
 - `onboarding.wifi_credentials` with selectable SoftAP/BLE/SmartConfig/factory/development/custom methods;
 - selectable ThingConnect binding methods plus stored-binding states and reset control;
 - requested features;
 - optional `runtime_evidence[]`, each bound to a full firmware SHA-256.
+- `build_evidence.artifacts[]` containing each accepted BIN/ELF path, byte size, and full SHA-256.
 
 The selected Wi-Fi method must be available and corroborated, credentials must remain outside tracked source, and reprovisioning must be defined. A board without SoftAP is valid when another selected method meets those conditions.
 
@@ -54,10 +57,11 @@ Run the phase gates in order:
 python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
   --phase intake --strict
 python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
-  --phase build --artifact-sha256 <64-character-sha256> --strict
+  --phase build --project <generated-project> \
+  --artifact-sha256 <64-character-sha256> --strict
 ```
 
-The intake phase returns `READY_TO_PORT`; the build phase returns `BUILD_VERIFIED`. Missing serial or browser access does not block either phase.
+The intake phase returns `READY_TO_PORT`; the build phase returns `BUILD_VERIFIED`. Build assessment only accepts a hash already present in `build_evidence.artifacts[]` and reruns the project-local media contracts through `--project`. Missing serial or browser access does not block either phase.
 
 Run:
 

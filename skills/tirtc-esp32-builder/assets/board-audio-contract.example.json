@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "evidence": [
+    "exact-board-schematic",
+    "official-codec-datasheet",
+    "official-board-peripheral-example"
+  ],
+  "clock": {
+    "sample_rate_hz": 8000,
+    "mclk_ratio": 512,
+    "mclk_hz": 4096000,
+    "codec_tables": [
+      {
+        "codec": "ES7210",
+        "source": "managed_components/espressif__es7210/es7210.c"
+      },
+      {
+        "codec": "ES8311",
+        "source": "managed_components/espressif__es8311/es8311.c"
+      }
+    ]
+  },
+  "capture": {
+    "controller": 0,
+    "role": "master",
+    "mode": "tdm",
+    "tdm_enabled": true,
+    "slot_count": 4,
+    "slot_order": ["CH1", "CH3", "CH2", "CH4"],
+    "slot_signals": ["MIC1", "PLAYBACK_REFERENCE", "MIC2", "GROUND"],
+    "selected_slot": 0,
+    "selected_signal": "MIC1",
+    "mapping_evidence": "ES7210 Rev 9.1 Figure 2e plus the exact PCB schematic"
+  },
+  "playback": {
+    "controller": 1,
+    "role": "master",
+    "mode": "standard"
+  },
+  "shared_clock": {
+    "gpios": [38, 14, 13],
+    "directions_simultaneous": false,
+    "handoff": "release_before_claim"
+  },
+  "implementation_assertions": [
+    {
+      "file": "components/starter_media/src/starter_media.c",
+      "contains": [],
+      "contains_compact": [
+        "#defineAUDIO_SAMPLE_RATE_HZ8000U",
+        "#defineAUDIO_MCLK_MULTIPLE512U",
+        "#defineI2S_CAPTURE_PORTI2S_NUM_0",
+        "#defineI2S_PLAYBACK_PORTI2S_NUM_1",
+        "#defineES7210_MIC1_TDM_INDEX0U",
+        ".flags.tdm_enable=true",
+        "I2S_TDM_SLOT0|I2S_TDM_SLOT1|I2S_TDM_SLOT2|I2S_TDM_SLOT3",
+        "i2s_channel_reconfig_tdm_gpio",
+        "i2s_channel_reconfig_std_gpio"
+      ],
+      "absent": [],
+      "absent_compact": [
+        ".flags.tdm_enable=false"
+      ]
+    }
+  ]
+}

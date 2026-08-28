@@ -70,7 +70,7 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 
 ### 4. 把板卡和目标告诉 Codex
 
-把你已经掌握的信息填进下面的提示词即可，不用先查齐所有硬件参数。路径请使用绝对路径，不确定的内容写“未知”。可直接复制的版本见[开发板接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
+把你已经掌握的信息填进下面的提示词即可，不用先查齐所有硬件参数。先指定工作区根目录，本地路径尽量相对工作区填写；不确定的内容写“未知”。可直接复制的版本见[开发板接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
 
 ```text
 请使用 $tirtc-esp32-builder 完成这块开发板的 TiRTC 移植。
@@ -78,6 +78,8 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 开发板：
 - 厂商、完整型号、PCB/硬件版本：<填写>
 - 资料与手中实物是否对应：<是/否/未知>
+
+工作区：<本机目录；以下本地路径均相对此目录>
 
 资料：
 - <原理图、BSP/厂商示例、数据手册或产品页；一行一个>
@@ -88,9 +90,9 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 - Wi-Fi：<指定方案/根据 BSP 选择>
 - 设备绑定：<指定方案/根据平台合同选择>
 
-工程：<输出目录或现有工程的绝对路径>
+工程：<输出目录或现有工程的工作区相对路径>
 
-请先运行 Doctor，分析全部资料并生成 Hardware IR v2。把未知项区分为可由资料、实现、构建或 HIL 解决，以及必须由用户补充的阻塞项。READY_TO_PORT 表示资料足以开始设计，不要求最终 ELF；随后生成、适配和编译，以 artifact SHA-256 运行 build 阶段评估，并输出 TIRTC_PORTING_REPORT.md。
+请先运行 Doctor，分析全部资料并生成 Hardware IR v2。把未知项区分为可由资料、实现、构建或 HIL 解决，以及必须由用户补充的阻塞项。READY_TO_PORT 表示资料足以开始设计，不要求最终 ELF；随后生成、适配和编译，运行项目内音视频语义门禁，把 artifact SHA-256 写入 build_evidence 后执行 build 阶段评估，并输出 TIRTC_PORTING_REPORT.md。
 本轮不访问串口、不烧录、不擦除 NVS；缺少串口只让 L2-L7 记为 SKIP，不得阻止 L0/L1。不要把任何凭证写入源码或报告。
 ```
 
@@ -462,7 +464,7 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
 | `NEEDS_CONFIRMATION` | 当前阶段的关键事实未知、冲突或证据等级不足 | 按资料、实现、构建、HIL 或用户输入来源继续闭环 |
 | `BLOCKED` | 现有硬件或 SDK 已确认不满足 | 更换硬件，补编码/播放路径，或取得匹配 SDK |
 | `READY_TO_PORT` | 资料足以开始生成和板级实现 | 进入工程生成与编译 |
-| `BUILD_VERIFIED` | 精确 artifact 通过源码、编译和 post-link 门禁 | 记录 BIN/ELF SHA-256；按授权进入实机验收 |
+| `BUILD_VERIFIED` | 精确 artifact 通过源码、音视频语义、编译和 post-link 门禁 | 记录 BIN/ELF SHA-256；按授权进入实机验收 |
 | `HIL_VERIFIED` | 已完成端到端实机验证 | 固定版本并保存证据 |
 
 `assess --strict` 在条件不足时返回非零，这是门禁在阻止过早生成，不代表脚本损坏。
@@ -472,7 +474,8 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
 ```bash
 python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
   /absolute/path/hardware-ir.json \
-  --phase build --artifact-sha256 <64-character-sha256> --strict
+  --phase build --project /absolute/path/generated-project \
+  --artifact-sha256 <64-character-sha256> --strict
 
 python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
   /absolute/path/hardware-ir.json \
@@ -503,13 +506,18 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/doctor.py \
   --project /absolute/path/my-esp32-device
 ```
 
-`TiRTC build contract` 为 `PASS` 后编译：
+`TiRTC build contract` 为 `PASS` 后，先执行 `idf.py reconfigure` 锁定依赖。根据 [音频合同](skills/tirtc-esp32-builder/references/audio-contract.md) 和 [视频合同](skills/tirtc-esp32-builder/references/video-contract.md) 生成、核验并安装请求能力对应的项目内门禁，再编译：
 
 ```bash
 cd /absolute/path/my-esp32-device
 idf.py set-target esp32s3
+idf.py reconfigure
+python3 ~/.codex/skills/tirtc-esp32-builder/scripts/install_audio_gate.py .
+python3 ~/.codex/skills/tirtc-esp32-builder/scripts/install_video_gate.py .
 idf.py build
 ```
+
+只安装实际请求能力的门禁。编译后把 BIN/ELF 的路径、大小和 SHA-256 写入 Hardware IR 的 `build_evidence.artifacts[]`，再运行 build 阶段评估。编译成功但语义门禁缺失或失败时只能记录 `COMPILE_PASS / CAPABILITY_BLOCKED`。
 
 生成器会把 TiRTC SDK 复制到工程的 `third_party/tirtc/`。此后工程不再依赖 `tirtc-server-example`，但换机编译仍需准备兼容的 ESP-IDF 5.5.x 工具链。
 
@@ -606,7 +614,7 @@ Wi-Fi 配网和 ThingConnect 设备绑定是两套独立流程。绑定可以选
 |---|---|
 | L-1 Environment | Doctor 必需项和项目构建契约通过 |
 | L0 Generate | 新工程和 Hardware IR 存在，没有覆盖旧目录 |
-| L1 Build | `idf.py build` 成功，固件和 SHA-256 已记录 |
+| L1 Build | 请求能力的语义门禁与 `idf.py build` 均成功，固件和已登记 SHA-256 通过 build assessment |
 | L2 Boot | 指定串口烧录成功，无 panic 或反复重启 |
 | L3 Online | 所选 Wi-Fi 凭证和设备绑定流程、MQTT 与 TiRTC 就绪 |
 | L4 Media | 摄像头、麦克风、扬声器的本地路径和计数正常 |
@@ -626,6 +634,8 @@ Wi-Fi 配网和 ThingConnect 设备绑定是两套独立流程。绑定可以选
 - L-1 到 L7 的 `PASS`、`FAIL` 或 `SKIP`。
 
 任务只做到生成和编译时，报告应明确停在 L1。
+
+换机前运行 `project_portability.py <project> --export`，只交付源码、依赖锁和工程内 TiRTC SDK，不携带包含原机器绝对路径的 `build/`。
 
 ## 常见问题
 

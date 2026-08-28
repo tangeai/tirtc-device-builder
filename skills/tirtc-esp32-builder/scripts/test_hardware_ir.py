@@ -20,6 +20,7 @@ EXAMPLE_V1 = ASSETS / "hardware-ir.example.json"
 EXAMPLE_V2 = ASSETS / "hardware-ir-v2.example.json"
 ARTIFACT_A = "a" * 64
 ARTIFACT_B = "b" * 64
+SEMANTIC_GATE = ("SATISFIED", "semantic gate passed", 3)
 
 
 def ready_resources(ir: dict) -> None:
@@ -160,6 +161,28 @@ def mark_build_verified(ir: dict) -> None:
         resources[section]["verification"] = "build_verified"
 
 
+def record_build_artifacts(ir: dict, *artifacts: str) -> None:
+    ir["build_evidence"] = {
+        "artifacts": [
+            {
+                "path": f"build/{index}.elf",
+                "size_bytes": 123,
+                "sha256": artifact,
+            }
+            for index, artifact in enumerate(artifacts)
+        ]
+    }
+
+
+def assess_with_semantic_gates(ir: dict, **kwargs: object) -> dict:
+    return MODULE.assess_ir(
+        ir,
+        audio_gate=SEMANTIC_GATE,
+        video_gate=SEMANTIC_GATE,
+        **kwargs,
+    )
+
+
 class HardwareIrV2Test(unittest.TestCase):
     def setUp(self) -> None:
         self.ir = json.loads(EXAMPLE_V2.read_text(encoding="utf-8"))
@@ -193,7 +216,7 @@ class HardwareIrV2Test(unittest.TestCase):
             planned, artifact_sha256=ARTIFACT_A, phase="build"
         )
         self.assertEqual(
-            "NEEDS_CONFIRMATION", assessment["project_gate"]["status"]
+            "BLOCKED", assessment["project_gate"]["status"]
         )
         self.assertEqual(
             "NEEDS_CONFIRMATION",
@@ -203,7 +226,7 @@ class HardwareIrV2Test(unittest.TestCase):
     def test_build_phase_requires_an_exact_artifact(self) -> None:
         built = ready_v2("mjpeg")
         mark_build_verified(built)
-        assessment = MODULE.assess_ir(built, phase="build")
+        assessment = assess_with_semantic_gates(built, phase="build")
         self.assertEqual(
             "NEEDS_CONFIRMATION", assessment["project_gate"]["status"]
         )
@@ -215,7 +238,8 @@ class HardwareIrV2Test(unittest.TestCase):
     def test_build_phase_passes_build_verified_paths(self) -> None:
         built = ready_v2("mjpeg")
         mark_build_verified(built)
-        assessment = MODULE.assess_ir(
+        record_build_artifacts(built, ARTIFACT_A)
+        assessment = assess_with_semantic_gates(
             built, artifact_sha256=ARTIFACT_A, phase="build"
         )
         statuses = {item["status"] for item in assessment["features"].values()}
@@ -344,6 +368,7 @@ class HardwareIrV2Test(unittest.TestCase):
     def test_hil_status_requires_matching_artifact_evidence(self) -> None:
         ready = ready_v2()
         mark_build_verified(ready)
+        record_build_artifacts(ready, ARTIFACT_A, ARTIFACT_B)
         ready["runtime_evidence"] = [
             {
                 "artifact_sha256": ARTIFACT_A,
@@ -357,10 +382,10 @@ class HardwareIrV2Test(unittest.TestCase):
                 "source_refs": ["board-materials"],
             }
         ]
-        unmatched = MODULE.assess_ir(
+        unmatched = assess_with_semantic_gates(
             ready, artifact_sha256=ARTIFACT_B, phase="hil"
         )
-        matched = MODULE.assess_ir(
+        matched = assess_with_semantic_gates(
             ready, artifact_sha256=ARTIFACT_A, phase="hil"
         )
         self.assertEqual(
@@ -372,9 +397,10 @@ class HardwareIrV2Test(unittest.TestCase):
         self.assertEqual("HIL_VERIFIED", matched["features"]["ai_talk"]["status"])
         self.assertEqual("HIL_VERIFIED", matched["project_gate"]["status"])
 
-    def test_cli_strict_build_phase(self) -> None:
+    def test_cli_strict_build_phase_requires_semantic_contracts(self) -> None:
         built = ready_v2("mjpeg")
         mark_build_verified(built)
+        record_build_artifacts(built, ARTIFACT_A)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "hardware-ir.json"
             path.write_text(json.dumps(built), encoding="utf-8")
@@ -394,7 +420,7 @@ class HardwareIrV2Test(unittest.TestCase):
                 text=True,
                 check=False,
             )
-        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(3, result.returncode, result.stderr)
         self.assertEqual("build", json.loads(result.stdout)["phase"])
 
     def test_invalid_runtime_artifact_sha_is_rejected(self) -> None:
@@ -409,6 +435,22 @@ class HardwareIrV2Test(unittest.TestCase):
         ]
         errors = MODULE.validate_ir(invalid)
         self.assertTrue(any("artifact_sha256" in error for error in errors))
+
+    def test_invalid_build_artifact_record_is_rejected(self) -> None:
+        invalid = ready_v2()
+        invalid["build_evidence"] = {
+            "artifacts": [
+                {
+                    "path": "/another-machine/build/firmware.elf",
+                    "size_bytes": 0,
+                    "sha256": "not-a-sha",
+                }
+            ]
+        }
+        errors = MODULE.validate_ir(invalid)
+        self.assertTrue(any("path must be project-relative" in error for error in errors))
+        self.assertTrue(any("size_bytes" in error for error in errors))
+        self.assertTrue(any("sha256" in error for error in errors))
 
     def test_unknown_source_reference_is_invalid(self) -> None:
         invalid = ready_v2()

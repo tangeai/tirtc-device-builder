@@ -2,6 +2,13 @@
 
 This project follows Semantic Versioning.
 
+## Unreleased
+
+- Add project-local audio and video semantic contracts that verify codec clock tables, I2S/TDM topology, selected video framing, dependency locks, scheduler isolation, sensor policy, and memory/backpressure before an artifact can reach `BUILD_VERIFIED`.
+- Require build assessment hashes to match `build_evidence.artifacts[]`, and propagate requested-feature failures to the project gate without downgrading an existing `BLOCKED` result.
+- Add portable CMake gate installers, source-export checks, a clean-room LCKFB ESP32-S3 prompt, and regression coverage for MJPEG, H.264, and H.265 video contracts.
+- Distinguish compiler success from capability verification and document source-only transfer to another machine.
+
 ## 0.5.0
 
 - Split Hardware IR assessment into explicit `intake`, `build`, and `hil` phases so implementation- and build-resolvable facts do not require runtime proof before adapter work begins.

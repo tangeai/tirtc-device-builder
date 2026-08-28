@@ -71,7 +71,7 @@ Use a bounded loop per layer: diagnose one failing invariant, make the smallest 
 Run the assessor once per layer:
 
 - `--phase intake`: corroborated design evidence; success is `READY_TO_PORT`.
-- `--phase build --artifact-sha256 <sha>`: compile/post-link evidence; success is `BUILD_VERIFIED`.
+- `--phase build --project <project> --artifact-sha256 <sha>`: compile/semantic/post-link evidence; success is `BUILD_VERIFIED`.
 - `--phase hil --artifact-sha256 <sha>`: matching L5/L6 runtime evidence; success is `HIL_VERIFIED`.
 
 No serial authorization is required for L0/L1. When serial, browser, account, service, or network access is unavailable, complete the safe build work and report the affected L2-L7 levels as `SKIP`.

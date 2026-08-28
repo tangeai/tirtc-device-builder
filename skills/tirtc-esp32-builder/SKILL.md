@@ -22,13 +22,13 @@ Before stopping on `NEEDS_CONFIRMATION`, classify every unresolved fact as `sour
 
 Run `<device-kit-root>/device-sim/scripts/create_esp32_project.py` for the current ESP32-S3 H5/AI starter. Keep ThingConnect onboarding, H5, AI, TiRTC lifecycle, callback, stream, and generation behavior in the existing deep modules. Put board-specific camera, microphone, encoder, codec, amplifier, GPIO, DMA, and task behavior behind the `starter_media` seam or a board media adapter owned by it.
 
-Before changing media code, read [capability-rules.md](references/capability-rules.md) and [porting-risks.md](references/porting-risks.md), then read the repository documents they route to. A camera sensor alone does not establish H5 video support; validate the user-selected MJPEG, H.264, or H.265 profile end to end. Choose half duplex for AI when the supplied hardware and BSP do not establish a usable full-duplex/AEC path.
+Before changing media code, read [capability-rules.md](references/capability-rules.md) and [porting-risks.md](references/porting-risks.md), then read the repository documents they route to. For requested audio, read [audio-contract.md](references/audio-contract.md); for requested video, read [video-contract.md](references/video-contract.md). Complete every applicable project-local semantic gate. A camera sensor alone does not establish H5 video support; validate the selected MJPEG, H.264, or H.265 profile end to end. Choose half duplex for AI when the supplied hardware and BSP do not establish a usable full-duplex/AEC path.
 
 Keep the Skill board-agnostic. The prompt supplies product intent and artifact locations; Hardware IR stores evidence; the generated board adapter owns concrete sensors, codecs, pins, clocks, slots, DMA, and task allocation. Never add one board's values to Skill defaults to make an assessment pass.
 
-Run focused tests before ESP-IDF build. Resolve the TiRTC SDK target and `manifest/build-contract.env` against the generated `sdkconfig`; a mismatched precompiled SDK is a blocked build, not a code-generation problem.
+Run focused tests before ESP-IDF build. Resolve the TiRTC SDK target and `manifest/build-contract.env` against the generated `sdkconfig`; a mismatched precompiled SDK is a blocked build, not a code-generation problem. Resolve managed components with `idf.py reconfigure`, then validate and install every applicable audio/video contract gate. A value copied from a “typical” header comment or a different sample rate is not clock evidence. A self-declared camera realtime or memory boolean is not video evidence.
 
-After a successful build, promote only facts actually established by source, compile, or post-link gates to `build_verified`. Hash the exact BIN/ELF and run `hardware_ir.py assess --phase build --artifact-sha256 <sha256> --strict`. A design plan at `corroborated` can pass intake but cannot pass the build phase.
+After a successful build, promote only facts actually established by source, compile, semantic, or post-link gates to `build_verified`. Hash the exact BIN/ELF, record that exact hash under `build_evidence.artifacts[]`, and run `hardware_ir.py assess --phase build --project <project> --artifact-sha256 <sha256> --strict`. The assessment must reject a well-formed but unrecorded hash. A design plan at `corroborated` can pass intake but cannot pass the build phase. Report a successful compiler invocation as `COMPILE_PASS` when any requested feature gate is blocked; project-wide `BUILD_VERIFIED` requires every requested feature to pass.
 
 ## Flash and verify
 
@@ -40,4 +40,4 @@ For HIL assessment, run `hardware_ir.py assess --phase hil --artifact-sha256 <sh
 
 ## Finish
 
-Return the generated project path, Hardware IR, capability assessment, build artifacts, flash record when applicable, and `TIRTC_PORTING_REPORT.md`. The task is complete only when every requested feature is either verified at the requested level or named as a blocker with the smallest next action that can resolve it.
+Run `project_portability.py <project> --export` against the source-only deliverable; do not ship a machine-bound `build/` tree. Return the generated project path, Hardware IR, capability assessment, build artifacts, flash record when applicable, and `TIRTC_PORTING_REPORT.md`. The task is complete only when every requested feature is either verified at the requested level or named as a blocker with the smallest next action that can resolve it.
