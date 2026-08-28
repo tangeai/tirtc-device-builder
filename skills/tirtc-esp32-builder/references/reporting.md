@@ -16,11 +16,13 @@ Use [the report template](../assets/report-template.md) and preserve separate `P
 | L6 AI | Token, WHIP, `start_session`, bidirectional audio, stop, and H5 recovery work |
 | L7 Stability | Requested weak-network, repeated-session, resource, and soak criteria pass |
 
+Run and record the intake assessment before L0, the build assessment with the exact artifact SHA-256 at L1, and the HIL assessment only when matching runtime evidence exists. Missing serial or browser access is a `SKIP` for the affected L2-L7 levels, not an L0/L1 failure.
+
 ## Evidence
 
 Record exact board revision, selected media, Wi-Fi, and binding profiles, toolchain and SDK versions, source/adapter revisions, commands, return codes, firmware size and SHA-256, serial port/chip, sanitized log paths, browser or platform observations, and every unavailable dependency.
 
-Runtime evidence belongs to one artifact. Label superseded artifacts and keep their observations as history; do not promote them to the current BIN/ELF. For HIL assessment, add the full SHA-256 to `runtime_evidence` and run `hardware_ir.py assess --artifact-sha256 <sha> --strict`.
+Runtime evidence belongs to one artifact. Label superseded artifacts and keep their observations as history; do not promote them to the current BIN/ELF. For HIL assessment, add the full SHA-256 to `runtime_evidence` and run `hardware_ir.py assess --phase hil --artifact-sha256 <sha> --strict`.
 
 For L3-L7 media runs, capture the signals that distinguish software regressions from environment changes: onboarding/binding state, BSSID/channel/RSSI, reconnect or roaming events, audio/video send/receive/drop/error counters, queue watermarks, camera overflow count, internal heap/largest block, PSRAM, and measured latency when available. Never record credential values.
 

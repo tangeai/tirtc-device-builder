@@ -3,6 +3,9 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -140,6 +143,23 @@ def ready_v2(codec: str = "mjpeg") -> dict:
     return ir
 
 
+def mark_build_verified(ir: dict) -> None:
+    for section in ("audio_input", "audio_output"):
+        for codec in ir[section]["codecs"]:
+            codec["verification"] = "build_verified"
+    for profile in ir["camera"]["video_profiles"]:
+        profile["verification"] = "build_verified"
+    resources = ir["hardware_resources"]
+    for section in (
+        "i2c",
+        "i2s",
+        "audio_channel_mapping",
+        "camera_realtime",
+        "memory",
+    ):
+        resources[section]["verification"] = "build_verified"
+
+
 class HardwareIrV2Test(unittest.TestCase):
     def setUp(self) -> None:
         self.ir = json.loads(EXAMPLE_V2.read_text(encoding="utf-8"))
@@ -165,6 +185,43 @@ class HardwareIrV2Test(unittest.TestCase):
         self.assertEqual({"READY_TO_PORT"}, statuses)
         self.assertEqual("mjpeg", assessment["selected_video_profile"]["codec"])
         self.assertEqual("READY_TO_PORT", assessment["project_gate"]["status"])
+        self.assertEqual("intake", assessment["phase"])
+
+    def test_intake_plan_does_not_claim_build_verification(self) -> None:
+        planned = ready_v2("mjpeg")
+        assessment = MODULE.assess_ir(
+            planned, artifact_sha256=ARTIFACT_A, phase="build"
+        )
+        self.assertEqual(
+            "NEEDS_CONFIRMATION", assessment["project_gate"]["status"]
+        )
+        self.assertEqual(
+            "NEEDS_CONFIRMATION",
+            assessment["features"]["h5_live_video"]["status"],
+        )
+
+    def test_build_phase_requires_an_exact_artifact(self) -> None:
+        built = ready_v2("mjpeg")
+        mark_build_verified(built)
+        assessment = MODULE.assess_ir(built, phase="build")
+        self.assertEqual(
+            "NEEDS_CONFIRMATION", assessment["project_gate"]["status"]
+        )
+        self.assertEqual(
+            "BUILD_VERIFIED",
+            assessment["features"]["h5_live_video"]["status"],
+        )
+
+    def test_build_phase_passes_build_verified_paths(self) -> None:
+        built = ready_v2("mjpeg")
+        mark_build_verified(built)
+        assessment = MODULE.assess_ir(
+            built, artifact_sha256=ARTIFACT_A, phase="build"
+        )
+        statuses = {item["status"] for item in assessment["features"].values()}
+        self.assertEqual({"BUILD_VERIFIED"}, statuses)
+        self.assertEqual("BUILD_VERIFIED", assessment["project_gate"]["status"])
+        self.assertEqual("build", assessment["phase"])
 
     def test_each_contract_video_profile_has_its_own_validator(self) -> None:
         for codec in ("mjpeg", "h264", "h265"):
@@ -286,6 +343,7 @@ class HardwareIrV2Test(unittest.TestCase):
 
     def test_hil_status_requires_matching_artifact_evidence(self) -> None:
         ready = ready_v2()
+        mark_build_verified(ready)
         ready["runtime_evidence"] = [
             {
                 "artifact_sha256": ARTIFACT_A,
@@ -299,15 +357,45 @@ class HardwareIrV2Test(unittest.TestCase):
                 "source_refs": ["board-materials"],
             }
         ]
-        unmatched = MODULE.assess_ir(ready, artifact_sha256=ARTIFACT_B)
-        matched = MODULE.assess_ir(ready, artifact_sha256=ARTIFACT_A)
+        unmatched = MODULE.assess_ir(
+            ready, artifact_sha256=ARTIFACT_B, phase="hil"
+        )
+        matched = MODULE.assess_ir(
+            ready, artifact_sha256=ARTIFACT_A, phase="hil"
+        )
         self.assertEqual(
-            "READY_TO_PORT", unmatched["features"]["h5_live_video"]["status"]
+            "BUILD_VERIFIED", unmatched["features"]["h5_live_video"]["status"]
         )
         self.assertEqual(
             "HIL_VERIFIED", matched["features"]["h5_live_video"]["status"]
         )
         self.assertEqual("HIL_VERIFIED", matched["features"]["ai_talk"]["status"])
+        self.assertEqual("HIL_VERIFIED", matched["project_gate"]["status"])
+
+    def test_cli_strict_build_phase(self) -> None:
+        built = ready_v2("mjpeg")
+        mark_build_verified(built)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "hardware-ir.json"
+            path.write_text(json.dumps(built), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "assess",
+                    str(path),
+                    "--phase",
+                    "build",
+                    "--artifact-sha256",
+                    ARTIFACT_A,
+                    "--strict",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("build", json.loads(result.stdout)["phase"])
 
     def test_invalid_runtime_artifact_sha_is_rejected(self) -> None:
         invalid = ready_v2()

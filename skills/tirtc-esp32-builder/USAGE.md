@@ -25,7 +25,7 @@ $tirtc-esp32-builder
 Wi-Fi 与设备绑定：<指定方案/根据 BSP 和平台合同选择>
 工程：<输出目录或现有工程的绝对路径>
 
-先运行 Doctor，再生成 Hardware IR v2。达到 READY_TO_PORT 后完成板级适配和编译，输出 TIRTC_PORTING_REPORT.md。
+先运行 Doctor，再生成 Hardware IR v2。READY_TO_PORT 只表示资料足以设计板级适配；随后完成适配和编译，以精确 artifact SHA-256 运行 build 阶段评估并输出 TIRTC_PORTING_REPORT.md。
 本轮不访问串口、不烧录、不擦除 NVS，也不把凭证写入源码或报告。
 ```
 
@@ -92,10 +92,14 @@ python3 <skill-dir>/scripts/doctor.py \
 ```bash
 python3 <skill-dir>/scripts/hardware_ir.py init /tmp/hardware-ir.json
 python3 <skill-dir>/scripts/hardware_ir.py validate /tmp/hardware-ir.json
-python3 <skill-dir>/scripts/hardware_ir.py assess --strict /tmp/hardware-ir.json
+python3 <skill-dir>/scripts/hardware_ir.py assess --phase intake --strict /tmp/hardware-ir.json
+python3 <skill-dir>/scripts/hardware_ir.py assess --phase build \
+  --artifact-sha256 <64-character-sha256> --strict /tmp/hardware-ir.json
+python3 <skill-dir>/scripts/hardware_ir.py assess --phase hil \
+  --artifact-sha256 <64-character-sha256> --strict /tmp/hardware-ir.json
 ```
 
-`init` 默认创建 schema v2；v1 仅用于兼容已有 H.264 IR。`BLOCKED` 表示资料已确认硬件/合同/资源或凭证策略不满足；`NEEDS_CONFIRMATION` 表示仍有未知项或只有单一来源；`READY_TO_PORT` 表示可以生成并实现板级适配；`HIL_VERIFIED` 还要求 `--artifact-sha256` 匹配该固件的 L5/L6 运行证据。
+`init` 默认创建 schema v2；v1 仅用于兼容已有 H.264 IR。`BLOCKED` 表示资料已确认硬件/合同/资源或凭证策略不满足；`NEEDS_CONFIRMATION` 表示当前阶段仍有未知项或证据不足；`READY_TO_PORT` 表示可以生成并实现板级适配；`BUILD_VERIFIED` 表示精确 artifact 已通过源码、编译和 post-link 门禁；`HIL_VERIFIED` 还要求同一 SHA-256 的 L5/L6 运行证据。
 
 ## 当前边界
 

@@ -90,8 +90,8 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 
 工程：<输出目录或现有工程的绝对路径>
 
-请先运行 Doctor，分析全部资料并生成 Hardware IR v2。资料不足时列出最小补充项；达到 READY_TO_PORT 后再生成、适配和编译，并输出 TIRTC_PORTING_REPORT.md。
-本轮不访问串口、不烧录、不擦除 NVS，也不要把任何凭证写入源码或报告。
+请先运行 Doctor，分析全部资料并生成 Hardware IR v2。把未知项区分为可由资料、实现、构建或 HIL 解决，以及必须由用户补充的阻塞项。READY_TO_PORT 表示资料足以开始设计，不要求最终 ELF；随后生成、适配和编译，以 artifact SHA-256 运行 build 阶段评估，并输出 TIRTC_PORTING_REPORT.md。
+本轮不访问串口、不烧录、不擦除 NVS；缺少串口只让 L2-L7 记为 SKIP，不得阻止 L0/L1。不要把任何凭证写入源码或报告。
 ```
 
 手头只有型号也可以开始：
@@ -450,26 +450,33 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py init \
 python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py validate \
   /absolute/path/hardware-ir.json
 
-python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess --strict \
+python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
+  --phase intake --strict \
   /absolute/path/hardware-ir.json
 ```
 
-能力门禁有四种状态：
+能力门禁有五种状态：
 
 | 状态 | 含义 | 怎么处理 |
 |---|---|---|
-| `NEEDS_CONFIRMATION` | 关键事实未知、冲突或只有单一来源 | 补原理图、BSP、数据手册或实测证据 |
+| `NEEDS_CONFIRMATION` | 当前阶段的关键事实未知、冲突或证据等级不足 | 按资料、实现、构建、HIL 或用户输入来源继续闭环 |
 | `BLOCKED` | 现有硬件或 SDK 已确认不满足 | 更换硬件，补编码/播放路径，或取得匹配 SDK |
 | `READY_TO_PORT` | 资料足以开始生成和板级实现 | 进入工程生成与编译 |
+| `BUILD_VERIFIED` | 精确 artifact 通过源码、编译和 post-link 门禁 | 记录 BIN/ELF SHA-256；按授权进入实机验收 |
 | `HIL_VERIFIED` | 已完成端到端实机验证 | 固定版本并保存证据 |
 
 `assess --strict` 在条件不足时返回非零，这是门禁在阻止过早生成，不代表脚本损坏。
 
-Hardware IR v2 只有在运行证据绑定到同一固件 SHA-256 时才会给出 `HIL_VERIFIED`：
+构建后运行 build 阶段；只有运行证据绑定到同一固件 SHA-256 时，hil 阶段才会给出 `HIL_VERIFIED`：
 
 ```bash
 python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
   /absolute/path/hardware-ir.json \
+  --phase build --artifact-sha256 <64-character-sha256> --strict
+
+python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
+  /absolute/path/hardware-ir.json \
+  --phase hil \
   --artifact-sha256 <64-character-sha256> --strict
 ```
 
@@ -750,7 +757,7 @@ WSL 默认不一定能看到 USB 设备。按 [Microsoft WSL USB 连接说明](h
 
 ### Hardware IR 一直是 `NEEDS_CONFIRMATION`
 
-先查看各个未知项要求什么来源。常见缺口包括准确的 PCB 版本、摄像头数据格式、所选视频 profile 的完整输出路径、Codec 时钟、功放使能脚、配网方法和可工作的厂商示例。不要从相似开发板复制管脚来填补这些信息。
+先确认当前运行的是 intake、build 还是 hil 阶段，再标记每个未知项的下一证据来源。资料/固定源码可解决的事实继续检查；adapter 或 ELF 可解决的事实进入对应实现/构建层；运行指标留到 HIL。只有准确 PCB 版本、关键连接、器件身份、产品合同或不可用 SDK 等无法安全推导的事实需要用户补充。不要从相似开发板复制管脚来填补这些信息。
 
 ### 工程能编译，浏览器没有画面
 
@@ -874,8 +881,8 @@ gh release create kit-esp32s3-v1.0.0 \
 
 ```bash
 npm test
-git tag -a v0.4.0 -m "v0.4.0"
-git push origin v0.4.0
+git tag -a v0.5.0 -m "v0.5.0"
+git push origin v0.5.0
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

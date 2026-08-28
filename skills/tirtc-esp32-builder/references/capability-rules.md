@@ -1,6 +1,6 @@
 # Capability rules
 
-Run `hardware_ir.py assess --strict` before generation. Hardware IR v2 validates the selected product contract rather than assuming one video codec or provisioning method. Schema v1 remains readable for existing H.264 projects.
+Run `hardware_ir.py assess --phase intake --strict` before generation. Hardware IR v2 validates the selected product contract rather than assuming one video codec or provisioning method. Schema v1 remains readable for existing H.264 projects.
 
 ## Current starter contract
 
@@ -11,7 +11,9 @@ Run `hardware_ir.py assess --strict` before generation. Hardware IR v2 validates
 | `h5_talkback` | G.711 A-law, 8 kHz downlink decode and speaker path for stream 14; audio controller/GPIO ownership and memory budget resolved |
 | `ai_talk` | A-law 8 kHz microphone and speaker paths for AI stream 1, started only after `start_session`; audio ownership/channel mapping and memory budget resolved |
 
-The complete media path must be at least `corroborated` to become `READY_TO_PORT`. A path with unknown facts is `NEEDS_CONFIRMATION`; a confirmed missing or incompatible resource is `BLOCKED`.
+Hardware identity, wiring, the selected media contract, and the adapter/resource design must be at least `corroborated` to become `READY_TO_PORT`. At intake, `available=true` means a pinned source path can implement the selected profile; it does not claim that the final adapter or physical media path has run. Implementation composition, final ELF policy, runtime memory margin, browser media, and stability belong to the build or HIL phases.
+
+A design fact that is still unknown is `NEEDS_CONFIRMATION`; a confirmed missing or incompatible resource is `BLOCKED`. Facts that can be resolved safely through source inspection, adapter implementation, compilation, or post-link inspection should be resolved in that layer rather than converted into a request for HIL evidence.
 
 ## Selected video profiles
 
@@ -25,14 +27,16 @@ Hardware IR v2 stores one or more `camera.video_profiles` and exactly one select
 
 Available but unselected profiles do not satisfy or block the selected contract. Stream IDs and codec support must come from the applicable ThingConnect/H5 contract, not this table alone.
 
-## Project gates
+## Phased project gates
 
-Schema v2 also requires:
+The intake phase requires:
 
-- one evidenced I2C driver family when I2C is used;
+- one selected and evidenced I2C driver-family plan when I2C is used;
 - a selected Wi-Fi credential method that is available, reprovisionable, and keeps credentials outside source control;
 - one evidenced binding method—verification code, factory-bound identity, development credentials, or documented custom flow—plus stored-binding behavior and reset control;
-- feature-specific I2S/GPIO ownership, channel/TDM mapping, realtime camera policy, and startup/media memory budget.
+- feature-specific I2S/GPIO ownership plans, channel/TDM mapping, realtime camera policy, and a static startup/media memory budget.
+
+At intake, `corroborated` on these fields means the design is resolved from authoritative sources and is safe to implement. After compilation, promote a field to `build_verified` only when the generated source, component lock, compile result, or post-link gate establishes it. The build phase requires an exact artifact SHA-256 and returns `BUILD_VERIFIED`. Runtime measurements never need to be invented to pass intake or build.
 
 SoftAP is one Wi-Fi option, not a universal requirement. BLE, SmartConfig, factory NVS, development configuration, or a documented custom method can satisfy intake when the selected path is evidenced. Committed plaintext credentials are always `BLOCKED`.
 
@@ -43,7 +47,7 @@ SoftAP is one Wi-Fi option, not a universal requirement. BLE, SmartConfig, facto
 - Start AI media only after the successful `start_session` response; stop and flush media before disconnecting.
 - Copy SDK callback payloads into bounded queues before returning. Perform decoding, playback, HTTP, and lifecycle changes outside callbacks.
 - Use monotonic timestamps and session generation to reject stale frames and delayed callbacks.
-- Record runtime evidence with the exact BIN/ELF SHA-256. Use `assess --artifact-sha256 <sha>`; documentation verification alone never becomes v2 `HIL_VERIFIED`.
+- Record runtime evidence with the exact BIN/ELF SHA-256. Use `assess --phase hil --artifact-sha256 <sha>`; documentation verification alone never becomes v2 `HIL_VERIFIED`.
 
 ## Typical blocked cases
 

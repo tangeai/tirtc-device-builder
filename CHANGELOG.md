@@ -2,6 +2,14 @@
 
 This project follows Semantic Versioning.
 
+## 0.5.0
+
+- Split Hardware IR assessment into explicit `intake`, `build`, and `hil` phases so implementation- and build-resolvable facts do not require runtime proof before adapter work begins.
+- Add `BUILD_VERIFIED` with exact artifact SHA-256 binding, while keeping L5/L6 runtime evidence exclusive to `HIL_VERIFIED`.
+- Classify unresolved facts by their next evidence source and stop pre-build work only for facts that genuinely require user input, unavailable hardware/SDK, or a public-contract decision.
+- Update the developer intake prompt and reporting guidance so missing serial access produces L2-L7 `SKIP` results without blocking L0/L1.
+- Add phase regression coverage while retaining schema v1 compatibility and independent MJPEG, H.264, and H.265 profile validation.
+
 ## 0.4.0
 
 - Add Hardware IR v2 with selected MJPEG, H.264, or H.265 video profiles while retaining schema v1 compatibility.

@@ -25,7 +25,12 @@ VERIFICATION_LEVELS = {
     "hardware_verified": 4,
     "hil_verified": 5,
 }
-READY_STATUSES = {"READY_TO_PORT", "HIL_VERIFIED"}
+ASSESSMENT_PHASES = {"intake", "build", "hil"}
+PHASE_SUCCESS_STATUSES = {
+    "intake": {"READY_TO_PORT", "HIL_VERIFIED"},
+    "build": {"BUILD_VERIFIED", "HIL_VERIFIED"},
+    "hil": {"HIL_VERIFIED"},
+}
 VIDEO_CONTRACTS = {
     "mjpeg": "jpeg_complete_frames",
     "h264": "h264_annex_b_access_units",
@@ -482,7 +487,15 @@ def validate_ir(data: dict[str, Any]) -> list[str]:
     return errors
 
 
-def codec_requirement(media: dict[str, Any], section: str) -> Requirement:
+def minimum_verification_for_phase(phase: str) -> str:
+    if phase == "intake":
+        return "corroborated"
+    return "build_verified"
+
+
+def codec_requirement(
+    media: dict[str, Any], section: str, minimum_verification: str = "corroborated"
+) -> Requirement:
     present = media.get("present")
     if present is None:
         return "NEEDS_CONFIRMATION", f"{section} presence is unknown", 0
@@ -496,17 +509,20 @@ def codec_requirement(media: dict[str, Any], section: str) -> Requirement:
             continue
         verification = codec.get("verification")
         level = VERIFICATION_LEVELS.get(verification, 0)
-        if level < VERIFICATION_LEVELS["corroborated"]:
+        if level < VERIFICATION_LEVELS[minimum_verification]:
             return (
                 "NEEDS_CONFIRMATION",
-                f"{section} A-law 8 kHz path is only {verification}",
+                f"{section} A-law 8 kHz path is only {verification}; "
+                f"{minimum_verification} is required",
                 level,
             )
         return "SATISFIED", f"{section} provides A-law 8 kHz", level
     return "BLOCKED", f"{section} has no A-law 8 kHz path", 0
 
 
-def legacy_video_requirement(camera: dict[str, Any]) -> Requirement:
+def legacy_video_requirement(
+    camera: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     present = camera.get("present")
     if present is None:
         return "NEEDS_CONFIRMATION", "camera presence is unknown", 0
@@ -530,10 +546,11 @@ def legacy_video_requirement(camera: dict[str, Any]) -> Requirement:
         return "BLOCKED", "key-frame requests cannot reach the encoder", 0
     verification = h264.get("verification")
     level = VERIFICATION_LEVELS.get(verification, 0)
-    if level < VERIFICATION_LEVELS["corroborated"]:
+    if level < VERIFICATION_LEVELS[minimum_verification]:
         return (
             "NEEDS_CONFIRMATION",
-            f"H.264 Annex-B path is only {verification}",
+            f"H.264 Annex-B path is only {verification}; "
+            f"{minimum_verification} is required",
             level,
         )
     return "SATISFIED", "camera provides H.264 Annex-B and IDR control", level
@@ -548,7 +565,9 @@ def selected_item(items: Any, selected_id: Any) -> dict[str, Any] | None:
     return None
 
 
-def video_requirement_v2(camera: dict[str, Any]) -> Requirement:
+def video_requirement_v2(
+    camera: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     present = camera.get("present")
     if present is None:
         return "NEEDS_CONFIRMATION", "camera presence is unknown", 0
@@ -585,10 +604,11 @@ def video_requirement_v2(camera: dict[str, Any]) -> Requirement:
         return "BLOCKED", "H5 refresh requests cannot reach the media pipeline", 0
     verification = profile.get("verification")
     level = VERIFICATION_LEVELS.get(verification, 0)
-    if level < VERIFICATION_LEVELS["corroborated"]:
+    if level < VERIFICATION_LEVELS[minimum_verification]:
         return (
             "NEEDS_CONFIRMATION",
-            f"selected {codec} path is only {verification}",
+            f"selected {codec} path is only {verification}; "
+            f"{minimum_verification} is required",
             level,
         )
     return (
@@ -599,7 +619,10 @@ def video_requirement_v2(camera: dict[str, Any]) -> Requirement:
 
 
 def verified_bool_requirement(
-    section: dict[str, Any], field: str, label: str
+    section: dict[str, Any],
+    field: str,
+    label: str,
+    minimum_verification: str = "corroborated",
 ) -> Requirement:
     value = section.get(field)
     if value is None:
@@ -608,12 +631,18 @@ def verified_bool_requirement(
         return "BLOCKED", f"{label} is unresolved", 0
     verification = section.get("verification")
     level = VERIFICATION_LEVELS.get(verification, 0)
-    if level < VERIFICATION_LEVELS["corroborated"]:
-        return "NEEDS_CONFIRMATION", f"{label} is only {verification}", level
+    if level < VERIFICATION_LEVELS[minimum_verification]:
+        return (
+            "NEEDS_CONFIRMATION",
+            f"{label} is only {verification}; {minimum_verification} is required",
+            level,
+        )
     return "SATISFIED", f"{label} is resolved", level
 
 
-def i2c_requirement(resources: dict[str, Any]) -> Requirement:
+def i2c_requirement(
+    resources: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     i2c = resources.get("i2c", {})
     used = i2c.get("used")
     if used is None:
@@ -626,11 +655,16 @@ def i2c_requirement(resources: dict[str, Any]) -> Requirement:
     if family == "none":
         return "BLOCKED", "I2C is used but no driver family is selected", 0
     return verified_bool_requirement(
-        i2c, "single_driver_family", f"single {family} I2C driver family"
+        i2c,
+        "single_driver_family",
+        f"single {family} I2C driver family plan",
+        minimum_verification,
     )
 
 
-def i2s_requirement(resources: dict[str, Any]) -> Requirement:
+def i2s_requirement(
+    resources: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     i2s = resources.get("i2s", {})
     used = i2s.get("used")
     if used is None:
@@ -640,11 +674,14 @@ def i2s_requirement(resources: dict[str, Any]) -> Requirement:
     return verified_bool_requirement(
         i2s,
         "controller_and_gpio_ownership_resolved",
-        "I2S controller and GPIO ownership",
+        "I2S controller and GPIO ownership plan",
+        minimum_verification,
     )
 
 
-def audio_mapping_requirement(resources: dict[str, Any]) -> Requirement:
+def audio_mapping_requirement(
+    resources: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     channel = resources.get("audio_channel_mapping", {})
     required = channel.get("required")
     if required is None:
@@ -652,23 +689,32 @@ def audio_mapping_requirement(resources: dict[str, Any]) -> Requirement:
     if required is False:
         return "SATISFIED", "audio channel/TDM mapping is not required", 2
     return verified_bool_requirement(
-        channel, "resolved", "audio channel/TDM mapping"
+        channel,
+        "resolved",
+        "audio channel/TDM mapping",
+        minimum_verification,
     )
 
 
-def camera_realtime_requirement(resources: dict[str, Any]) -> Requirement:
+def camera_realtime_requirement(
+    resources: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     return verified_bool_requirement(
         resources.get("camera_realtime", {}),
         "pipeline_safe",
-        "camera DMA/task realtime policy",
+        "camera DMA/task realtime policy design",
+        minimum_verification,
     )
 
 
-def memory_requirement(resources: dict[str, Any]) -> Requirement:
+def memory_requirement(
+    resources: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
     return verified_bool_requirement(
         resources.get("memory", {}),
         "startup_and_media_budgeted",
-        "startup and media memory budget",
+        "static startup and media memory budget",
+        minimum_verification,
     )
 
 
@@ -750,7 +796,9 @@ def binding_requirement(onboarding: dict[str, Any]) -> Requirement:
 
 
 def combine_requirements(
-    requirements: list[Requirement], legacy_hil_from_levels: bool = False
+    requirements: list[Requirement],
+    success_status: str = "READY_TO_PORT",
+    legacy_hil_from_levels: bool = False,
 ) -> dict[str, Any]:
     reasons = [reason for _, reason, _ in requirements]
     states = {state for state, _, _ in requirements}
@@ -766,7 +814,7 @@ def combine_requirements(
     ):
         status = "HIL_VERIFIED"
     else:
-        status = "READY_TO_PORT"
+        status = success_status
     return {"status": status, "reasons": reasons}
 
 
@@ -839,9 +887,32 @@ def matching_runtime_evidence(
     return None
 
 
+def artifact_requirement(artifact_sha256: str | None) -> Requirement:
+    if artifact_sha256 is None:
+        return "NEEDS_CONFIRMATION", "exact build artifact SHA-256 is missing", 0
+    if not SHA256_RE.fullmatch(artifact_sha256):
+        return "BLOCKED", "build artifact SHA-256 is invalid", 0
+    return (
+        "SATISFIED",
+        f"build evidence is bound to artifact {artifact_sha256}",
+        VERIFICATION_LEVELS["build_verified"],
+    )
+
+
 def assess_ir(
-    data: dict[str, Any], artifact_sha256: str | None = None
+    data: dict[str, Any],
+    artifact_sha256: str | None = None,
+    phase: str | None = None,
 ) -> dict[str, Any]:
+    selected_phase = phase or ("hil" if artifact_sha256 else "intake")
+    if selected_phase not in ASSESSMENT_PHASES:
+        raise ValueError(
+            f"assessment phase must be one of {', '.join(sorted(ASSESSMENT_PHASES))}"
+        )
+    minimum_verification = minimum_verification_for_phase(selected_phase)
+    success_status = (
+        "READY_TO_PORT" if selected_phase == "intake" else "BUILD_VERIFIED"
+    )
     schema_version = data.get("schema_version")
     requested = data["features"]["requested"]
     audio_input = data["audio_input"]
@@ -858,7 +929,7 @@ def assess_ir(
         onboarding = data["onboarding"]
         project.extend(
             [
-                i2c_requirement(resources),
+                i2c_requirement(resources, minimum_verification),
                 wifi_requirement(onboarding),
                 binding_requirement(onboarding),
             ]
@@ -875,73 +946,101 @@ def assess_ir(
     else:
         resources = {}
 
+    if selected_phase in {"build", "hil"}:
+        project.append(artifact_requirement(artifact_sha256))
+
     for feature in requested:
         if schema_version == 1:
             if feature == "h5_live_audio":
-                requirements = [codec_requirement(audio_input, "audio_input")]
+                requirements = [
+                    codec_requirement(
+                        audio_input, "audio_input", minimum_verification
+                    )
+                ]
             elif feature == "h5_live_video":
-                requirements = [legacy_video_requirement(camera)]
+                requirements = [
+                    legacy_video_requirement(camera, minimum_verification)
+                ]
             elif feature == "h5_talkback":
-                requirements = [codec_requirement(audio_output, "audio_output")]
+                requirements = [
+                    codec_requirement(
+                        audio_output, "audio_output", minimum_verification
+                    )
+                ]
             else:
                 requirements = [
-                    codec_requirement(audio_input, "audio_input"),
-                    codec_requirement(audio_output, "audio_output"),
+                    codec_requirement(
+                        audio_input, "audio_input", minimum_verification
+                    ),
+                    codec_requirement(
+                        audio_output, "audio_output", minimum_verification
+                    ),
                 ]
             result[feature] = combine_requirements(
-                requirements, legacy_hil_from_levels=True
+                requirements,
+                success_status=success_status,
+                legacy_hil_from_levels=(selected_phase == "intake"),
             )
             continue
 
         if feature == "h5_live_audio":
             requirements = [
-                codec_requirement(audio_input, "audio_input"),
-                i2s_requirement(resources),
-                audio_mapping_requirement(resources),
-                memory_requirement(resources),
+                codec_requirement(audio_input, "audio_input", minimum_verification),
+                i2s_requirement(resources, minimum_verification),
+                audio_mapping_requirement(resources, minimum_verification),
+                memory_requirement(resources, minimum_verification),
             ]
         elif feature == "h5_live_video":
             requirements = [
-                video_requirement_v2(camera),
-                camera_realtime_requirement(resources),
-                memory_requirement(resources),
+                video_requirement_v2(camera, minimum_verification),
+                camera_realtime_requirement(resources, minimum_verification),
+                memory_requirement(resources, minimum_verification),
             ]
         elif feature == "h5_talkback":
             requirements = [
-                codec_requirement(audio_output, "audio_output"),
-                i2s_requirement(resources),
-                memory_requirement(resources),
+                codec_requirement(audio_output, "audio_output", minimum_verification),
+                i2s_requirement(resources, minimum_verification),
+                memory_requirement(resources, minimum_verification),
             ]
         else:
             requirements = [
-                codec_requirement(audio_input, "audio_input"),
-                codec_requirement(audio_output, "audio_output"),
-                i2s_requirement(resources),
-                audio_mapping_requirement(resources),
-                memory_requirement(resources),
+                codec_requirement(audio_input, "audio_input", minimum_verification),
+                codec_requirement(audio_output, "audio_output", minimum_verification),
+                i2s_requirement(resources, minimum_verification),
+                audio_mapping_requirement(resources, minimum_verification),
+                memory_requirement(resources, minimum_verification),
             ]
-        result[feature] = combine_requirements(requirements)
+        result[feature] = combine_requirements(
+            requirements, success_status=success_status
+        )
 
     project_gate = combine_requirements(
-        project, legacy_hil_from_levels=(schema_version == 1)
+        project,
+        success_status=success_status,
+        legacy_hil_from_levels=(schema_version == 1 and selected_phase == "intake"),
     )
     evidence = matching_runtime_evidence(data, artifact_sha256)
-    if schema_version == 2 and evidence is not None:
-        evidence_features = set(evidence.get("features", []))
-        evidence_levels = set(evidence.get("acceptance_levels", []))
-        for feature, assessment in result.items():
-            if (
-                assessment["status"] == "READY_TO_PORT"
-                and feature in evidence_features
-                and FEATURE_HIL_LEVEL[feature] in evidence_levels
-            ):
-                assessment["status"] = "HIL_VERIFIED"
-                assessment["reasons"].append(
-                    f"artifact {artifact_sha256} passed {FEATURE_HIL_LEVEL[feature]}"
+    if schema_version == 2 and selected_phase == "hil":
+        evidence_features = set(evidence.get("features", [])) if evidence else set()
+        evidence_levels = (
+            set(evidence.get("acceptance_levels", [])) if evidence else set()
+        )
+        for feature, feature_assessment in result.items():
+            if feature_assessment["status"] != "BUILD_VERIFIED":
+                continue
+            required_level = FEATURE_HIL_LEVEL[feature]
+            if feature in evidence_features and required_level in evidence_levels:
+                feature_assessment["status"] = "HIL_VERIFIED"
+                feature_assessment["reasons"].append(
+                    f"artifact {artifact_sha256} passed {required_level}"
+                )
+            else:
+                feature_assessment["reasons"].append(
+                    f"artifact {artifact_sha256} has no matching {required_level} runtime evidence"
                 )
         if result and all(
             item["status"] == "HIL_VERIFIED" for item in result.values()
-        ):
+        ) and project_gate["status"] == "BUILD_VERIFIED":
             project_gate["status"] = "HIL_VERIFIED"
             project_gate["reasons"].append(
                 f"all requested features have matching artifact evidence for {artifact_sha256}"
@@ -949,6 +1048,7 @@ def assess_ir(
 
     assessment: dict[str, Any] = {
         "schema_version": schema_version,
+        "phase": selected_phase,
         "board_id": data["board"]["id"],
         "hardware_revision": data["board"]["hardware_revision"],
         "project_gate": project_gate,
@@ -1005,12 +1105,26 @@ def command_assess(args: argparse.Namespace) -> int:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
         return 2
-    assessment = assess_ir(data, artifact_sha256=args.artifact_sha256)
+    if args.artifact_sha256 is not None and not SHA256_RE.fullmatch(
+        args.artifact_sha256
+    ):
+        print("error: --artifact-sha256 must be a 64-character SHA-256", file=sys.stderr)
+        return 2
+    try:
+        assessment = assess_ir(
+            data,
+            artifact_sha256=args.artifact_sha256,
+            phase=args.phase,
+        )
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     print(json.dumps(assessment, ensure_ascii=False, indent=2))
     if args.strict:
         statuses = {item["status"] for item in assessment["features"].values()}
         statuses.add(assessment["project_gate"]["status"])
-        if not statuses.issubset(READY_STATUSES):
+        allowed_statuses = PHASE_SUCCESS_STATUSES[assessment["phase"]]
+        if not statuses.issubset(allowed_statuses):
             return 3
     return 0
 
@@ -1036,11 +1150,16 @@ def parse_args() -> argparse.Namespace:
     assess_parser.add_argument(
         "--strict",
         action="store_true",
-        help="return non-zero unless every requested feature is ready or HIL verified",
+        help="return non-zero unless every requested feature passes the selected phase",
+    )
+    assess_parser.add_argument(
+        "--phase",
+        choices=sorted(ASSESSMENT_PHASES),
+        help="assessment phase; defaults to intake, or hil when an artifact SHA is supplied",
     )
     assess_parser.add_argument(
         "--artifact-sha256",
-        help="bind HIL status to runtime evidence for this exact firmware artifact",
+        help="bind build or HIL assessment to this exact firmware artifact",
     )
     assess_parser.set_defaults(handler=command_assess)
     return parser.parse_args()

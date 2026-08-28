@@ -36,7 +36,7 @@ For every method, keep device credentials outside source control, handle an alre
 
 Platform service discovery and the TiRTC SDK service endpoint are different settings. Record both. HTTPS requires valid time, DNS, certificate validation, TLS client/TLS 1.2, and enough contiguous internal memory.
 
-Before sizing TiRTC buffers, measure internal free/largest blocks, PSRAM, frame size distribution, queue watermarks, and send/drop rates. A larger queue can prevent drops, exhaust startup memory, or add buffer latency. If an authorized HTTP baseline exists, stage transport changes separately from media changes and retain the HTTPS requirements as a pending acceptance item.
+Define a conservative static budget before implementation using the locked SDK contract, framebuffer geometry, DMA/queue bounds, task stacks, and an internal-memory reserve. Before claiming runtime margin or tuning TiRTC buffers, measure internal free/largest blocks, PSRAM, frame size distribution, queue watermarks, and send/drop rates on the exact artifact. A larger queue can prevent drops, exhaust startup memory, or add buffer latency. If an authorized HTTP baseline exists, stage transport changes separately from media changes and retain the HTTPS requirements as a pending acceptance item.
 
 ## Network and media evidence
 

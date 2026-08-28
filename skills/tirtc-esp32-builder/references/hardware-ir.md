@@ -27,6 +27,8 @@ Verification levels are ordered:
 4. `hardware_verified`: the local peripheral works on the exact board revision.
 5. `hil_verified`: retained for legacy facts; schema v2 feature HIL additionally requires matching artifact evidence.
 
+Use the same fact across phases without overstating it. `corroborated` means authoritative sources establish an implementable design; `build_verified` means the generated source, locked dependencies, compile, or post-link gates establish that implementation; runtime behavior requires matching artifact evidence. For example, a corroborated single-I2C-family field records a dependency plan, while its build-verified form records the final ELF audit.
+
 ## Schema v2 contracts
 
 The IR contains:
@@ -46,11 +48,22 @@ The selected video profile controls assessment. An unselected H.264 fallback can
 
 ## Artifact-bound HIL
 
+Run the phase gates in order:
+
+```bash
+python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
+  --phase intake --strict
+python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
+  --phase build --artifact-sha256 <64-character-sha256> --strict
+```
+
+The intake phase returns `READY_TO_PORT`; the build phase returns `BUILD_VERIFIED`. Missing serial or browser access does not block either phase.
+
 Run:
 
 ```bash
 python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
-  --artifact-sha256 <64-character-sha256> --strict
+  --phase hil --artifact-sha256 <64-character-sha256> --strict
 ```
 
 H5 features require matching L5 evidence; AI requires matching L6 evidence. Evidence from an older firmware remains provenance but does not verify the current artifact.

@@ -30,10 +30,12 @@ $tirtc-esp32-builder
 
 执行要求：
 1. 先运行 Device Kit Doctor，读完全部资料，再生成 Hardware IR v2。没有证据的器件、GPIO 和媒体能力保持未知。
-2. 资料不足时，列出矛盾、缺失项和最小补充动作；达到 READY_TO_PORT 后再生成板级 adapter、编译并记录 BIN/ELF SHA-256。
-3. 移植前核对媒体合同、板级资源、内存预算、配网和绑定状态。具体板卡参数只写入该板的 Hardware IR 和 adapter。
-4. 输出 TIRTC_PORTING_REPORT.md，并把编译结果与 L2-L7 实机验收分开记录。
-5. 本轮不访问串口、不烧录、不擦除 NVS。Wi-Fi 密码、设备密钥、token、私钥和用户音视频也不能写入工程或报告。
+2. 把每个未知项标为 source_resolvable、implementation_resolvable、build_resolvable、hil_resolvable 或 user_blocked。先通过资料和固定版本源码解决 source_resolvable；只有 user_blocked 会阻止开始 adapter 开发。
+3. READY_TO_PORT 表示硬件身份、连接、媒体合同和资源设计已经有证据，足以开始实现；它不要求最终 ELF 或实机数据。可通过实现或构建解决的项目必须继续生成 compile-safe adapter、锁定依赖、运行门禁并编译。
+4. 移植前核对媒体合同、板级资源、静态内存预算、配网和绑定状态。构建后只把源代码、锁定依赖、编译或 post-link 门禁实际证明的事实升级为 build_verified。
+5. 记录 BIN/ELF 路径、大小和 SHA-256，运行 build 阶段评估并输出 TIRTC_PORTING_REPORT.md。编译结果必须与 L2-L7 实机验收分开。
+6. 本轮不访问串口、不烧录、不擦除 NVS；因此缺少启动、浏览器、实体声音和运行时资源数据时，把相应 L2-L7 标为 SKIP，不得阻止 L0/L1。
+7. Wi-Fi 密码、设备密钥、token、私钥和用户音视频不能写入工程或报告。
 ```
 
 ## 只有已知时才补充
@@ -46,5 +48,6 @@ $tirtc-esp32-builder
 - 凭证保存与重配方式、已有绑定处理和独立清除入口；
 - 已知资料矛盾、实机 PID、串口日志或已知良好固件 SHA-256；
 - 非默认 ESP-IDF、TiRTC SDK、Device Kit、服务发现地址或 HTTP/HTTPS 分阶段要求。
+- 若用于 clean-room 验证，明确允许的资料根目录，并列出不得读取的历史工程或旧 artifact。
 
 直接把它们追加在提示词末尾即可，不必逐项填表。

@@ -23,8 +23,8 @@ Use this branch when the user supplies a board model, vendor URL, schematic, BOM
 3. Prefer official schematic/BOM and BSP facts. For a PDF schematic, inspect page labels and net names; prefer an exported netlist, pin CSV, or vendor board definition when available.
 4. Cross-check critical pins, clocks, power enables, reset lines, sensor/codec variants, ESP-IDF version, resource ownership, and onboarding behavior across at least two independent artifacts when possible.
 5. Create the Hardware IR v2. Use `null` for unknown facts and retain contradictory values as an explicit issue instead of selecting one silently. Store concrete board values in the IR/adapter rather than Skill files.
-6. Validate and assess requested features. Ask only for unresolved facts that block the next safe step. SoftAP is optional when another evidenced Wi-Fi credential method is available, keeps credentials outside source, and defines reprovisioning.
-7. When all requirements reach `READY_TO_PORT`, generate the starter and implement the board adapter. When requirements remain blocked, generate only the IR, capability report, and an optional compile-safe skeleton if requested.
+6. Validate and run the intake assessment. Classify unresolved facts by their next evidence source: source, implementation, build, HIL, or user input. Ask only for `user_blocked` facts that prevent a safe design. SoftAP is optional when another evidenced Wi-Fi credential method is available, keeps credentials outside source, and defines reprovisioning.
+7. When hardware identity, wiring, product contracts, and an evidenced resource plan reach `READY_TO_PORT`, generate the starter and implement the board adapter. Generate a compile-safe adapter by default when remaining uncertainty is implementation-, build-, or HIL-resolvable. Stop at the IR/report only when missing user evidence or an incompatible dependency makes a safe implementation impossible.
 
 The branch is complete when every supplied artifact maps to an IR fact, provenance entry, contradiction, or declared irrelevant item.
 
@@ -67,5 +67,13 @@ The stable modules own stream IDs, negotiated/contracted formats, TiRTC callback
 ## Verification loop
 
 Use a bounded loop per layer: diagnose one failing invariant, make the smallest correction, and rerun that layer before moving forward. Change one high-risk variable per HIL comparison. Turn reusable invariants into tests or post-link gates. Stop and report when the remaining failure requires unavailable hardware, credentials, a new SDK binary, a public protocol change, or a user choice.
+
+Run the assessor once per layer:
+
+- `--phase intake`: corroborated design evidence; success is `READY_TO_PORT`.
+- `--phase build --artifact-sha256 <sha>`: compile/post-link evidence; success is `BUILD_VERIFIED`.
+- `--phase hil --artifact-sha256 <sha>`: matching L5/L6 runtime evidence; success is `HIL_VERIFIED`.
+
+No serial authorization is required for L0/L1. When serial, browser, account, service, or network access is unavailable, complete the safe build work and report the affected L2-L7 levels as `SKIP`.
 
 Do not use successful compilation as evidence for camera frames, speaker output, Web rendering, AI audio, or long-run stability. Bind every runtime conclusion to the tested firmware SHA-256.
