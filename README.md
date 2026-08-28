@@ -635,7 +635,7 @@ Wi-Fi 配网和 ThingConnect 设备绑定是两套独立流程。绑定可以选
 
 任务只做到生成和编译时，报告应明确停在 L1。
 
-换机前运行 `project_portability.py <project> --export`，只交付源码、依赖锁和工程内 TiRTC SDK，不携带包含原机器绝对路径的 `build/`。
+换机前先创建排除 `build/`、`managed_components/` 和 `.git` 的源码交付副本，再运行 `project_portability.py <source-only-export> --export`。只交付源码、依赖锁和工程内 TiRTC SDK，不携带包含原机器绝对路径的构建缓存。
 
 ## 常见问题
 
