@@ -18,6 +18,10 @@ Use [the report template](../assets/report-template.md) and preserve separate `P
 
 ## Evidence
 
-Record exact board revision, toolchain and SDK versions, source/adapter revisions, commands, return codes, firmware size and SHA-256, serial port/chip, sanitized log paths, browser or platform observations, and every unavailable dependency.
+Record exact board revision, selected media, Wi-Fi, and binding profiles, toolchain and SDK versions, source/adapter revisions, commands, return codes, firmware size and SHA-256, serial port/chip, sanitized log paths, browser or platform observations, and every unavailable dependency.
+
+Runtime evidence belongs to one artifact. Label superseded artifacts and keep their observations as history; do not promote them to the current BIN/ELF. For HIL assessment, add the full SHA-256 to `runtime_evidence` and run `hardware_ir.py assess --artifact-sha256 <sha> --strict`.
+
+For L3-L7 media runs, capture the signals that distinguish software regressions from environment changes: onboarding/binding state, BSSID/channel/RSSI, reconnect or roaming events, audio/video send/receive/drop/error counters, queue watermarks, camera overflow count, internal heap/largest block, PSRAM, and measured latency when available. Never record credential values.
 
 Reports describe observed current behavior. A `SKIP` caused by missing hardware, account, service, browser, or external network does not become a pass. If the user's requested completion level includes a skipped critical case, the final outcome remains incomplete.

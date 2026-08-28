@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -25,6 +26,34 @@ VERIFICATION_LEVELS = {
     "hil_verified": 5,
 }
 READY_STATUSES = {"READY_TO_PORT", "HIL_VERIFIED"}
+VIDEO_CONTRACTS = {
+    "mjpeg": "jpeg_complete_frames",
+    "h264": "h264_annex_b_access_units",
+    "h265": "h265_annex_b_access_units",
+}
+WIFI_METHOD_TYPES = {
+    "softap",
+    "ble",
+    "smartconfig",
+    "factory_nvs",
+    "development_config",
+    "custom",
+}
+BINDING_METHOD_TYPES = {
+    "verification_code",
+    "factory_bound",
+    "development_credentials",
+    "custom",
+}
+ACCEPTANCE_LEVELS = {"L-1", "L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"}
+FEATURE_HIL_LEVEL = {
+    "h5_live_audio": "L5",
+    "h5_live_video": "L5",
+    "h5_talkback": "L5",
+    "ai_talk": "L6",
+}
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+Requirement = tuple[str, str, int]
 
 
 def load_ir(path: Path) -> dict[str, Any]:
@@ -51,15 +80,30 @@ def nonempty_string(value: Any, path: str, errors: list[str]) -> None:
         errors.append(f"{path} must be a non-empty string")
 
 
+def nullable_string(value: Any, path: str, errors: list[str]) -> None:
+    if value is not None and (not isinstance(value, str) or not value.strip()):
+        errors.append(f"{path} must be a non-empty string or null")
+
+
 def positive_int(value: Any, path: str, errors: list[str], allow_zero: bool = False) -> None:
     minimum = 0 if allow_zero else 1
     if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
         errors.append(f"{path} must be an integer >= {minimum}")
 
 
+def nullable_positive_int(value: Any, path: str, errors: list[str]) -> None:
+    if value is not None:
+        positive_int(value, path, errors)
+
+
 def nullable_bool(value: Any, path: str, errors: list[str]) -> None:
     if value is not None and not isinstance(value, bool):
         errors.append(f"{path} must be true, false, or null")
+
+
+def validate_verification(value: Any, path: str, errors: list[str]) -> None:
+    if value not in VERIFICATION_LEVELS:
+        errors.append(f"{path} must be one of " + ", ".join(VERIFICATION_LEVELS))
 
 
 def validate_source_refs(
@@ -90,18 +134,268 @@ def validate_codec_list(value: Any, path: str, errors: list[str]) -> None:
         else:
             for rate_index, rate in enumerate(rates):
                 positive_int(rate, f"{prefix}.sample_rates_hz[{rate_index}]", errors)
-        verification = codec.get("verification")
-        if verification not in VERIFICATION_LEVELS:
+        validate_verification(codec.get("verification"), f"{prefix}.verification", errors)
+
+
+def validate_video_profiles(
+    camera: dict[str, Any], source_ids: set[str], errors: list[str]
+) -> None:
+    nullable_string(
+        camera.get("selected_video_profile"),
+        "camera.selected_video_profile",
+        errors,
+    )
+    profiles = camera.get("video_profiles")
+    if not isinstance(profiles, list):
+        errors.append("camera.video_profiles must be an array")
+        return
+    ids: set[str] = set()
+    for index, item in enumerate(profiles):
+        prefix = f"camera.video_profiles[{index}]"
+        profile = mapping(item, prefix, errors)
+        nonempty_string(profile.get("id"), f"{prefix}.id", errors)
+        profile_id = profile.get("id")
+        if isinstance(profile_id, str) and profile_id:
+            if profile_id in ids:
+                errors.append(f"duplicate video profile id {profile_id!r}")
+            ids.add(profile_id)
+        codec = profile.get("codec")
+        if codec not in VIDEO_CONTRACTS:
             errors.append(
-                f"{prefix}.verification must be one of "
-                + ", ".join(VERIFICATION_LEVELS)
+                f"{prefix}.codec must be one of " + ", ".join(VIDEO_CONTRACTS)
             )
+        nullable_bool(profile.get("available"), f"{prefix}.available", errors)
+        nullable_string(profile.get("output_format"), f"{prefix}.output_format", errors)
+        nullable_bool(
+            profile.get("refresh_frame_control"),
+            f"{prefix}.refresh_frame_control",
+            errors,
+        )
+        nullable_positive_int(profile.get("stream_id"), f"{prefix}.stream_id", errors)
+        validate_verification(
+            profile.get("verification"), f"{prefix}.verification", errors
+        )
+        validate_source_refs(profile, prefix, source_ids, errors)
+    selected = camera.get("selected_video_profile")
+    if isinstance(selected, str) and selected and selected not in ids:
+        errors.append(
+            f"camera.selected_video_profile references unknown profile {selected!r}"
+        )
+
+
+def validate_hardware_resources(
+    data: dict[str, Any], source_ids: set[str], errors: list[str]
+) -> None:
+    resources = mapping(data.get("hardware_resources"), "hardware_resources", errors)
+    validate_source_refs(resources, "hardware_resources", source_ids, errors)
+
+    i2c = mapping(resources.get("i2c"), "hardware_resources.i2c", errors)
+    nullable_bool(i2c.get("used"), "hardware_resources.i2c.used", errors)
+    driver_family = i2c.get("driver_family")
+    if driver_family not in {None, "legacy", "ng", "none"}:
+        errors.append(
+            "hardware_resources.i2c.driver_family must be legacy, ng, none, or null"
+        )
+    nullable_bool(
+        i2c.get("single_driver_family"),
+        "hardware_resources.i2c.single_driver_family",
+        errors,
+    )
+    validate_verification(
+        i2c.get("verification"), "hardware_resources.i2c.verification", errors
+    )
+
+    i2s = mapping(resources.get("i2s"), "hardware_resources.i2s", errors)
+    nullable_bool(i2s.get("used"), "hardware_resources.i2s.used", errors)
+    nullable_bool(
+        i2s.get("controller_and_gpio_ownership_resolved"),
+        "hardware_resources.i2s.controller_and_gpio_ownership_resolved",
+        errors,
+    )
+    validate_verification(
+        i2s.get("verification"), "hardware_resources.i2s.verification", errors
+    )
+
+    mapping_section = mapping(
+        resources.get("audio_channel_mapping"),
+        "hardware_resources.audio_channel_mapping",
+        errors,
+    )
+    nullable_bool(
+        mapping_section.get("required"),
+        "hardware_resources.audio_channel_mapping.required",
+        errors,
+    )
+    nullable_bool(
+        mapping_section.get("resolved"),
+        "hardware_resources.audio_channel_mapping.resolved",
+        errors,
+    )
+    validate_verification(
+        mapping_section.get("verification"),
+        "hardware_resources.audio_channel_mapping.verification",
+        errors,
+    )
+
+    realtime = mapping(
+        resources.get("camera_realtime"),
+        "hardware_resources.camera_realtime",
+        errors,
+    )
+    nullable_bool(
+        realtime.get("pipeline_safe"),
+        "hardware_resources.camera_realtime.pipeline_safe",
+        errors,
+    )
+    validate_verification(
+        realtime.get("verification"),
+        "hardware_resources.camera_realtime.verification",
+        errors,
+    )
+
+    memory = mapping(resources.get("memory"), "hardware_resources.memory", errors)
+    nullable_bool(
+        memory.get("startup_and_media_budgeted"),
+        "hardware_resources.memory.startup_and_media_budgeted",
+        errors,
+    )
+    validate_verification(
+        memory.get("verification"), "hardware_resources.memory.verification", errors
+    )
+
+
+def validate_onboarding(
+    data: dict[str, Any], source_ids: set[str], errors: list[str]
+) -> None:
+    onboarding = mapping(data.get("onboarding"), "onboarding", errors)
+    validate_source_refs(onboarding, "onboarding", source_ids, errors)
+    wifi = mapping(onboarding.get("wifi_credentials"), "onboarding.wifi_credentials", errors)
+    nullable_string(
+        wifi.get("selected_method"), "onboarding.wifi_credentials.selected_method", errors
+    )
+    nullable_bool(
+        wifi.get("credentials_committed_to_source"),
+        "onboarding.wifi_credentials.credentials_committed_to_source",
+        errors,
+    )
+    nullable_bool(
+        wifi.get("reprovisioning_defined"),
+        "onboarding.wifi_credentials.reprovisioning_defined",
+        errors,
+    )
+    methods = wifi.get("methods")
+    method_ids: set[str] = set()
+    if not isinstance(methods, list):
+        errors.append("onboarding.wifi_credentials.methods must be an array")
+    else:
+        for index, item in enumerate(methods):
+            prefix = f"onboarding.wifi_credentials.methods[{index}]"
+            method = mapping(item, prefix, errors)
+            nonempty_string(method.get("id"), f"{prefix}.id", errors)
+            method_id = method.get("id")
+            if isinstance(method_id, str) and method_id:
+                if method_id in method_ids:
+                    errors.append(f"duplicate Wi-Fi method id {method_id!r}")
+                method_ids.add(method_id)
+            method_type = method.get("type")
+            if method_type not in WIFI_METHOD_TYPES:
+                errors.append(
+                    f"{prefix}.type must be one of " + ", ".join(sorted(WIFI_METHOD_TYPES))
+                )
+            nullable_bool(method.get("available"), f"{prefix}.available", errors)
+            validate_verification(
+                method.get("verification"), f"{prefix}.verification", errors
+            )
+            validate_source_refs(method, prefix, source_ids, errors)
+    selected = wifi.get("selected_method")
+    if isinstance(selected, str) and selected and selected not in method_ids:
+        errors.append(
+            f"onboarding.wifi_credentials.selected_method references unknown method {selected!r}"
+        )
+
+    binding = mapping(onboarding.get("device_binding"), "onboarding.device_binding", errors)
+    nullable_string(
+        binding.get("selected_method"),
+        "onboarding.device_binding.selected_method",
+        errors,
+    )
+    for field in (
+        "credentials_committed_to_source",
+        "stored_credential_state_handled",
+        "clear_binding_control",
+    ):
+        nullable_bool(binding.get(field), f"onboarding.device_binding.{field}", errors)
+    methods = binding.get("methods")
+    method_ids = set()
+    if not isinstance(methods, list):
+        errors.append("onboarding.device_binding.methods must be an array")
+    else:
+        for index, item in enumerate(methods):
+            prefix = f"onboarding.device_binding.methods[{index}]"
+            method = mapping(item, prefix, errors)
+            nonempty_string(method.get("id"), f"{prefix}.id", errors)
+            method_id = method.get("id")
+            if isinstance(method_id, str) and method_id:
+                if method_id in method_ids:
+                    errors.append(f"duplicate binding method id {method_id!r}")
+                method_ids.add(method_id)
+            method_type = method.get("type")
+            if method_type not in BINDING_METHOD_TYPES:
+                errors.append(
+                    f"{prefix}.type must be one of "
+                    + ", ".join(sorted(BINDING_METHOD_TYPES))
+                )
+            nullable_bool(method.get("available"), f"{prefix}.available", errors)
+            validate_verification(
+                method.get("verification"), f"{prefix}.verification", errors
+            )
+            validate_source_refs(method, prefix, source_ids, errors)
+    selected = binding.get("selected_method")
+    if isinstance(selected, str) and selected and selected not in method_ids:
+        errors.append(
+            f"onboarding.device_binding.selected_method references unknown method {selected!r}"
+        )
+
+
+def validate_runtime_evidence(
+    data: dict[str, Any], source_ids: set[str], errors: list[str]
+) -> None:
+    evidence = data.get("runtime_evidence")
+    if not isinstance(evidence, list):
+        errors.append("runtime_evidence must be an array")
+        return
+    for index, item in enumerate(evidence):
+        prefix = f"runtime_evidence[{index}]"
+        record = mapping(item, prefix, errors)
+        sha = record.get("artifact_sha256")
+        if not isinstance(sha, str) or not SHA256_RE.fullmatch(sha):
+            errors.append(f"{prefix}.artifact_sha256 must be a 64-character SHA-256")
+        levels = record.get("acceptance_levels")
+        if not isinstance(levels, list) or not levels:
+            errors.append(f"{prefix}.acceptance_levels must be a non-empty array")
+        else:
+            for level_index, level in enumerate(levels):
+                if level not in ACCEPTANCE_LEVELS:
+                    errors.append(
+                        f"{prefix}.acceptance_levels[{level_index}] must be a known acceptance level"
+                    )
+        features = record.get("features")
+        if not isinstance(features, list) or not features:
+            errors.append(f"{prefix}.features must be a non-empty array")
+        else:
+            for feature_index, feature in enumerate(features):
+                if feature not in FEATURES:
+                    errors.append(
+                        f"{prefix}.features[{feature_index}] must be a known feature"
+                    )
+        validate_source_refs(record, prefix, source_ids, errors)
 
 
 def validate_ir(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if data.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
+    schema_version = data.get("schema_version")
+    if schema_version not in {1, 2}:
+        errors.append("schema_version must be 1 or 2")
 
     board = mapping(data.get("board"), "board", errors)
     for key in ("id", "vendor", "model", "hardware_revision"):
@@ -135,12 +429,9 @@ def validate_ir(data: dict[str, Any]) -> list[str]:
     nonempty_string(
         toolchain.get("framework_version"), "toolchain.framework_version", errors
     )
-    toolchain_verification = toolchain.get("verification")
-    if toolchain_verification not in VERIFICATION_LEVELS:
-        errors.append(
-            "toolchain.verification must be one of "
-            + ", ".join(VERIFICATION_LEVELS)
-        )
+    validate_verification(
+        toolchain.get("verification"), "toolchain.verification", errors
+    )
     tirtc = mapping(toolchain.get("tirtc"), "toolchain.tirtc", errors)
     for key in ("platform", "version", "sdk_path", "build_contract"):
         nonempty_string(tirtc.get(key), f"toolchain.tirtc.{key}", errors)
@@ -148,17 +439,17 @@ def validate_ir(data: dict[str, Any]) -> list[str]:
 
     camera = mapping(data.get("camera"), "camera", errors)
     nullable_bool(camera.get("present"), "camera.present", errors)
-    h264 = mapping(camera.get("h264"), "camera.h264", errors)
-    nullable_bool(h264.get("available"), "camera.h264.available", errors)
-    nullable_bool(
-        h264.get("key_frame_control"), "camera.h264.key_frame_control", errors
-    )
-    verification = h264.get("verification")
-    if verification not in VERIFICATION_LEVELS:
-        errors.append(
-            "camera.h264.verification must be one of "
-            + ", ".join(VERIFICATION_LEVELS)
+    if schema_version == 1:
+        h264 = mapping(camera.get("h264"), "camera.h264", errors)
+        nullable_bool(h264.get("available"), "camera.h264.available", errors)
+        nullable_bool(
+            h264.get("key_frame_control"), "camera.h264.key_frame_control", errors
         )
+        validate_verification(
+            h264.get("verification"), "camera.h264.verification", errors
+        )
+    elif schema_version == 2:
+        validate_video_profiles(camera, source_ids, errors)
     validate_source_refs(camera, "camera", source_ids, errors)
 
     for name in ("audio_input", "audio_output"):
@@ -183,10 +474,15 @@ def validate_ir(data: dict[str, Any]) -> list[str]:
                 errors.append(f"features.requested contains duplicate {feature!r}")
             else:
                 seen.add(feature)
+
+    if schema_version == 2:
+        validate_hardware_resources(data, source_ids, errors)
+        validate_onboarding(data, source_ids, errors)
+        validate_runtime_evidence(data, source_ids, errors)
     return errors
 
 
-def codec_requirement(media: dict[str, Any], section: str) -> tuple[str, str, int]:
+def codec_requirement(media: dict[str, Any], section: str) -> Requirement:
     present = media.get("present")
     if present is None:
         return "NEEDS_CONFIRMATION", f"{section} presence is unknown", 0
@@ -210,7 +506,7 @@ def codec_requirement(media: dict[str, Any], section: str) -> tuple[str, str, in
     return "BLOCKED", f"{section} has no A-law 8 kHz path", 0
 
 
-def video_requirement(camera: dict[str, Any]) -> tuple[str, str, int]:
+def legacy_video_requirement(camera: dict[str, Any]) -> Requirement:
     present = camera.get("present")
     if present is None:
         return "NEEDS_CONFIRMATION", "camera presence is unknown", 0
@@ -243,7 +539,219 @@ def video_requirement(camera: dict[str, Any]) -> tuple[str, str, int]:
     return "SATISFIED", "camera provides H.264 Annex-B and IDR control", level
 
 
-def combine_requirements(requirements: list[tuple[str, str, int]]) -> dict[str, Any]:
+def selected_item(items: Any, selected_id: Any) -> dict[str, Any] | None:
+    if not isinstance(items, list) or not isinstance(selected_id, str):
+        return None
+    for item in items:
+        if isinstance(item, dict) and item.get("id") == selected_id:
+            return item
+    return None
+
+
+def video_requirement_v2(camera: dict[str, Any]) -> Requirement:
+    present = camera.get("present")
+    if present is None:
+        return "NEEDS_CONFIRMATION", "camera presence is unknown", 0
+    if present is False:
+        return "BLOCKED", "camera is not present", 0
+    selected_id = camera.get("selected_video_profile")
+    if not isinstance(selected_id, str) or not selected_id:
+        return "NEEDS_CONFIRMATION", "selected video profile is unknown", 0
+    profile = selected_item(camera.get("video_profiles"), selected_id)
+    if profile is None:
+        return "BLOCKED", f"selected video profile {selected_id!r} does not exist", 0
+    codec = profile.get("codec")
+    if codec not in VIDEO_CONTRACTS:
+        return "BLOCKED", f"selected video codec {codec!r} is unsupported", 0
+    available = profile.get("available")
+    if available is None:
+        return "NEEDS_CONFIRMATION", f"{codec} path availability is unknown", 0
+    if available is False:
+        return "BLOCKED", f"selected {codec} path is unavailable", 0
+    output_format = profile.get("output_format")
+    if output_format is None:
+        return "NEEDS_CONFIRMATION", f"{codec} output format is unknown", 0
+    expected = VIDEO_CONTRACTS[codec]
+    if str(output_format).lower() != expected:
+        return (
+            "BLOCKED",
+            f"selected {codec} profile requires output_format={expected}",
+            0,
+        )
+    refresh = profile.get("refresh_frame_control")
+    if refresh is None:
+        return "NEEDS_CONFIRMATION", "refresh/key-frame control is unknown", 0
+    if refresh is False:
+        return "BLOCKED", "H5 refresh requests cannot reach the media pipeline", 0
+    verification = profile.get("verification")
+    level = VERIFICATION_LEVELS.get(verification, 0)
+    if level < VERIFICATION_LEVELS["corroborated"]:
+        return (
+            "NEEDS_CONFIRMATION",
+            f"selected {codec} path is only {verification}",
+            level,
+        )
+    return (
+        "SATISFIED",
+        f"selected {codec} profile provides {expected} on stream {profile.get('stream_id')}",
+        level,
+    )
+
+
+def verified_bool_requirement(
+    section: dict[str, Any], field: str, label: str
+) -> Requirement:
+    value = section.get(field)
+    if value is None:
+        return "NEEDS_CONFIRMATION", f"{label} is unknown", 0
+    if value is False:
+        return "BLOCKED", f"{label} is unresolved", 0
+    verification = section.get("verification")
+    level = VERIFICATION_LEVELS.get(verification, 0)
+    if level < VERIFICATION_LEVELS["corroborated"]:
+        return "NEEDS_CONFIRMATION", f"{label} is only {verification}", level
+    return "SATISFIED", f"{label} is resolved", level
+
+
+def i2c_requirement(resources: dict[str, Any]) -> Requirement:
+    i2c = resources.get("i2c", {})
+    used = i2c.get("used")
+    if used is None:
+        return "NEEDS_CONFIRMATION", "I2C usage is unknown", 0
+    if used is False:
+        return "SATISFIED", "board media path does not use I2C", 2
+    family = i2c.get("driver_family")
+    if family is None:
+        return "NEEDS_CONFIRMATION", "I2C driver family is unknown", 0
+    if family == "none":
+        return "BLOCKED", "I2C is used but no driver family is selected", 0
+    return verified_bool_requirement(
+        i2c, "single_driver_family", f"single {family} I2C driver family"
+    )
+
+
+def i2s_requirement(resources: dict[str, Any]) -> Requirement:
+    i2s = resources.get("i2s", {})
+    used = i2s.get("used")
+    if used is None:
+        return "NEEDS_CONFIRMATION", "I2S usage is unknown", 0
+    if used is False:
+        return "SATISFIED", "audio path does not use I2S", 2
+    return verified_bool_requirement(
+        i2s,
+        "controller_and_gpio_ownership_resolved",
+        "I2S controller and GPIO ownership",
+    )
+
+
+def audio_mapping_requirement(resources: dict[str, Any]) -> Requirement:
+    channel = resources.get("audio_channel_mapping", {})
+    required = channel.get("required")
+    if required is None:
+        return "NEEDS_CONFIRMATION", "audio channel/TDM mapping requirement is unknown", 0
+    if required is False:
+        return "SATISFIED", "audio channel/TDM mapping is not required", 2
+    return verified_bool_requirement(
+        channel, "resolved", "audio channel/TDM mapping"
+    )
+
+
+def camera_realtime_requirement(resources: dict[str, Any]) -> Requirement:
+    return verified_bool_requirement(
+        resources.get("camera_realtime", {}),
+        "pipeline_safe",
+        "camera DMA/task realtime policy",
+    )
+
+
+def memory_requirement(resources: dict[str, Any]) -> Requirement:
+    return verified_bool_requirement(
+        resources.get("memory", {}),
+        "startup_and_media_budgeted",
+        "startup and media memory budget",
+    )
+
+
+def wifi_requirement(onboarding: dict[str, Any]) -> Requirement:
+    wifi = onboarding.get("wifi_credentials", {})
+    committed = wifi.get("credentials_committed_to_source")
+    if committed is None:
+        return "NEEDS_CONFIRMATION", "credential source-control policy is unknown", 0
+    if committed is True:
+        return "BLOCKED", "Wi-Fi credentials are committed to source", 0
+    reprovisioning = wifi.get("reprovisioning_defined")
+    if reprovisioning is None:
+        return "NEEDS_CONFIRMATION", "Wi-Fi reprovisioning path is unknown", 0
+    if reprovisioning is False:
+        return "BLOCKED", "Wi-Fi reprovisioning path is undefined", 0
+    selected_id = wifi.get("selected_method")
+    if not isinstance(selected_id, str) or not selected_id:
+        return "NEEDS_CONFIRMATION", "Wi-Fi credential method is not selected", 0
+    method = selected_item(wifi.get("methods"), selected_id)
+    if method is None:
+        return "BLOCKED", f"selected Wi-Fi method {selected_id!r} does not exist", 0
+    available = method.get("available")
+    if available is None:
+        return "NEEDS_CONFIRMATION", "selected Wi-Fi method availability is unknown", 0
+    if available is False:
+        return "BLOCKED", "selected Wi-Fi method is unavailable", 0
+    verification = method.get("verification")
+    level = VERIFICATION_LEVELS.get(verification, 0)
+    if level < VERIFICATION_LEVELS["corroborated"]:
+        return (
+            "NEEDS_CONFIRMATION",
+            f"selected Wi-Fi method is only {verification}",
+            level,
+        )
+    return (
+        "SATISFIED",
+        f"Wi-Fi credentials use {method.get('type')} outside source control",
+        level,
+    )
+
+
+def binding_requirement(onboarding: dict[str, Any]) -> Requirement:
+    binding = onboarding.get("device_binding", {})
+    committed = binding.get("credentials_committed_to_source")
+    if committed is None:
+        return "NEEDS_CONFIRMATION", "device credential source-control policy is unknown", 0
+    if committed is True:
+        return "BLOCKED", "device credentials are committed to source", 0
+    for field in ("stored_credential_state_handled", "clear_binding_control"):
+        value = binding.get(field)
+        if value is None:
+            return "NEEDS_CONFIRMATION", f"device binding {field} is unknown", 0
+        if value is False:
+            return "BLOCKED", f"device binding {field} is unsupported", 0
+    selected_id = binding.get("selected_method")
+    if not isinstance(selected_id, str) or not selected_id:
+        return "NEEDS_CONFIRMATION", "device binding method is not selected", 0
+    method = selected_item(binding.get("methods"), selected_id)
+    if method is None:
+        return "BLOCKED", f"selected binding method {selected_id!r} does not exist", 0
+    available = method.get("available")
+    if available is None:
+        return "NEEDS_CONFIRMATION", "selected binding method availability is unknown", 0
+    if available is False:
+        return "BLOCKED", "selected binding method is unavailable", 0
+    verification = method.get("verification")
+    level = VERIFICATION_LEVELS.get(verification, 0)
+    if level < VERIFICATION_LEVELS["corroborated"]:
+        return (
+            "NEEDS_CONFIRMATION",
+            f"selected binding method is only {verification}",
+            level,
+        )
+    return (
+        "SATISFIED",
+        f"device binding uses {method.get('type')} outside source control",
+        level,
+    )
+
+
+def combine_requirements(
+    requirements: list[Requirement], legacy_hil_from_levels: bool = False
+) -> dict[str, Any]:
     reasons = [reason for _, reason, _ in requirements]
     states = {state for state, _, _ in requirements}
     levels = [level for state, _, level in requirements if state == "SATISFIED"]
@@ -251,15 +759,19 @@ def combine_requirements(requirements: list[tuple[str, str, int]]) -> dict[str, 
         status = "BLOCKED"
     elif "NEEDS_CONFIRMATION" in states:
         status = "NEEDS_CONFIRMATION"
-    elif levels and min(levels) >= VERIFICATION_LEVELS["hil_verified"]:
+    elif (
+        legacy_hil_from_levels
+        and levels
+        and min(levels) >= VERIFICATION_LEVELS["hil_verified"]
+    ):
         status = "HIL_VERIFIED"
     else:
         status = "READY_TO_PORT"
     return {"status": status, "reasons": reasons}
 
 
-def project_requirements(data: dict[str, Any]) -> list[tuple[str, str, int]]:
-    requirements: list[tuple[str, str, int]] = []
+def project_requirements(data: dict[str, Any]) -> list[Requirement]:
+    requirements: list[Requirement] = []
     revision = data["board"]["hardware_revision"].strip().lower()
     if revision in {"unknown", "unspecified", "n/a"}:
         requirements.append(
@@ -312,31 +824,143 @@ def project_requirements(data: dict[str, Any]) -> list[tuple[str, str, int]]:
     return requirements
 
 
-def assess_ir(data: dict[str, Any]) -> dict[str, Any]:
+def matching_runtime_evidence(
+    data: dict[str, Any], artifact_sha256: str | None
+) -> dict[str, Any] | None:
+    if artifact_sha256 is None:
+        return None
+    normalized = artifact_sha256.lower()
+    for record in data.get("runtime_evidence", []):
+        if (
+            isinstance(record, dict)
+            and str(record.get("artifact_sha256", "")).lower() == normalized
+        ):
+            return record
+    return None
+
+
+def assess_ir(
+    data: dict[str, Any], artifact_sha256: str | None = None
+) -> dict[str, Any]:
+    schema_version = data.get("schema_version")
     requested = data["features"]["requested"]
     audio_input = data["audio_input"]
     audio_output = data["audio_output"]
     camera = data["camera"]
     result: dict[str, Any] = {}
+    project = project_requirements(data)
+    selected_video: dict[str, Any] | None = None
+    selected_wifi: dict[str, Any] | None = None
+    selected_binding: dict[str, Any] | None = None
+
+    if schema_version == 2:
+        resources = data["hardware_resources"]
+        onboarding = data["onboarding"]
+        project.extend(
+            [
+                i2c_requirement(resources),
+                wifi_requirement(onboarding),
+                binding_requirement(onboarding),
+            ]
+        )
+        selected_video = selected_item(
+            camera.get("video_profiles"), camera.get("selected_video_profile")
+        )
+        wifi = onboarding.get("wifi_credentials", {})
+        selected_wifi = selected_item(wifi.get("methods"), wifi.get("selected_method"))
+        binding = onboarding.get("device_binding", {})
+        selected_binding = selected_item(
+            binding.get("methods"), binding.get("selected_method")
+        )
+    else:
+        resources = {}
+
     for feature in requested:
+        if schema_version == 1:
+            if feature == "h5_live_audio":
+                requirements = [codec_requirement(audio_input, "audio_input")]
+            elif feature == "h5_live_video":
+                requirements = [legacy_video_requirement(camera)]
+            elif feature == "h5_talkback":
+                requirements = [codec_requirement(audio_output, "audio_output")]
+            else:
+                requirements = [
+                    codec_requirement(audio_input, "audio_input"),
+                    codec_requirement(audio_output, "audio_output"),
+                ]
+            result[feature] = combine_requirements(
+                requirements, legacy_hil_from_levels=True
+            )
+            continue
+
         if feature == "h5_live_audio":
-            requirements = [codec_requirement(audio_input, "audio_input")]
+            requirements = [
+                codec_requirement(audio_input, "audio_input"),
+                i2s_requirement(resources),
+                audio_mapping_requirement(resources),
+                memory_requirement(resources),
+            ]
         elif feature == "h5_live_video":
-            requirements = [video_requirement(camera)]
+            requirements = [
+                video_requirement_v2(camera),
+                camera_realtime_requirement(resources),
+                memory_requirement(resources),
+            ]
         elif feature == "h5_talkback":
-            requirements = [codec_requirement(audio_output, "audio_output")]
+            requirements = [
+                codec_requirement(audio_output, "audio_output"),
+                i2s_requirement(resources),
+                memory_requirement(resources),
+            ]
         else:
             requirements = [
                 codec_requirement(audio_input, "audio_input"),
                 codec_requirement(audio_output, "audio_output"),
+                i2s_requirement(resources),
+                audio_mapping_requirement(resources),
+                memory_requirement(resources),
             ]
         result[feature] = combine_requirements(requirements)
-    return {
+
+    project_gate = combine_requirements(
+        project, legacy_hil_from_levels=(schema_version == 1)
+    )
+    evidence = matching_runtime_evidence(data, artifact_sha256)
+    if schema_version == 2 and evidence is not None:
+        evidence_features = set(evidence.get("features", []))
+        evidence_levels = set(evidence.get("acceptance_levels", []))
+        for feature, assessment in result.items():
+            if (
+                assessment["status"] == "READY_TO_PORT"
+                and feature in evidence_features
+                and FEATURE_HIL_LEVEL[feature] in evidence_levels
+            ):
+                assessment["status"] = "HIL_VERIFIED"
+                assessment["reasons"].append(
+                    f"artifact {artifact_sha256} passed {FEATURE_HIL_LEVEL[feature]}"
+                )
+        if result and all(
+            item["status"] == "HIL_VERIFIED" for item in result.values()
+        ):
+            project_gate["status"] = "HIL_VERIFIED"
+            project_gate["reasons"].append(
+                f"all requested features have matching artifact evidence for {artifact_sha256}"
+            )
+
+    assessment: dict[str, Any] = {
+        "schema_version": schema_version,
         "board_id": data["board"]["id"],
         "hardware_revision": data["board"]["hardware_revision"],
-        "project_gate": combine_requirements(project_requirements(data)),
+        "project_gate": project_gate,
         "features": result,
     }
+    if schema_version == 2:
+        assessment["selected_video_profile"] = selected_video
+        assessment["selected_wifi_method"] = selected_wifi
+        assessment["selected_binding_method"] = selected_binding
+        assessment["artifact_sha256"] = artifact_sha256
+        assessment["artifact_evidence_matched"] = evidence is not None
+    return assessment
 
 
 def command_init(args: argparse.Namespace) -> int:
@@ -344,7 +968,11 @@ def command_init(args: argparse.Namespace) -> int:
     if output.exists():
         print(f"refusing to overwrite existing file: {output}", file=sys.stderr)
         return 2
-    example = Path(__file__).resolve().parent.parent / "assets" / "hardware-ir.example.json"
+    example = (
+        Path(__file__).resolve().parent.parent
+        / "assets"
+        / "hardware-ir-v2.example.json"
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(example, output)
     print(f"created Hardware IR: {output}")
@@ -377,12 +1005,10 @@ def command_assess(args: argparse.Namespace) -> int:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
         return 2
-    assessment = assess_ir(data)
+    assessment = assess_ir(data, artifact_sha256=args.artifact_sha256)
     print(json.dumps(assessment, ensure_ascii=False, indent=2))
     if args.strict:
-        statuses = {
-            item["status"] for item in assessment["features"].values()
-        }
+        statuses = {item["status"] for item in assessment["features"].values()}
         statuses.add(assessment["project_gate"]["status"])
         if not statuses.issubset(READY_STATUSES):
             return 3
@@ -395,7 +1021,7 @@ def parse_args() -> argparse.Namespace:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="create a new Hardware IR")
+    init_parser = subparsers.add_parser("init", help="create a new Hardware IR v2")
     init_parser.add_argument("output", type=Path)
     init_parser.set_defaults(handler=command_init)
 
@@ -411,6 +1037,10 @@ def parse_args() -> argparse.Namespace:
         "--strict",
         action="store_true",
         help="return non-zero unless every requested feature is ready or HIL verified",
+    )
+    assess_parser.add_argument(
+        "--artifact-sha256",
+        help="bind HIL status to runtime evidence for this exact firmware artifact",
     )
     assess_parser.set_defaults(handler=command_assess)
     return parser.parse_args()

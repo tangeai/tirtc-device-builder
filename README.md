@@ -70,7 +70,7 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 
 ### 4. 把板卡和目标告诉 Codex
 
-有完整板卡资料时，复制下面的提示词并替换尖括号内容。路径使用绝对路径：
+有完整板卡资料时，复制下面的提示词并替换尖括号内容。路径使用绝对路径；未知项写“未知”，不要让 Skill 猜。完整版本见 [通用开发者接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
 
 ```text
 请使用 $tirtc-esp32-builder 完成这块开发板的 TiRTC 移植。
@@ -80,25 +80,41 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 - 完整型号：<型号>
 - 模组：<例如 ESP32-S3-WROOM-1-N16R8>
 - PCB 丝印/硬件版本：<版本>
+- Flash/PSRAM：<容量和总线模式>
 
 资料：
 - 资料目录：/absolute/path/board-materials
 - 原理图或网表：/absolute/path/board-materials/schematic/<file>
 - BSP 或厂商示例：/absolute/path/vendor-bsp
 - 摄像头、Codec、功放数据手册：/absolute/path/board-materials/datasheets
+- BSP 版本：<commit/tag/release>
 
 目标：
 - H5 实时视频和声音
 - H5 下行语音对讲
 - AI 双向语音对讲
 
+媒体合同：
+- H5 支持的视频格式：<MJPEG/H264/H265及合同链接>
+- 本设备选择：<选择一种>
+- 视频提交单位/stream：<完整JPEG或Annex-B access unit/stream ID>
+- 音频格式和stream：<codec、采样率、位宽、声道、ID>
+
+配网与绑定：
+- 板卡/BSP支持：<SoftAP/BLE/SmartConfig/工厂NVS/其他/未知>
+- 本工程选择：<方法或根据证据选择>
+- 凭证注入/保存：<NVS/安全工厂工具/不跟踪的开发配置>
+- 设备绑定支持/选择：<验证码/工厂预绑定/开发凭证/custom>
+- 重配、已有绑定处理与绑定清除方式：<方式或未知>
+
 输出：
 - 新工程：/absolute/path/my-esp32-device
 - 报告：/absolute/path/my-esp32-device/TIRTC_PORTING_REPORT.md
 
-先运行环境检查，再分析全部资料并生成 Hardware IR。
+先运行环境检查，再分析全部资料并生成 Hardware IR v2。
 达到 READY_TO_PORT 后生成工程、完成板级适配并编译。
-本轮不烧录；不要把 Wi-Fi 密码、设备密钥或用户音视频写入工程和报告。
+Skill 保持开发板无关；具体器件、GPIO、时钟、槽位和配网方法只进入该板的 IR/adapter。
+本轮不烧录；不要把 Wi-Fi 密码、设备密钥或用户音视频写入源码、IR和报告。
 ```
 
 手头只有型号也可以开始：
@@ -144,7 +160,7 @@ H5 对讲和 AI 双向对讲。
 - 生成并校验 `hardware-ir.json`，把冲突和未知项留在报告里；
 - 判断视频、上行音频、下行播放和 AI 会话是否具备移植条件；
 - 生成带 TiRTC SDK 的独立 ESP-IDF 工程；
-- 把摄像头、H.264 编码、麦克风、Codec、I2S、功放和按键接到板级 adapter；
+- 把摄像头、所选 MJPEG/H.264/H.265 路径、麦克风、Codec、I2S、功放和按键接到板级 adapter；
 - 运行测试和 `idf.py build`，记录固件路径、版本和 SHA-256；
 - 在用户明确给出芯片、工程和串口后烧录；
 - 分别验证启动、上线、本地媒体、H5、AI 和稳定性；
@@ -154,7 +170,7 @@ H5 对讲和 AI 双向对讲。
 
 模板工程包含配网、绑定、MQTT、TiRTC、H5 和 AI 会话骨架，不包含所有开发板的产品驱动。开发板仍需具备并正确接入：
 
-- 摄像头和 H.264 编码路径；
+- 摄像头和所选 MJPEG/H.264/H.265 完整媒体路径；
 - 麦克风采集路径；
 - Codec、I2S、功放和扬声器播放路径；
 - 板级电源、时钟、复位和使能控制；
@@ -212,6 +228,14 @@ board-materials/
 - H5 实时音频：
 - H5 下行对讲：
 - AI 双向对讲：
+
+# 媒体与接入合同
+
+- H5 支持/选定的视频 profile：
+- 音频格式与 stream ID：
+- 板卡/BSP 支持的 Wi-Fi 凭证方法：
+- 本工程选择的凭证方法和重配入口：
+- ThingConnect 绑定、已绑定跳过和清除方式：
 ```
 
 不同能力需要的证据不一样：
@@ -221,8 +245,9 @@ board-materials/
 | 板卡身份 | 厂商、完整型号、模组、PCB 丝印和硬件版本 | 必需 |
 | 原理图或网表 | GPIO、电源、复位、时钟、I2C、I2S、SPI、摄像头和音频链路 | 必需 |
 | BSP 或厂商示例 | 实际初始化顺序、驱动版本、ESP-IDF 版本和可工作的管脚定义 | 必需 |
-| 摄像头和编码资料 | Sensor、输入接口、H.264 编码位置、Annex-B、SPS/PPS、IDR 控制 | H5 视频必需 |
+| 摄像头和编码资料 | Sensor、输入接口、所选 MJPEG/H.264/H.265 输出边界与刷新/关键帧控制 | H5 视频必需 |
 | 音频资料 | 麦克风类型、Codec/ADC/DAC、采样率、位宽、声道、MCLK/BCLK/LRCK、功放使能 | 对讲必需 |
+| 配网/绑定资料 | 可用 Wi-Fi 凭证方法、凭证存储/重配、可用绑定方法、已有绑定状态和清除入口 | 上线必需 |
 | 数据手册 | 器件寄存器、时序、电气限制和版本差异 | 推荐 |
 | 实测小工程 | 证明摄像头、录音、播放或编码确实在该 PCB 版本工作 | 强烈推荐 |
 
@@ -280,7 +305,7 @@ sudo apt-get install -y git python3 python3-venv bash tar
 
 ### 媒体约束
 
-H5 视频至少需要 H.264 Annex-B access unit、SPS/PPS、IDR 和关键帧请求控制。板上只有摄像头 Sensor，不代表浏览器一定能出图。
+H5 视频必须先从当前前端/服务合同选择一种 profile。MJPEG 需要完整 JPEG 帧；H.264/H.265 需要合同规定的 Annex-B access unit、参数集和刷新/关键帧控制。板上只有摄像头 Sensor，不代表浏览器一定能出图。
 
 当前音频基线使用 G.711 A-law、8 kHz、单声道。对讲还要有可靠的下行队列、A-law 解码、Codec/I2S/功放播放和会话停止清理。没有可用的全双工和 AEC 证据时，应按半双工设计 AI 对讲。
 
@@ -463,6 +488,14 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess --stri
 
 `assess --strict` 在条件不足时返回非零，这是门禁在阻止过早生成，不代表脚本损坏。
 
+Hardware IR v2 只有在运行证据绑定到同一固件 SHA-256 时才会给出 `HIL_VERIFIED`：
+
+```bash
+python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
+  /absolute/path/hardware-ir.json \
+  --artifact-sha256 <64-character-sha256> --strict
+```
+
 ### 生成和编译
 
 推荐直接让 Skill 生成、实现并编译。需要人工复现时，先激活环境，并确保输出目录还不存在：
@@ -502,7 +535,7 @@ idf.py build
 rg -n 'TODO\(product-' main components
 ```
 
-常见适配内容包括麦克风采集、G.711 A-law 编码、H.264 Annex-B 输出、IDR 请求、下行音频播放、实体按键和会话停止后的资源清理。
+常见适配内容包括麦克风采集、G.711 A-law 编码、所选视频 profile 输出与刷新请求、下行音频播放、实体按键和会话停止后的资源清理。
 
 ## 烧录和验收
 
@@ -544,35 +577,29 @@ idf.py -p /dev/ttyACM0 flash monitor
 
 使用 `Ctrl+]` 退出 ESP-IDF Monitor。多个串口同时存在时，需要通过 USB 拔插、设备标识或芯片探测确认目标，不能默认烧录第一个端口。
 
-### 首次配网和设备绑定
+### Wi-Fi 凭证和设备绑定
 
-固件首次启动且没有 Wi-Fi 配置时：
+Skill 不假设每块板都支持 SoftAP，也不要求开发者把 SSID/密码写死。Hardware IR 应从 BSP 和产品要求中选择一条可用路径：SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。
 
-1. 用手机或电脑连接 `TiRTC-Setup-XXXX`。
-2. 输入默认密码 `tirtc1234`。
-3. 打开 `http://192.168.4.1`，填写设备要连接的 Wi-Fi。
-4. 设备重启并联网后，在串口日志中查看绑定验证码和体验平台地址。
-5. 登录体验平台，在设备绑定入口输入验证码。
-6. 回到串口输入 `status`，确认 platform、MQTT 和 TiRTC 均已就绪，runtime 为 `waiting`。
+选中的方法必须满足：凭证不进入 Git/源码/报告；存在清除或重配入口；该 PCB/BSP 有证据支持。没有 SoftAP 但支持工厂 NVS 的设备仍可接入。把明文密码提交到工程会被 v2 门禁判为 `BLOCKED`。
 
-常用串口命令：
+Wi-Fi 和 ThingConnect 绑定是两个独立状态机。绑定可选择验证码、工厂预绑定、开发凭证或平台合同允许的 custom 流程，应分别验证：
 
-```text
-wifi-set <ssid> <password>
-wifi-clear
-status
-restart
-```
+1. 无 Wi-Fi 凭证时进入所选配网/注入流程。
+2. 已联网但无设备绑定时，进入所选绑定流程；选择验证码时才显示验证码。
+3. NVS 已有绑定时，明确记录复用/跳过初始绑定，而不是误判为绑定流程缺失。
+4. 分别验证只清设备绑定和只清 Wi-Fi 凭证的入口。
+5. `status` 确认 platform、MQTT、TiRTC 和 runtime 状态。
 
-`tirtc-set <device_id> <device_secret> [client_id]` 只用于受控的底层联调。正常接入优先使用验证码绑定，真实凭证不能写进源码、脚本、报告或 Git。
+具体命令和 UI 由生成工程及所选方法定义，不能从另一块板复制。生产凭证、设备 secret 和 token 不能写进源码、脚本、Hardware IR、报告或 Git。
 
 ### 验证 H5 实时查看和对讲
 
 1. 串口 `status` 显示 runtime 为 `waiting`。
 2. 在体验平台打开该设备的实时查看入口。
-3. 确认 H.264 视频持续显示，音频和视频发送计数持续增长。
+3. 确认所选 MJPEG/H.264/H.265 视频持续显示，音频和视频发送计数持续增长。
 4. 发起 H5 对讲，确认 stream 14 下行计数增长，实体扬声器可以听到声音。
-5. 触发浏览器重连或关键帧请求，确认板端产生新的 IDR，画面能够恢复。
+5. 触发浏览器重连或刷新请求，确认 MJPEG 提交下一张完整 JPEG，或 H.264/H.265 产生合同要求的刷新/关键帧，画面能够恢复。
 
 视频、声音和重连分别保留证据。浏览器偶尔显示一帧，不等于持续实时查看已经通过。
 
@@ -597,7 +624,7 @@ restart
 | L0 Generate | 新工程和 Hardware IR 存在，没有覆盖旧目录 |
 | L1 Build | `idf.py build` 成功，固件和 SHA-256 已记录 |
 | L2 Boot | 指定串口烧录成功，无 panic 或反复重启 |
-| L3 Online | 配网、验证码绑定、MQTT 和 TiRTC 就绪 |
+| L3 Online | 所选 Wi-Fi 凭证和设备绑定流程、MQTT 与 TiRTC 就绪 |
 | L4 Media | 摄像头、麦克风、扬声器的本地路径和计数正常 |
 | L5 H5 | 浏览器持续收到声明的音视频，下行对讲到达实体扬声器 |
 | L6 AI | token、WHIP、`start_session`、双向音频、停止和 H5 恢复正常 |
@@ -746,11 +773,11 @@ WSL 默认不一定能看到 USB 设备。按 [Microsoft WSL USB 连接说明](h
 
 ### Hardware IR 一直是 `NEEDS_CONFIRMATION`
 
-查看每个未知项的来源要求。最常缺的是准确 PCB 版本、摄像头数据格式、H.264 编码位置、Codec 时钟、功放使能脚和可工作的厂商示例。补资料比从相似开发板复制管脚更可靠。
+查看每个未知项的来源要求。最常缺的是准确 PCB 版本、摄像头数据格式、所选视频 profile 的完整输出路径、Codec 时钟、功放使能脚、配网方法和可工作的厂商示例。补资料比从相似开发板复制管脚更可靠。
 
 ### 工程能编译，浏览器没有画面
 
-重点检查摄像头输出是否真正进入 H.264 编码器，以及输出是否为 Annex-B。还要确认 SPS/PPS、首个 IDR、关键帧请求和持续发送计数。只有 JPEG、RGB 或裸 YUV 输出时，模板不会自动把它变成 H.264。
+重点检查摄像头输出是否真正进入所选视频路径。MJPEG 必须逐次提交完整 JPEG；H.264/H.265 必须符合合同规定的 Annex-B、参数集和刷新帧行为。还要确认持续发送计数、丢弃和队列水位。Sensor 的 JPEG、RGB 或裸 YUV 能力本身不等于完整 H5 路径。
 
 ### 工程能编译，但 H5 或 AI 没有声音
 
@@ -787,7 +814,7 @@ Skill、Device Kit 和 ESP-IDF 会写到 npm 包目录之外，还可能占用�
 
 ### 只给开发板型号能不能自动完成全部代码？
 
-可以先开始分析，不能保证直接完成硬件移植。型号足以定位候选资料，但 GPIO、器件版本、H.264 能力和音频时钟必须有可信来源。资料不足时，Skill 会给出最小补充清单，不会用相似板型填空。
+可以先开始分析，不能保证直接完成硬件移植。型号足以定位候选资料，但 GPIO、器件版本、所选视频 profile、音频时钟和配网能力必须有可信来源。资料不足时，Skill 会给出最小补充清单，不会用相似板型填空。
 
 ### 能接入已有 ESP-IDF 工程吗？
 

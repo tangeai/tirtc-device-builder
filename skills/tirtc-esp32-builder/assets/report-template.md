@@ -5,6 +5,9 @@
 - Board ID: `{{BOARD_ID}}`
 - Model/revision: `{{BOARD_MODEL_REVISION}}`
 - Requested features: `{{REQUESTED_FEATURES}}`
+- Selected media profile: `{{SELECTED_MEDIA_PROFILE}}`
+- Selected Wi-Fi credential method: `{{SELECTED_WIFI_METHOD}}`
+- Selected device-binding method: `{{SELECTED_BINDING_METHOD}}`
 - Output project: `{{PROJECT_PATH}}`
 
 ## Locked inputs
@@ -45,6 +48,18 @@
 - Firmware artifacts: `{{FIRMWARE_ARTIFACTS}}`
 - Firmware SHA-256: `{{FIRMWARE_SHA256}}`
 - Flash command/result: `{{FLASH_RESULT}}`
+
+## Artifact-bound runtime evidence
+
+| Artifact SHA-256 | Acceptance levels | Observations | Current/superseded |
+|---|---|---|---|
+|  |  |  |  |
+
+## Runtime metrics
+
+- Wi-Fi BSSID/channel/RSSI and roaming: `{{WIFI_RUNTIME_METRICS}}`
+- Media tx/rx/drop/error and queue watermarks: `{{MEDIA_RUNTIME_METRICS}}`
+- Camera overflow, internal heap/largest block, PSRAM: `{{RESOURCE_RUNTIME_METRICS}}`
 
 ## Remaining work and risks
 

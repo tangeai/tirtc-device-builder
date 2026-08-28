@@ -23,10 +23,17 @@ $tirtc-esp32-builder
 - 产品页或资料链接：...
 - 原理图：/absolute/path/board-schematic.pdf
 - BSP 或示例工程：/absolute/path/vendor-bsp
+- H5 媒体合同：<支持格式、选定格式、stream 和帧/访问单元边界>
+- Wi-Fi 凭证方式：<SoftAP/BLE/SmartConfig/工厂 NVS/其他/未知>
+- 重配与设备绑定合同：<资料或未知>
 - 输出目录：/absolute/path/my-tirtc-device
 
-先完成能力分析；具备条件后生成并编译。只有我明确指定串口时才烧录。
+先生成 Hardware IR v2 并完成能力分析；具备条件后生成并编译。
+Skill 保持板卡无关，具体器件、引脚和配网方式只进入该板 IR/adapter。
+只有我明确指定串口并授权当前固件 SHA-256 时才烧录。
 ```
+
+更完整的可复制版本见 [通用开发者接入提示词](assets/developer-intake-prompt.md)。SoftAP 不是强制条件；没有 AP 配网时，可选择有证据的 BLE、SmartConfig、安全工厂/NVS 注入或其他可重配路径。生产 SSID/密码不能进入源码或报告。
 
 ## ESP32 Device Kit
 
@@ -92,8 +99,8 @@ python3 <skill-dir>/scripts/hardware_ir.py validate /tmp/hardware-ir.json
 python3 <skill-dir>/scripts/hardware_ir.py assess --strict /tmp/hardware-ir.json
 ```
 
-`BLOCKED` 表示资料已确认硬件不满足；`NEEDS_CONFIRMATION` 表示仍有未知项或只有单一来源；`READY_TO_PORT` 表示可以生成并实现板级适配；`HIL_VERIFIED` 表示端到端实机验收通过。
+`init` 默认创建 schema v2；v1 仅用于兼容已有 H.264 IR。`BLOCKED` 表示资料已确认硬件/合同/资源或凭证策略不满足；`NEEDS_CONFIRMATION` 表示仍有未知项或只有单一来源；`READY_TO_PORT` 表示可以生成并实现板级适配；`HIL_VERIFIED` 还要求 `--artifact-sha256` 匹配该固件的 L5/L6 运行证据。
 
 ## 当前边界
 
-ThingConnect 仓库提供 ESP32-S3 H5/AI 模板和生成器，但默认媒体适配器不包含特定开发板的摄像头、麦克风、H.264 编码和扬声器驱动。模板生成和编译成功只证明工程与协议骨架可用，不代表 Web 已经出图或 AI 音频已经通过实机验收。
+ThingConnect 仓库提供 ESP32-S3 H5/AI 模板和生成器，但默认媒体适配器不包含特定开发板的摄像头、麦克风、选定视频路径、Wi-Fi 凭证方法和扬声器驱动。模板生成和编译成功只证明工程与协议骨架可用，不代表 Web 已经出图或 AI 音频已经通过实机验收。

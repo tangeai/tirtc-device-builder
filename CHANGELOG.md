@@ -2,6 +2,15 @@
 
 This project follows Semantic Versioning.
 
+## 0.4.0
+
+- Add Hardware IR v2 with selected MJPEG, H.264, or H.265 video profiles while retaining schema v1 compatibility.
+- Gate I2C driver-family consistency, I2S/GPIO ownership, audio channel mapping, camera realtime policy, and startup/media memory budgeting.
+- Model Wi-Fi credential methods independently from board hardware: SoftAP, BLE, SmartConfig, factory NVS, development configuration, or documented custom provisioning can be selected from evidence.
+- Block credentials committed to source and require a reprovisioning path plus a selected verification-code/factory/custom binding profile, stored-binding handling, and reset behavior.
+- Bind HIL status to the exact firmware SHA-256 and acceptance level instead of inheriting evidence from older artifacts.
+- Add a board-agnostic developer intake prompt and bring-up risk gates covering sensor identity, TLS/memory, Wi-Fi quality, media counters, and one-variable HIL diagnosis.
+
 ## 0.3.0
 
 - Add reproducible packaging for a minimal, checksummed ESP32-S3 Device Kit release asset.

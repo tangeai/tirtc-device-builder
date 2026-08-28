@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "board": {
+    "id": "example_esp32s3_media_board",
+    "vendor": "Example Vendor",
+    "model": "ESP32-S3 Media Board",
+    "hardware_revision": "unspecified"
+  },
+  "sources": [
+    {
+      "id": "board-materials",
+      "kind": "user-supplied-materials",
+      "location": "user-supplied://board-materials",
+      "revision": "unspecified"
+    }
+  ],
+  "soc": {
+    "target": "esp32s3",
+    "module": "ESP32-S3-WROOM-1-N16R8",
+    "flash_mb": 16,
+    "psram_mb": 8,
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "toolchain": {
+    "framework": "esp-idf",
+    "framework_version": "5.5.x",
+    "verification": "extracted",
+    "tirtc": {
+      "platform": "espressif-esp32s3",
+      "version": "2.3.0",
+      "sdk_path": "device-sim/sdk/espressif-esp32s3/2.3.0",
+      "build_contract": "manifest/build-contract.env"
+    },
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "camera": {
+    "present": null,
+    "sensor": null,
+    "interface": null,
+    "selected_video_profile": null,
+    "video_profiles": [],
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "audio_input": {
+    "present": null,
+    "interface": null,
+    "codecs": [],
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "audio_output": {
+    "present": null,
+    "interface": null,
+    "codecs": [],
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "hardware_resources": {
+    "i2c": {
+      "used": null,
+      "driver_family": null,
+      "single_driver_family": null,
+      "verification": "extracted"
+    },
+    "i2s": {
+      "used": null,
+      "controller_and_gpio_ownership_resolved": null,
+      "verification": "extracted"
+    },
+    "audio_channel_mapping": {
+      "required": null,
+      "resolved": null,
+      "verification": "extracted"
+    },
+    "camera_realtime": {
+      "pipeline_safe": null,
+      "verification": "extracted"
+    },
+    "memory": {
+      "startup_and_media_budgeted": null,
+      "verification": "extracted"
+    },
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "onboarding": {
+    "wifi_credentials": {
+      "selected_method": null,
+      "methods": [],
+      "credentials_committed_to_source": null,
+      "reprovisioning_defined": null
+    },
+    "device_binding": {
+      "selected_method": null,
+      "methods": [],
+      "credentials_committed_to_source": null,
+      "stored_credential_state_handled": null,
+      "clear_binding_control": null
+    },
+    "source_refs": [
+      "board-materials"
+    ]
+  },
+  "runtime_evidence": [],
+  "features": {
+    "requested": [
+      "h5_live_audio",
+      "h5_live_video",
+      "h5_talkback",
+      "ai_talk"
+    ]
+  }
+}

@@ -48,6 +48,14 @@ test("install copies a complete skill to an explicit skills directory", async ()
     assert.equal(result.status, 0, result.stderr);
     assert.equal(existsSync(join(target, "SKILL.md")), true);
     assert.equal(existsSync(join(target, "scripts", "doctor.py")), true);
+    assert.equal(
+      existsSync(join(target, "assets", "hardware-ir-v2.example.json")),
+      true,
+    );
+    assert.equal(
+      existsSync(join(target, "assets", "developer-intake-prompt.md")),
+      true,
+    );
     assert.match(result.stdout, /Installed tirtc-esp32-builder/);
   });
 });

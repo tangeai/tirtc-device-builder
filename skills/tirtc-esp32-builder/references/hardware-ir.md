@@ -1,49 +1,69 @@
 # Hardware IR
 
-Hardware IR is a generated, reviewable description of one exact board revision. It is the only input consumed by deterministic capability checks. Start from [the example](../assets/hardware-ir.example.json) with:
+Hardware IR describes one exact board revision and product contract. It is the deterministic handoff from board evidence to capability assessment, generation, build, and HIL reporting.
+
+Create the current schema:
 
 ```bash
 python3 <skill-dir>/scripts/hardware_ir.py init <output>/hardware-ir.json
 ```
 
+The initializer creates schema v2. The validator still accepts schema v1 for existing H.264-only projects; update new or materially changed boards to v2.
+
 ## Evidence rules
 
 - Give every source a stable `id`, `kind`, `location`, and revision when available.
-- Reference those IDs from `soc`, `toolchain`, `camera`, `audio_input`, and `audio_output`.
-- Use `null` for unknown presence, pins, formats, or encoder properties. Empty strings are invalid facts.
-- Hardware revision `unspecified` is acceptable during intake but blocks registration as a reusable supported board.
-- Keep desired features under `features.requested`; do not encode wishes as hardware facts.
-- Record the strongest evidenced verification level, not the intended future state.
+- Reference source IDs from board facts, selected profiles, onboarding methods, resources, and runtime evidence.
+- Use `null` for unknown facts. Retain contradictory values as explicit issues instead of choosing silently.
+- Hardware revision `unspecified` is valid during intake but blocks reusable-board readiness.
+- Keep requested product features under `features.requested`; desired behavior is not hardware evidence.
+- Store concrete sensors, pins, clocks, codecs, slots, and task allocation in this board IR/adapter, never in generic Skill defaults.
 
 Verification levels are ordered:
 
-1. `extracted`: obtained from one source.
-2. `corroborated`: confirmed by another authoritative artifact, such as schematic plus BSP.
-3. `build_verified`: the matching implementation builds with the locked toolchain.
-4. `hardware_verified`: the peripheral works on the exact physical revision.
-5. `hil_verified`: the requested H5/AI path passes end to end.
+1. `extracted`: one source.
+2. `corroborated`: another authoritative artifact confirms it.
+3. `build_verified`: matching implementation builds with the locked toolchain.
+4. `hardware_verified`: the local peripheral works on the exact board revision.
+5. `hil_verified`: retained for legacy facts; schema v2 feature HIL additionally requires matching artifact evidence.
 
-## Minimum facts
+## Schema v2 contracts
 
 The IR contains:
 
-- exact board identity and revision;
-- SoC target, module, Flash, and PSRAM;
-- ESP-IDF and TiRTC SDK platform/version/build contract plus their verification level;
-- camera presence, sensor/interface, and H.264 output/key-frame properties;
-- audio input and output presence, interface, codecs, sample rates, and verification;
-- requested ThingConnect feature IDs.
+- exact board identity, module, Flash/PSRAM, ESP-IDF, TiRTC SDK and build contract;
+- camera identity evidence plus `video_profiles[]` and `selected_video_profile`;
+- audio input/output paths;
+- `hardware_resources` for I2C, I2S/GPIO ownership, audio channel mapping, camera realtime policy, and memory budget;
+- `onboarding.wifi_credentials` with selectable SoftAP/BLE/SmartConfig/factory/development/custom methods;
+- selectable ThingConnect binding methods plus stored-binding states and reset control;
+- requested features;
+- optional `runtime_evidence[]`, each bound to a full firmware SHA-256.
 
-Pin and driver details may live in a board adapter manifest referenced from the IR once the adapter exists. Until then, missing pins remain capability issues even if the high-level media path appears possible.
+The selected Wi-Fi method must be available and corroborated, credentials must remain outside tracked source, and reprovisioning must be defined. A board without SoftAP is valid when another selected method meets those conditions.
+
+The selected video profile controls assessment. An unselected H.264 fallback cannot make an MJPEG target pass, and missing H.264 cannot block an evidenced MJPEG target.
+
+## Artifact-bound HIL
+
+Run:
+
+```bash
+python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
+  --artifact-sha256 <64-character-sha256> --strict
+```
+
+H5 features require matching L5 evidence; AI requires matching L6 evidence. Evidence from an older firmware remains provenance but does not verify the current artifact.
 
 ## Intake quality
 
-Preferred input order:
+Preferred evidence order:
 
 1. exact schematic/netlist and BOM for the physical revision;
 2. official BSP pinned to a commit or release;
-3. sensor, codec, amplifier, and module datasheets;
-4. a minimal project that has been built for the board;
-5. product pages, README files, photographs, and community material.
+3. sensor, codec, amplifier and module datasheets;
+4. minimal peripheral projects built for that board;
+5. product pages, photographs and community material;
+6. artifact-bound boot, media and browser observations.
 
-A schematic establishes electrical connectivity, not driver maturity, encoding throughput, acoustic behavior, or end-to-end TiRTC compatibility. Preserve those as separate verification facts.
+A schematic establishes connectivity, not driver family compatibility, encoding throughput, acoustic behavior, provisioning usability, network performance, or end-to-end TiRTC operation. Preserve each as a separate fact and verification level.

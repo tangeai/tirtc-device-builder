@@ -19,11 +19,12 @@ The branch is complete when the new run has its own build and verification evide
 Use this branch when the user supplies a board model, vendor URL, schematic, BOM, pin map, BSP, datasheets, photographs, or peripheral example projects without a verified adapter.
 
 1. Resolve the full model, module, PCB marking, and hardware revision. Treat different revisions as different boards.
-2. Prefer official schematic/BOM and BSP facts. For a PDF schematic, inspect page labels and net names; prefer an exported netlist, pin CSV, or vendor board definition when available.
-3. Cross-check critical pins, clocks, power enables, reset lines, sensor/codec variants, and ESP-IDF version across at least two independent artifacts when possible.
-4. Create the Hardware IR. Use `null` for unknown facts and retain contradictory values as an explicit issue instead of selecting one silently.
-5. Validate and assess requested features. Ask only for unresolved facts that block the next safe step.
-6. When all requirements reach `READY_TO_PORT`, generate the starter and implement the board adapter. When requirements remain blocked, generate only the IR, capability report, and an optional compile-safe skeleton if requested.
+2. Freeze the user-supplied product contract: selected video profile, audio/stream formats, duplex/AEC policy, supported Wi-Fi credential methods, selected onboarding method, transport staging, output path, and mutation boundary. Use `unknown` where the prompt lacks an answer.
+3. Prefer official schematic/BOM and BSP facts. For a PDF schematic, inspect page labels and net names; prefer an exported netlist, pin CSV, or vendor board definition when available.
+4. Cross-check critical pins, clocks, power enables, reset lines, sensor/codec variants, ESP-IDF version, resource ownership, and onboarding behavior across at least two independent artifacts when possible.
+5. Create the Hardware IR v2. Use `null` for unknown facts and retain contradictory values as an explicit issue instead of selecting one silently. Store concrete board values in the IR/adapter rather than Skill files.
+6. Validate and assess requested features. Ask only for unresolved facts that block the next safe step. SoftAP is optional when another evidenced Wi-Fi credential method is available, keeps credentials outside source, and defines reprovisioning.
+7. When all requirements reach `READY_TO_PORT`, generate the starter and implement the board adapter. When requirements remain blocked, generate only the IR, capability report, and an optional compile-safe skeleton if requested.
 
 The branch is complete when every supplied artifact maps to an IR fact, provenance entry, contradiction, or declared irrelevant item.
 
@@ -55,16 +56,16 @@ The runtime-facing `starter_media` interface stays stable. A reusable board inte
 
 The adapter owns:
 
-- camera capture and H.264 encoding tasks;
+- camera capture and the selected MJPEG/H.264/H.265 media path;
 - microphone capture and audio encoding;
 - downlink audio decode, buffering, codec, amplifier, and I2S playback;
-- DMA buffers, hardware clocks, power, reset, GPIO, and key-frame requests;
+- DMA buffers, hardware clocks, power, reset, GPIO, refresh/key-frame requests, and realtime task allocation;
 - bounded stop, resource release, and generation-aware flushing.
 
 The stable modules own stream IDs, negotiated/contracted formats, TiRTC callback copying, connection handles, session generation, and H5/AI sequencing.
 
 ## Verification loop
 
-Use a bounded loop per layer: diagnose one failing invariant, make the smallest correction, and rerun that layer before moving forward. Stop and report when the remaining failure requires unavailable hardware, credentials, a new SDK binary, a public protocol change, or a user choice.
+Use a bounded loop per layer: diagnose one failing invariant, make the smallest correction, and rerun that layer before moving forward. Change one high-risk variable per HIL comparison. Turn reusable invariants into tests or post-link gates. Stop and report when the remaining failure requires unavailable hardware, credentials, a new SDK binary, a public protocol change, or a user choice.
 
-Do not use successful compilation as evidence for camera frames, speaker output, Web rendering, AI audio, or long-run stability.
+Do not use successful compilation as evidence for camera frames, speaker output, Web rendering, AI audio, or long-run stability. Bind every runtime conclusion to the tested firmware SHA-256.
