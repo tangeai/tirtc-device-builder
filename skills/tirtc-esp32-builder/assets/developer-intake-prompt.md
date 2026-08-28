@@ -1,90 +1,50 @@
-# Generic TiRTC ESP32 developer intake prompt
+# TiRTC ESP32 开发板接入提示词
 
-Replace every `<...>` value. Write `unknown` when the fact is not known; do not remove the field or invite a guess.
+不用先把所有硬件参数查齐。你只要说明是哪块板、资料放在哪里、想实现什么，以及工程输出到哪里。其余内容由 Skill 从原理图、BSP、Device Kit 和数据手册中提取；确实不知道的地方写“未知”。
+
+## 精简模板
 
 ```text
 $tirtc-esp32-builder
 
-Build a ThingConnect TiRTC port for this exact board revision. Start with evidence
-and gates; generate and compile only after the requested features reach READY_TO_PORT.
+请为下面这块开发板完成 ThingConnect TiRTC ESP32 接入。
 
-Board identity
-- Vendor: <vendor>
-- Full sales model: <model>
-- SoC/module: <full part number>
-- PCB marking/hardware revision: <revision>
-- Flash/PSRAM: <capacity and bus mode>
-- I confirm the supplied schematic/BOM/BSP matches the physical board: <yes/no/unknown>
-- Board photo directory: <absolute path or URL>
+开发板：
+- 厂商、完整型号、PCB/硬件版本：<填写>
+- 资料与手中实物是否对应：<是/否/未知>
 
-Requested product behavior
-- H5 live video: <yes/no>
-- H5 live audio: <yes/no>
-- H5 talkback: <yes/no>
-- AI bidirectional talk: <yes/no>
-- Initial duplex policy: <half duplex/full duplex required>
-- AEC requirement: <none/required with HIL>
+资料：
+- <原理图、BSP/厂商示例、数据手册、产品页等本地绝对路径或固定链接；一行一个>
 
-Media contract
-- H5-supported video codecs and contract version: <MJPEG/H264/H265 + document>
-- Selected device video codec: <exactly one>
-- Video stream ID and submission unit: <complete JPEG/Annex-B access unit/etc.>
-- Refresh/key-frame behavior: <contract>
-- Uplink audio codec/rate/bits/channels/stream: <values>
-- H5 downlink audio codec/rate/bits/channels/stream: <values>
-- AI audio codec/rate/bits/channels/stream: <values>
+目标：
+- <例如：H5 实时视频和声音、H5 语音对讲、AI 双向语音对讲>
+- 视频选择：<MJPEG/H264/H265/根据合同和硬件证据选择>
+- 双工或 AEC 的硬要求：<无，初版可半双工/必须全双工或 AEC/未知>
 
-Board evidence
-- Material root: <absolute path>
-- Schematic/netlist: <absolute path>
-- BOM: <absolute path>
-- BSP: <path or repository URL plus commit/tag>
-- Camera/record/playback examples: <paths or immutable links>
-- Camera, codec, amplifier, IO-expander and module datasheets: <paths>
-- Known-good logs/firmware and SHA-256: <paths or unknown>
-- Known contradictions: <for example schematic sensor vs probed PID, or none>
+接入方式：
+- Wi-Fi：<选择一种，或写“根据 BSP 选择”>
+- 设备绑定：<选择一种，或写“根据平台合同选择”>
 
-Wi-Fi and onboarding
-- Board/BSP-supported credential methods: <SoftAP/BLE/SmartConfig/factory NVS/custom/unknown>
-- Preferred method for this port: <method or ask the assessor to select from evidence>
-- Credential storage/injection: <NVS/encrypted NVS/secure factory tool/untracked dev config>
-- Reprovision/reset mechanism: <method or unknown>
-- ThingConnect binding methods: <verification code/factory bound/development credentials/custom>
-- Selected binding method, stored-binding behavior, and reset API/doc: <values>
-- Production credentials must remain outside source and reports: yes
+工程：
+- 输出目录或现有工程：<绝对路径>
 
-Toolchain and platform
-- ESP-IDF version: <version>
-- Target: <for example esp32s3>
-- TiRTC SDK platform/version: <values>
-- Device Kit root or managed setup: <absolute path>
-- Platform discovery endpoint/transport: <HTTP or HTTPS URL/environment>
-- TiRTC SDK endpoint: <built in or explicit; keep separate from discovery>
-- Transport staging: <for example HTTPS from start, or authorized HTTP L3-L5 baseline then HTTPS>
-- Output project: <absolute path>
-
-Required execution
-1. Run Device Kit Doctor first and resolve every required failure.
-2. Hash and inspect every supplied artifact. Generate Hardware IR v2; keep unknowns
-   null and contradictions as issues.
-3. Select only evidenced media and Wi-Fi profiles. Do not hardcode one board's sensor,
-   codec, pins, or provisioning method into the Skill.
-4. Before code, freeze camera identity/PID, I2C driver family, I2S/controller/GPIO/clock
-   ownership, audio channel/TDM mapping, DMA/tasks, memory budget, onboarding states,
-   and platform/TiRTC startup order.
-5. Treat plaintext credentials committed to source as BLOCKED. SoftAP is optional when
-   another evidenced, reprovisionable credential path exists.
-6. Generate a board adapter; keep concrete board facts out of common H5/AI/TiRTC modules.
-7. Add focused tests or post-link gates for each discovered invariant. Validate the final
-   ELF, build, record BIN/ELF size and SHA-256, and output TIRTC_PORTING_REPORT.md.
-8. Keep READY_TO_PORT, BUILD_VERIFIED, L2-L7, and HIL_VERIFIED separate. Bind runtime
-   evidence to the exact firmware SHA-256. Change one high-risk variable per HIL run.
-9. Do not access a serial port, flash, erase NVS, or monitor this turn. Flash only after I
-   provide an exact port and explicit authorization for that artifact.
-10. Never place Wi-Fi passwords, device keys, MQTT/WHIP/AI tokens, private keys, or user
-    media in source, Hardware IR, logs, or reports.
-
-Deliver doctor.json, hardware-ir.json, capability-assessment.json, dependency lock,
-the buildable ESP-IDF project, policy tests, artifact hashes, TIRTC_PORTING_REPORT.md,
-and every blocker with its smallest next action.
+执行要求：
+1. 先运行 Device Kit Doctor，读完全部资料，再生成 Hardware IR v2。没有证据的器件、GPIO 和媒体能力保持未知。
+2. 资料不足时，列出矛盾、缺失项和最小补充动作；达到 READY_TO_PORT 后再生成板级 adapter、编译并记录 BIN/ELF SHA-256。
+3. 移植前核对媒体合同、板级资源、内存预算、配网和绑定状态。具体板卡参数只写入该板的 Hardware IR 和 adapter。
+4. 输出 TIRTC_PORTING_REPORT.md，并把编译结果与 L2-L7 实机验收分开记录。
+5. 本轮不访问串口、不烧录、不擦除 NVS。Wi-Fi 密码、设备密钥、token、私钥和用户音视频也不能写入工程或报告。
 ```
+
+## 只有已知时才补充
+
+这些信息如果手头已有，也可以附上；没有就交给 Skill 查资料：
+
+- 主控/模组完整型号、Flash 和 PSRAM 容量及总线模式；
+- BSP 的 commit、tag 或 release，以及已验证的摄像头、录音和播放示例；
+- H5/AI 媒体合同链接、选定 profile、stream ID 和帧或 access unit 边界；
+- 凭证保存与重配方式、已有绑定处理和独立清除入口；
+- 已知资料矛盾、实机 PID、串口日志或已知良好固件 SHA-256；
+- 非默认 ESP-IDF、TiRTC SDK、Device Kit、服务发现地址或 HTTP/HTTPS 分阶段要求。
+
+直接把它们追加在提示词末尾即可，不必逐项填表。

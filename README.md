@@ -70,51 +70,28 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 
 ### 4. 把板卡和目标告诉 Codex
 
-资料较完整时，复制下面的提示词并替换尖括号内容。路径请使用绝对路径；不确定的内容直接写“未知”，交给 Skill 列出待确认项。更完整的版本见[通用开发者接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
+把你已经掌握的信息填进下面的提示词即可，不用先查齐所有硬件参数。路径请使用绝对路径，不确定的内容写“未知”。可直接复制的版本见[开发板接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
 
 ```text
 请使用 $tirtc-esp32-builder 完成这块开发板的 TiRTC 移植。
 
-板卡：
-- 厂商：<厂商>
-- 完整型号：<型号>
-- 模组：<例如 ESP32-S3-WROOM-1-N16R8>
-- PCB 丝印/硬件版本：<版本>
-- Flash/PSRAM：<容量和总线模式>
+开发板：
+- 厂商、完整型号、PCB/硬件版本：<填写>
+- 资料与手中实物是否对应：<是/否/未知>
 
 资料：
-- 资料目录：/absolute/path/board-materials
-- 原理图或网表：/absolute/path/board-materials/schematic/<file>
-- BSP 或厂商示例：/absolute/path/vendor-bsp
-- 摄像头、Codec、功放数据手册：/absolute/path/board-materials/datasheets
-- BSP 版本：<commit/tag/release>
+- <原理图、BSP/厂商示例、数据手册或产品页；一行一个>
 
 目标：
-- H5 实时视频和声音
-- H5 下行语音对讲
-- AI 双向语音对讲
+- 功能：<例如 H5 实时音视频、H5 对讲、AI 双向语音>
+- 视频：<MJPEG/H264/H265/根据合同和硬件证据选择>
+- Wi-Fi：<指定方案/根据 BSP 选择>
+- 设备绑定：<指定方案/根据平台合同选择>
 
-媒体合同：
-- H5 支持的视频格式：<MJPEG/H264/H265及合同链接>
-- 本设备选择：<选择一种>
-- 视频提交单位/stream：<完整JPEG或Annex-B access unit/stream ID>
-- 音频格式和stream：<codec、采样率、位宽、声道、ID>
+工程：<输出目录或现有工程的绝对路径>
 
-配网与绑定：
-- 板卡/BSP支持：<SoftAP/BLE/SmartConfig/工厂NVS/其他/未知>
-- 本工程选择：<方法或根据证据选择>
-- 凭证注入/保存：<NVS/安全工厂工具/不跟踪的开发配置>
-- 设备绑定支持/选择：<验证码/工厂预绑定/开发凭证/custom>
-- 重配、已有绑定处理与绑定清除方式：<方式或未知>
-
-输出：
-- 新工程：/absolute/path/my-esp32-device
-- 报告：/absolute/path/my-esp32-device/TIRTC_PORTING_REPORT.md
-
-先运行环境检查，再分析全部资料并生成 Hardware IR v2。
-达到 READY_TO_PORT 后生成工程、完成板级适配并编译。
-Skill 保持开发板无关；具体器件、GPIO、时钟、槽位和配网方法只进入该板的 IR/adapter。
-本轮不烧录；不要把 Wi-Fi 密码、设备密钥或用户音视频写入源码、IR和报告。
+请先运行 Doctor，分析全部资料并生成 Hardware IR v2。资料不足时列出最小补充项；达到 READY_TO_PORT 后再生成、适配和编译，并输出 TIRTC_PORTING_REPORT.md。
+本轮不访问串口、不烧录、不擦除 NVS，也不要把任何凭证写入源码或报告。
 ```
 
 手头只有型号也可以开始：

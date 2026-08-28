@@ -14,26 +14,22 @@ npx tirtc-device-builder@latest setup esp32 --install
 ```text
 $tirtc-esp32-builder
 
-在“厂商 + 完整开发板型号 + PCB 版本”上实现：
-- H5 实时视频和声音
-- H5 按住说话
-- AI 双向对讲
+开发板：<厂商、完整型号、PCB 版本>
+资料与实物对应：<是/否/未知>
 
 资料：
-- 产品页或资料链接：...
-- 原理图：/absolute/path/board-schematic.pdf
-- BSP 或示例工程：/absolute/path/vendor-bsp
-- H5 媒体合同：<支持格式、选定格式、stream 和帧/访问单元边界>
-- Wi-Fi 凭证方式：<SoftAP/BLE/SmartConfig/工厂 NVS/其他/未知>
-- 重配与设备绑定合同：<资料或未知>
-- 输出目录：/absolute/path/my-tirtc-device
+- <原理图、BSP/厂商示例、数据手册和产品页；一行一个>
 
-先生成 Hardware IR v2 并完成能力分析；具备条件后生成并编译。
-Skill 保持板卡无关，具体器件、引脚和配网方式只进入该板 IR/adapter。
-只有我明确指定串口并授权当前固件 SHA-256 时才烧录。
+目标：<H5 实时音视频、H5 对讲、AI 双向语音等>
+视频：<MJPEG/H264/H265/根据证据选择>
+Wi-Fi 与设备绑定：<指定方案/根据 BSP 和平台合同选择>
+工程：<输出目录或现有工程的绝对路径>
+
+先运行 Doctor，再生成 Hardware IR v2。达到 READY_TO_PORT 后完成板级适配和编译，输出 TIRTC_PORTING_REPORT.md。
+本轮不访问串口、不烧录、不擦除 NVS，也不把凭证写入源码或报告。
 ```
 
-更完整的可复制版本见 [通用开发者接入提示词](assets/developer-intake-prompt.md)。SoftAP 不是强制条件；没有 AP 配网时，可选择有证据的 BLE、SmartConfig、安全工厂/NVS 注入或其他可重配路径。生产 SSID/密码不能进入源码或报告。
+可直接复制的版本见[开发板接入提示词](assets/developer-intake-prompt.md)。SoftAP 只是可选方案；没有 AP 配网时，Skill 会根据 BSP 和产品要求评估其他可重配路径。生产 SSID 和密码不能进入源码或报告。
 
 ## ESP32 Device Kit
 
