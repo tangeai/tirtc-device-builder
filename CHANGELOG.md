@@ -2,6 +2,10 @@
 
 This project follows Semantic Versioning.
 
+## 0.7.1
+
+- Split clean-room bootstrap from Skill execution: install or replace the pinned Skill before Codex starts, restart the session, then run read-only version and Doctor checks before generation.
+
 ## 0.7.0
 
 - Separate the platform/Web video contract (MJPEG, H.264, and H.265 on stream 11) from the single codec profile selected by a board; keep the LCKFB ESP32-S3 adapter on MJPEG without narrowing platform capability.
