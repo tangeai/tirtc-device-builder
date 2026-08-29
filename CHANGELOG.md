@@ -8,7 +8,7 @@ This project follows Semantic Versioning.
 - Add a mandatory runtime semantic gate for service-endpoint wiring, callback-safe lifecycle changes, exact downlink media filtering, authoritative AI session-format validation, and remote session termination.
 - Reject invented, concatenated, absolute, missing, or hash-mismatched Hardware IR source locators and verify recorded build artifacts against the actual project-relative files.
 - Treat the entire ESP-IDF `build/` tree as non-portable, retain verified deliverable copies under `artifacts/`, and strengthen Doctor handling and negative regression tests.
-- Package the hardened generated starter and platform/runtime contracts in ESP32 Device Kit 1.1.0.
+- Package the hardened generated starter and platform/runtime contracts in ESP32 Device Kit 1.1.1.
 
 ## 0.6.0
 

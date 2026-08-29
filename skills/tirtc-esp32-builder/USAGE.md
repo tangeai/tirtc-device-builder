@@ -72,7 +72,7 @@ $tirtc-esp32-builder 使用 /path/hardware-ir.json 生成工程，编译后烧�
 python3 <skill-dir>/scripts/doctor.py \
   --expected-idf 5.5 \
   --target esp32s3 \
-  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.1.0 \
+  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.1.1 \
   --require-workspace
 ```
 

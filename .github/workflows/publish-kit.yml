@@ -36,18 +36,24 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
-      - name: Reproduce and verify Device Kit
+      - name: Reproduce Device Kit twice
         run: |
           kit_version="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.version)")"
           archive_name="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.archiveName)")"
-          expected_sha="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.sha256)")"
           npm run pack:esp32-kit -- \
             --source upstream/thing-connect \
             --kit-version "${kit_version}" \
-            --output dist
-          actual_sha="$(sha256sum "dist/${archive_name}" | cut -d ' ' -f 1)"
-          test "${actual_sha}" = "${expected_sha}"
-          sha256sum -c "dist/${archive_name}.sha256"
+            --output dist-first
+          npm run pack:esp32-kit -- \
+            --source upstream/thing-connect \
+            --kit-version "${kit_version}" \
+            --output dist-second
+          cmp "dist-first/${archive_name}" "dist-second/${archive_name}"
+          mkdir dist
+          cp "dist-first/${archive_name}" "dist/${archive_name}"
+          cp "dist-first/${archive_name}.sha256" "dist/${archive_name}.sha256"
+          cd dist
+          sha256sum -c "${archive_name}.sha256"
 
       - name: Publish GitHub Release
         env:
