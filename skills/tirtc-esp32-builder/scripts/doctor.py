@@ -27,6 +27,7 @@ GENERATOR_RELATIVE_PATH = Path("device-sim/scripts/create_esp32_project.py")
 DEFAULT_SDK_RELATIVE_PATH = Path(
     "device-sim/sdk/espressif-esp32s3/2.3.0"
 )
+DEVICE_KIT_MANIFEST = "manifest.json"
 
 
 def check(name: str, status: str, detail: str, required: bool = True) -> dict[str, Any]:
@@ -166,6 +167,43 @@ def normalize_thing_connect_root(candidate: Path) -> Path | None:
     return None
 
 
+def inspect_device_kit(root: Path | None) -> dict[str, str | bool | None]:
+    """Read the managed Kit identity without rejecting legacy workspaces."""
+    if root is None:
+        return {
+            "manifest_present": False,
+            "version": None,
+            "error": "Device Kit root is unresolved",
+        }
+    manifest_path = root / DEVICE_KIT_MANIFEST
+    if not manifest_path.is_file():
+        return {
+            "manifest_present": False,
+            "version": None,
+            "error": None,
+        }
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "manifest_present": True,
+            "version": None,
+            "error": f"invalid {manifest_path}: {exc}",
+        }
+    version = payload.get("kit_version") if isinstance(payload, dict) else None
+    if not isinstance(version, str) or not version.strip():
+        return {
+            "manifest_present": True,
+            "version": None,
+            "error": f"{manifest_path} does not declare kit_version",
+        }
+    return {
+        "manifest_present": True,
+        "version": version.strip(),
+        "error": None,
+    }
+
+
 def find_thing_connect_root(
     explicit: Path | None,
     project: Path | None,
@@ -273,27 +311,51 @@ def diagnose(args: argparse.Namespace) -> dict[str, Any]:
         args.thing_connect_root,
         args.project,
     )
-    workspace_status = "PASS" if thing_connect_root else (
-        "FAIL" if args.require_workspace else "WARN"
-    )
+    kit_identity = inspect_device_kit(thing_connect_root)
+    kit_error = kit_identity["error"]
+    actual_kit = kit_identity["version"]
+    if thing_connect_root is None:
+        workspace_status = "FAIL" if args.require_workspace or args.expected_kit else "WARN"
+        workspace_detail = (
+            f"not found; pass --thing-connect-root or set {THING_CONNECT_ENV}"
+        )
+    elif args.expected_kit and not kit_identity["manifest_present"]:
+        workspace_status = "FAIL"
+        workspace_detail = (
+            f"{thing_connect_root} ({thing_connect_source}) is an unversioned legacy "
+            f"workspace; expected managed Device Kit {args.expected_kit}"
+        )
+    elif kit_error:
+        workspace_status = "FAIL"
+        workspace_detail = str(kit_error)
+    elif args.expected_kit and actual_kit != args.expected_kit:
+        workspace_status = "FAIL"
+        workspace_detail = (
+            f"version {actual_kit or 'missing'} at {thing_connect_root} "
+            f"({thing_connect_source}); expected {args.expected_kit}"
+        )
+    else:
+        workspace_status = "PASS"
+        version_detail = (
+            f"version {actual_kit}"
+            if actual_kit
+            else "unversioned legacy workspace"
+        )
+        workspace_detail = (
+            f"{version_detail} at {thing_connect_root} ({thing_connect_source})"
+        )
     checks.append(
         check(
             "ESP32 Device Kit",
             workspace_status,
-            (
-                f"{thing_connect_root} ({thing_connect_source})"
-                if thing_connect_root
-                else (
-                    f"not found; pass --thing-connect-root or set {THING_CONNECT_ENV}"
-                )
-            ),
-            required=args.require_workspace,
+            workspace_detail,
+            required=args.require_workspace or bool(args.expected_kit),
         )
     )
-    if args.require_workspace and thing_connect_root is None:
+    if (args.require_workspace or args.expected_kit) and workspace_status == "FAIL":
         next_actions.append(
-            "Run setup esp32 --install or pass an existing Device Kit path with "
-            "--thing-connect-root."
+            "Run setup esp32 --install to select the pinned managed Device Kit, or "
+            "pass a matching Kit path with --thing-connect-root."
         )
 
     sdk_dir, sdk_source = resolve_sdk_dir(
@@ -390,6 +452,8 @@ def diagnose(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "overall": overall,
         "expected_idf": args.expected_idf,
+        "expected_kit": args.expected_kit,
+        "device_kit_version": actual_kit,
         "target": args.target,
         "thing_connect_root": (
             str(thing_connect_root) if thing_connect_root is not None else None
@@ -414,6 +478,10 @@ def parse_args() -> argparse.Namespace:
         description="Check ESP-IDF, target tools, TiRTC SDK, project contract, and serial access."
     )
     parser.add_argument("--expected-idf", default="5.5")
+    parser.add_argument(
+        "--expected-kit",
+        help="require an exact managed ESP32 Device Kit manifest version",
+    )
     parser.add_argument("--target", default="esp32s3")
     parser.add_argument("--idf-py", type=Path)
     parser.add_argument("--thing-connect-root", type=Path)

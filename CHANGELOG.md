@@ -2,6 +2,12 @@
 
 This project follows Semantic Versioning.
 
+## 0.7.2
+
+- Require the selected managed ESP32 Device Kit manifest to match the pinned Kit version; ignore stale managed references instead of reporting an older structurally complete Kit as ready.
+- Make Doctor validate an exact `--expected-kit` version and persist the version actually read from the selected Kit rather than the desired version.
+- Ship a verifiable Skill `VERSION` marker, include it in setup readiness and package tests, and remove the inapplicable Plugin-version prerequisite from the portable clean-room prompt.
+
 ## 0.7.1
 
 - Split clean-room bootstrap from Skill execution: install or replace the pinned Skill before Codex starts, restart the session, then run read-only version and Doctor checks before generation.

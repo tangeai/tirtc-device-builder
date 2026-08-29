@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import tempfile
 import unittest
@@ -33,6 +34,25 @@ class DoctorTest(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("test\n", encoding="utf-8")
         return sdk
+
+    def write_kit_manifest(self, root: Path, version: str) -> None:
+        (root / MODULE.DEVICE_KIT_MANIFEST).write_text(
+            '{"kit_version": "' + version + '"}\n', encoding="utf-8"
+        )
+
+    def diagnose_args(self, root: Path, idf_py: Path, expected_kit: str):
+        return argparse.Namespace(
+            expected_idf="5.5",
+            expected_kit=expected_kit,
+            target="esp32s3",
+            idf_py=idf_py,
+            thing_connect_root=root,
+            require_workspace=True,
+            sdk_dir=None,
+            project=None,
+            serial_port=None,
+            json=False,
+        )
 
     def test_version_matching_accepts_major_minor_line(self) -> None:
         self.assertTrue(MODULE.version_matches((5, 5, 2), "5.5"))
@@ -133,6 +153,75 @@ class DoctorTest(unittest.TestCase):
                 actual, source = MODULE.find_thing_connect_root(None, None)
             self.assertEqual(thing_connect.resolve(), actual)
             self.assertEqual(MODULE.THING_CONNECT_ENV, source)
+
+    def test_device_kit_identity_reads_exact_manifest_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_kit_manifest(root, "1.1.1")
+            identity = MODULE.inspect_device_kit(root)
+            self.assertTrue(identity["manifest_present"])
+            self.assertEqual("1.1.1", identity["version"])
+            self.assertIsNone(identity["error"])
+
+    def test_device_kit_identity_rejects_missing_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / MODULE.DEVICE_KIT_MANIFEST).write_text(
+                "{}\n", encoding="utf-8"
+            )
+            identity = MODULE.inspect_device_kit(root)
+            self.assertTrue(identity["manifest_present"])
+            self.assertIsNone(identity["version"])
+            self.assertIn("does not declare kit_version", str(identity["error"]))
+
+    def test_doctor_rejects_structurally_complete_older_kit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = self.create_workspace(root)
+            self.create_sdk(workspace / MODULE.DEFAULT_SDK_RELATIVE_PATH)
+            self.write_kit_manifest(workspace, "1.0.0")
+            idf_py = root / "idf.py"
+            idf_py.write_text("# test\n", encoding="utf-8")
+            args = self.diagnose_args(workspace, idf_py, "1.1.1")
+            with (
+                patch.object(MODULE, "run_version", return_value=(0, "ESP-IDF v5.5.4")),
+                patch.object(MODULE.shutil, "which", return_value="/test/tool"),
+                patch.object(MODULE, "discover_serial_ports", return_value=[]),
+            ):
+                result = MODULE.diagnose(args)
+
+            kit_check = next(
+                item for item in result["checks"]
+                if item["name"] == "ESP32 Device Kit"
+            )
+            self.assertEqual("FAIL", kit_check["status"])
+            self.assertIn("version 1.0.0", kit_check["detail"])
+            self.assertIn("expected 1.1.1", kit_check["detail"])
+            self.assertEqual("FAIL", result["overall"])
+
+    def test_doctor_accepts_exact_managed_kit_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = self.create_workspace(root)
+            self.create_sdk(workspace / MODULE.DEFAULT_SDK_RELATIVE_PATH)
+            self.write_kit_manifest(workspace, "1.1.1")
+            idf_py = root / "idf.py"
+            idf_py.write_text("# test\n", encoding="utf-8")
+            args = self.diagnose_args(workspace, idf_py, "1.1.1")
+            with (
+                patch.object(MODULE, "run_version", return_value=(0, "ESP-IDF v5.5.4")),
+                patch.object(MODULE.shutil, "which", return_value="/test/tool"),
+                patch.object(MODULE, "discover_serial_ports", return_value=[]),
+            ):
+                result = MODULE.diagnose(args)
+
+            kit_check = next(
+                item for item in result["checks"]
+                if item["name"] == "ESP32 Device Kit"
+            )
+            self.assertEqual("PASS", kit_check["status"])
+            self.assertIn("version 1.1.1", kit_check["detail"])
+            self.assertEqual("PASS", result["overall"])
 
     def test_project_bundled_sdk_takes_precedence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

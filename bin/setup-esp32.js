@@ -33,6 +33,8 @@ const REQUIRED_SDK_FILES = [
   join("lib", "libTiRTC.a"),
   join("manifest", "build-contract.env"),
 ];
+const DEVICE_KIT_MANIFEST = "manifest.json";
+const SKILL_VERSION_FILE = "VERSION";
 
 function setupRootFrom(environment) {
   return resolve(
@@ -199,14 +201,71 @@ function discoverThingConnectRoot(start) {
   }
 }
 
-function thingConnectReady(root) {
-  if (!root || !existsSync(join(root, GENERATOR_PATH))) {
-    return false;
+function readTrimmedFile(path) {
+  if (!existsSync(path)) {
+    return null;
   }
-  const sdk = join(root, SDK_PATH);
-  return REQUIRED_SDK_FILES.every((relative) =>
-    existsSync(join(sdk, relative)),
+  try {
+    const value = readFileSync(path, "utf8").trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+export function inspectDeviceKit(root) {
+  const manifestPath = root ? join(root, DEVICE_KIT_MANIFEST) : null;
+  let manifestPresent = false;
+  let version = null;
+  let manifestError = null;
+  if (manifestPath && existsSync(manifestPath)) {
+    manifestPresent = true;
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (
+        manifest &&
+        typeof manifest === "object" &&
+        typeof manifest.kit_version === "string" &&
+        manifest.kit_version.trim()
+      ) {
+        version = manifest.kit_version.trim();
+      } else {
+        manifestError = "manifest.json does not declare kit_version";
+      }
+    } catch (error) {
+      manifestError = `invalid manifest.json: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  }
+
+  const generatorReady = Boolean(
+    root && existsSync(join(root, GENERATOR_PATH)),
   );
+  const sdk = root ? join(root, SDK_PATH) : null;
+  const sdkReady = Boolean(
+    sdk &&
+      REQUIRED_SDK_FILES.every((relative) => existsSync(join(sdk, relative))),
+  );
+  const structureReady = generatorReady && sdkReady;
+  const versionCompatible =
+    !manifestPresent ||
+    (manifestError === null && version === ESP32_KIT.version);
+
+  return {
+    expectedVersion: ESP32_KIT.version,
+    manifestError,
+    manifestPath,
+    manifestPresent,
+    ready: structureReady && versionCompatible,
+    structureReady,
+    version,
+    versionCompatible,
+  };
+}
+
+export function readSkillVersion(skillRoot) {
+  return readTrimmedFile(join(skillRoot, SKILL_VERSION_FILE));
 }
 
 function readConfig(path) {
@@ -358,7 +417,7 @@ function writeManagedEnvironment(context, packageVersion) {
     idf_version: PINNED_IDF_VERSION,
     idf_dir: context.idfDir,
     idf_tools_path: context.idfToolsPath,
-    device_kit_version: ESP32_KIT.version,
+    device_kit_version: context.deviceKit.version,
     device_kit_root: context.thingConnectRoot,
     thing_connect_root: context.thingConnectRoot,
     skills_dir: context.skillsDir,
@@ -418,11 +477,31 @@ function setupContext(options, runtime) {
       requestedThingConnect = managedThingConnect;
     }
   }
-  const normalizedThingConnect = normalizeThingConnectRoot(
+  let normalizedThingConnect = normalizeThingConnectRoot(
     requestedThingConnect,
   );
-  const thingConnectRoot =
+  let thingConnectRoot =
     normalizedThingConnect || resolve(requestedThingConnect);
+  let deviceKit = inspectDeviceKit(thingConnectRoot);
+  let thingConnectFallback = null;
+  const versionedKitMismatch =
+    deviceKit.manifestPresent && !deviceKit.versionCompatible;
+  const staleManagedReference =
+    (thingConnectSource === "TIRTC_THING_CONNECT_ROOT" ||
+      thingConnectSource === "managed config") &&
+    !deviceKit.structureReady;
+  if (
+    thingConnectSource !== "explicit --thing-connect-root" &&
+    (versionedKitMismatch || staleManagedReference)
+  ) {
+    thingConnectFallback = `${thingConnectSource}: ${thingConnectRoot}`;
+    requestedThingConnect = managedThingConnect;
+    thingConnectSource = "managed Device Kit";
+    normalizedThingConnect = normalizeThingConnectRoot(requestedThingConnect);
+    thingConnectRoot =
+      normalizedThingConnect || resolve(requestedThingConnect);
+    deviceKit = inspectDeviceKit(thingConnectRoot);
+  }
 
   const active = currentIdf(environment);
   let idfDir;
@@ -459,6 +538,8 @@ function setupContext(options, runtime) {
     ? { ...active, directoryReady: directoryIdf.ready }
     : { ...directoryIdf, root: idfDir, directoryReady: directoryIdf.ready };
 
+  const skillTarget = join(options.skillsDir, runtime.platform.skill);
+  const skillVersion = readSkillVersion(skillTarget);
   return {
     activeIdf: active,
     configPath,
@@ -468,9 +549,17 @@ function setupContext(options, runtime) {
     idfToolsPath,
     managedThingConnect,
     rootDir: options.rootDir,
-    skillTarget: join(options.skillsDir, runtime.platform.skill),
+    deviceKit,
+    skillReady:
+      existsSync(join(skillTarget, "SKILL.md")) &&
+      skillVersion === runtime.packageVersion,
+    skillTarget,
+    skillVersion,
     skillsDir: options.skillsDir,
-    thingConnectReady: thingConnectReady(thingConnectRoot),
+    thingConnectFallback,
+    thingConnectManaged:
+      resolve(thingConnectRoot) === resolve(managedThingConnect),
+    thingConnectReady: deviceKit.ready,
     thingConnectRoot,
     thingConnectSource,
   };
@@ -479,15 +568,29 @@ function setupContext(options, runtime) {
 function printState(context, runtime) {
   printCheck("INFO", "setup root", context.rootDir);
   printCheck(
-    existsSync(join(context.skillTarget, "SKILL.md")) ? "PASS" : "MISS",
+    context.skillReady ? "PASS" : "MISS",
     "Codex Skill",
-    context.skillTarget,
+    `${context.skillTarget} (version ${
+      context.skillVersion || "missing"
+    }; expected ${runtime.packageVersion})`,
   );
+  const kitVersion = context.deviceKit.manifestPresent
+    ? context.deviceKit.version || "invalid manifest"
+    : "legacy workspace (unversioned)";
   printCheck(
     context.thingConnectReady ? "PASS" : "MISS",
     "ESP32 Device Kit",
-    `${context.thingConnectRoot} (${context.thingConnectSource})`,
+    `${context.thingConnectRoot} (${context.thingConnectSource}; version ${
+      kitVersion
+    }; expected ${ESP32_KIT.version})`,
   );
+  if (context.thingConnectFallback) {
+    printCheck(
+      "INFO",
+      "ignored stale Kit reference",
+      context.thingConnectFallback,
+    );
+  }
   printCheck(
     context.idf.ready ? "PASS" : "MISS",
     "ESP-IDF",
@@ -534,9 +637,18 @@ function printSystemDependencyHelp(missing) {
 
 function installSkill(options, context, runtime) {
   const present = existsSync(join(context.skillTarget, "SKILL.md"));
-  if (present && !options.forceSkill) {
-    console.log(`SKIP  Codex Skill already exists: ${context.skillTarget}`);
+  if (present && context.skillReady && !options.forceSkill) {
+    console.log(
+      `SKIP  Codex Skill ${runtime.packageVersion} already exists: ${context.skillTarget}`,
+    );
     return;
+  }
+  if (present && !options.forceSkill) {
+    throw new Error(
+      `Codex Skill at ${context.skillTarget} has version ${
+        context.skillVersion || "missing"
+      }, expected ${runtime.packageVersion}; rerun with --force-skill to replace it`,
+    );
   }
   const args = [
     runtime.cliPath,
@@ -560,9 +672,14 @@ function installDeviceKit(options, context, runtime) {
     );
     return context.thingConnectRoot;
   }
-  if (context.thingConnectSource !== "managed Device Kit") {
+  if (!context.thingConnectManaged) {
+    const reason =
+      context.deviceKit.manifestError ||
+      (context.deviceKit.manifestPresent
+        ? `version ${context.deviceKit.version || "missing"}; expected ${ESP32_KIT.version}`
+        : "missing generator or TiRTC SDK");
     throw new Error(
-      `${context.thingConnectSource} does not contain a complete ESP32 Device Kit: ${context.thingConnectRoot}`,
+      `${context.thingConnectSource} is not a compatible ESP32 Device Kit (${reason}): ${context.thingConnectRoot}`,
     );
   }
   if (existsSync(context.managedThingConnect)) {
@@ -577,9 +694,10 @@ function installDeviceKit(options, context, runtime) {
   }
   runOrThrow(process.execPath, args, { environment: runtime.environment });
   const root = normalizeThingConnectRoot(context.managedThingConnect);
-  if (!thingConnectReady(root)) {
+  const installedKit = inspectDeviceKit(root);
+  if (!installedKit.ready || installedKit.version !== ESP32_KIT.version) {
     throw new Error(
-      `installed ESP32 Device Kit is missing its generator or TiRTC SDK: ${context.managedThingConnect}`,
+      `installed ESP32 Device Kit is incomplete or has the wrong version: ${context.managedThingConnect}`,
     );
   }
   return root;
@@ -658,6 +776,9 @@ function runDoctor(context, runtime) {
     context.thingConnectRoot,
     "--require-workspace",
   ];
+  if (context.deviceKit.manifestPresent) {
+    args.push("--expected-kit", ESP32_KIT.version);
+  }
   let result;
   if (context.idfDir && existsSync(join(context.idfDir, "export.sh"))) {
     result = activatedResult(
@@ -691,7 +812,7 @@ function runDoctor(context, runtime) {
 
 function isReady(context) {
   return (
-    existsSync(join(context.skillTarget, "SKILL.md")) &&
+    context.skillReady &&
     context.thingConnectReady &&
     context.idf.ready
   );
@@ -729,7 +850,7 @@ export function runEsp32Setup(args, input) {
     if (!isReady(context)) {
       console.log("OVERALL: NEEDS_SETUP");
       console.log(
-        "NEXT: npx tirtc-device-builder@latest setup esp32 --install",
+        `NEXT: npx tirtc-device-builder@${runtime.packageVersion} setup esp32 --install`,
       );
       return 1;
     }
@@ -756,7 +877,12 @@ export function runEsp32Setup(args, input) {
   try {
     installSkill(options, context, runtime);
     const thingConnectRoot = installDeviceKit(options, context, runtime);
-    context = { ...context, thingConnectRoot, thingConnectReady: true };
+    context = {
+      ...context,
+      deviceKit: inspectDeviceKit(thingConnectRoot),
+      thingConnectRoot,
+      thingConnectReady: true,
+    };
     installIdf(context, runtime);
     context = setupContext(options, {
       ...runtime,

@@ -160,6 +160,8 @@ def validate_npm_package(errors: list[str]) -> None:
 
 
 def validate_skills(errors: list[str]) -> None:
+    package = load_json(NPM_MANIFEST, errors)
+    package_version = package.get("version")
     skills_root = ROOT / "skills"
     skill_dirs = sorted(path for path in skills_root.iterdir() if path.is_dir())
     if not skill_dirs:
@@ -179,6 +181,17 @@ def validate_skills(errors: list[str]) -> None:
             error(errors, f"invalid skill name: {name!r}")
         if not fields.get("description"):
             error(errors, f"{skill_file.relative_to(ROOT)} description is required")
+
+        version_file = skill_dir / "VERSION"
+        if not version_file.is_file():
+            error(errors, f"{skill_dir.relative_to(ROOT)} is missing VERSION")
+        else:
+            skill_version = version_file.read_text(encoding="utf-8").strip()
+            if skill_version != package_version:
+                error(
+                    errors,
+                    f"{version_file.relative_to(ROOT)} must match npm package version",
+                )
 
         openai_yaml = skill_dir / "agents" / "openai.yaml"
         if openai_yaml.is_file():

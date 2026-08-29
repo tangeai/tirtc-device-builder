@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -48,6 +49,47 @@ function run(command, args, options = {}) {
     );
   }
   return result;
+}
+
+function createDeviceKit(root, version) {
+  const required = [
+    join("device-sim", "scripts", "create_esp32_project.py"),
+    join(
+      "device-sim",
+      "sdk",
+      "espressif-esp32s3",
+      "2.3.0",
+      "include",
+      "tirtc",
+      "tiRTC.h",
+    ),
+    join(
+      "device-sim",
+      "sdk",
+      "espressif-esp32s3",
+      "2.3.0",
+      "lib",
+      "libTiRTC.a",
+    ),
+    join(
+      "device-sim",
+      "sdk",
+      "espressif-esp32s3",
+      "2.3.0",
+      "manifest",
+      "build-contract.env",
+    ),
+  ];
+  for (const relative of required) {
+    const path = join(root, relative);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "test\n", "utf8");
+  }
+  writeFileSync(
+    join(root, "manifest.json"),
+    JSON.stringify({ kit_version: version }) + "\n",
+    "utf8",
+  );
 }
 
 const temporary = mkdtempSync(join(tmpdir(), "tirtc-packed-package-"));
@@ -107,10 +149,18 @@ try {
     existsSync(join(skillsDir, "tirtc-esp32-builder", "SKILL.md")),
     true,
   );
+  assert.equal(
+    readFileSync(
+      join(skillsDir, "tirtc-esp32-builder", "VERSION"),
+      "utf8",
+    ).trim(),
+    packageMetadata.version,
+  );
 
   const doctor = run(process.execPath, [cli, "doctor", "esp32", "--help"]);
   assert.match(doctor.stdout, /--expected-idf/);
   assert.match(doctor.stdout, /--thing-connect-root/);
+  assert.match(doctor.stdout, /--expected-kit/);
 
   const setup = run(process.execPath, [cli, "setup", "esp32", "--help"]);
   assert.match(setup.stdout, /setup esp32 --install/);
@@ -121,6 +171,43 @@ try {
   assert.equal(
     existsSync(join(installedPackage, "bin", "install-esp32-kit.js")),
     true,
+  );
+
+  const managedRoot = join(temporary, "managed");
+  const oldKit = join(managedRoot, "kits", "esp32s3", "1.0.0");
+  const expectedKit = join(managedRoot, "kits", "esp32s3", "1.1.1");
+  createDeviceKit(oldKit, "1.0.0");
+  writeFileSync(
+    join(managedRoot, "config.json"),
+    JSON.stringify({
+      device_kit_root: oldKit,
+      device_kit_version: "1.1.1",
+    }),
+    "utf8",
+  );
+  const setupCheck = spawnSync(
+    process.execPath,
+    [
+      cli,
+      "setup",
+      "esp32",
+      "--root",
+      managedRoot,
+      "--skills-dir",
+      skillsDir,
+      "--idf-dir",
+      join(temporary, "missing-idf"),
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, TIRTC_THING_CONNECT_ROOT: "" },
+    },
+  );
+  assert.equal(setupCheck.status, 1, setupCheck.stderr);
+  assert.match(setupCheck.stdout, /ignored stale Kit reference/);
+  assert.match(
+    setupCheck.stdout,
+    new RegExp(expectedKit.replaceAll("\\", "\\\\")),
   );
 
   console.log(

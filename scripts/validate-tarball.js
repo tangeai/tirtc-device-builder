@@ -50,6 +50,7 @@ const required = [
   "bin/setup-esp32.js",
   "package.json",
   "skills/tirtc-esp32-builder/SKILL.md",
+  "skills/tirtc-esp32-builder/VERSION",
   "skills/tirtc-esp32-builder/scripts/doctor.py",
 ];
 const allowedTopLevel = new Set([

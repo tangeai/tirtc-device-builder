@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -16,6 +21,47 @@ function run(args, environment = {}) {
     encoding: "utf8",
     env: { ...process.env, ...environment },
   });
+}
+
+function createDeviceKit(root, version) {
+  const required = [
+    join("device-sim", "scripts", "create_esp32_project.py"),
+    join(
+      "device-sim",
+      "sdk",
+      "espressif-esp32s3",
+      "2.3.0",
+      "include",
+      "tirtc",
+      "tiRTC.h",
+    ),
+    join(
+      "device-sim",
+      "sdk",
+      "espressif-esp32s3",
+      "2.3.0",
+      "lib",
+      "libTiRTC.a",
+    ),
+    join(
+      "device-sim",
+      "sdk",
+      "espressif-esp32s3",
+      "2.3.0",
+      "manifest",
+      "build-contract.env",
+    ),
+  ];
+  for (const relative of required) {
+    const path = join(root, relative);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "test\n", "utf8");
+  }
+  writeFileSync(
+    join(root, "manifest.json"),
+    JSON.stringify({ kit_version: version }) + "\n",
+    "utf8",
+  );
 }
 
 async function withTemporaryDirectory(callback) {
@@ -47,6 +93,10 @@ test("install copies a complete skill to an explicit skills directory", async ()
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(existsSync(join(target, "SKILL.md")), true);
+    assert.equal(
+      readFileSync(join(target, "VERSION"), "utf8").trim(),
+      PACKAGE.version,
+    );
     assert.equal(existsSync(join(target, "scripts", "doctor.py")), true);
     assert.equal(
       existsSync(join(target, "assets", "hardware-ir-v2.example.json")),
@@ -119,6 +169,7 @@ test("doctor delegates to the packaged Python helper", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /--expected-idf/);
   assert.match(result.stdout, /--thing-connect-root/);
+  assert.match(result.stdout, /--expected-kit/);
 });
 
 test("setup help documents check and automatic installation", () => {
@@ -150,7 +201,9 @@ test("setup check is read-only and reports the automatic next action", async () 
     assert.match(result.stdout, /OVERALL: NEEDS_SETUP/);
     assert.match(
       result.stdout,
-      /npx tirtc-device-builder@latest setup esp32 --install/,
+      new RegExp(
+        `npx tirtc-device-builder@${PACKAGE.version.replaceAll(".", "\\.")} setup esp32 --install`,
+      ),
     );
     assert.equal(existsSync(root), false);
     assert.equal(existsSync(skillsDir), false);
@@ -161,4 +214,95 @@ test("setup only replaces an installed Skill with explicit install intent", () =
   const result = run(["setup", "esp32", "--force-skill"]);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /--force-skill requires --install/);
+});
+
+test("setup ignores a stale managed Kit reference and selects the pinned Kit", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const root = join(directory, "managed");
+    const oldKit = join(root, "kits", "esp32s3", "1.0.0");
+    const expectedKit = join(root, "kits", "esp32s3", "1.1.1");
+    createDeviceKit(oldKit, "1.0.0");
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      join(root, "config.json"),
+      JSON.stringify({
+        device_kit_root: oldKit,
+        device_kit_version: "1.1.1",
+      }),
+      "utf8",
+    );
+
+    const result = run(
+      [
+        "setup",
+        "esp32",
+        "--root",
+        root,
+        "--skills-dir",
+        join(directory, "skills"),
+        "--idf-dir",
+        join(directory, "missing-idf"),
+      ],
+      { TIRTC_THING_CONNECT_ROOT: "" },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /ignored stale Kit reference/);
+    assert.match(result.stdout, new RegExp(expectedKit.replaceAll("\\", "\\\\")));
+    assert.match(result.stdout, /expected 1\.1\.1/);
+  });
+});
+
+test("setup ignores a stale Kit selected by the managed environment", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const root = join(directory, "managed");
+    const oldKit = join(root, "kits", "esp32s3", "1.0.0");
+    const expectedKit = join(root, "kits", "esp32s3", "1.1.1");
+    createDeviceKit(oldKit, "1.0.0");
+
+    const result = run(
+      [
+        "setup",
+        "esp32",
+        "--root",
+        root,
+        "--skills-dir",
+        join(directory, "skills"),
+        "--idf-dir",
+        join(directory, "missing-idf"),
+      ],
+      { TIRTC_THING_CONNECT_ROOT: oldKit },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /TIRTC_THING_CONNECT_ROOT/);
+    assert.match(result.stdout, new RegExp(expectedKit.replaceAll("\\", "\\\\")));
+    assert.match(result.stdout, /OVERALL: NEEDS_SETUP/);
+  });
+});
+
+test("setup does not accept an explicit older Kit as the pinned Kit", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const oldKit = join(directory, "kit-1.0.0");
+    createDeviceKit(oldKit, "1.0.0");
+    const result = run(
+      [
+        "setup",
+        "esp32",
+        "--root",
+        join(directory, "managed"),
+        "--skills-dir",
+        join(directory, "skills"),
+        "--thing-connect-root",
+        oldKit,
+        "--idf-dir",
+        join(directory, "missing-idf"),
+      ],
+      { TIRTC_THING_CONNECT_ROOT: "" },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /version 1\.0\.0; expected 1\.1\.1/);
+    assert.match(result.stdout, /OVERALL: NEEDS_SETUP/);
+  });
 });
