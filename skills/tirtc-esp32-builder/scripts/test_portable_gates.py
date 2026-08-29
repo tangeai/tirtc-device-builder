@@ -11,11 +11,19 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from audio_contract import verify_contract  # noqa: E402
-from hardware_ir import artifact_requirement, constrain_project_gate  # noqa: E402
+from hardware_ir import (  # noqa: E402
+    artifact_file_requirement,
+    artifact_requirement,
+    constrain_project_gate,
+    sha256_file,
+)
 from install_audio_gate import MARKER, install  # noqa: E402
 from install_video_gate import MARKER as VIDEO_MARKER  # noqa: E402
 from install_video_gate import install as install_video  # noqa: E402
 from project_portability import check_project  # noqa: E402
+from install_runtime_gate import MARKER as RUNTIME_MARKER  # noqa: E402
+from install_runtime_gate import install as install_runtime  # noqa: E402
+from runtime_contract import verify_contract as verify_runtime_contract  # noqa: E402
 from video_contract import verify_contract as verify_video_contract  # noqa: E402
 
 
@@ -118,6 +126,7 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         return {
             "schema_version": 1,
             "evidence": ["schematic", "locked-camera-source"],
+            "platform_contract": "platform-media-contract.json",
             "dependencies": {
                 "espressif/esp32-camera": "2.1.7",
                 "idf": "5.5.4",
@@ -154,6 +163,36 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         }
 
     def write_video_fixture(self) -> Path:
+        (self.project / "platform-media-contract.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "h5": {
+                        "video_up": {
+                            "stream_id": 11,
+                            "supported_profiles": [
+                                {
+                                    "codec": "mjpeg",
+                                    "media": "TIRTC_VIDEO_JPEG",
+                                    "send_boundary": "complete_jpeg",
+                                },
+                                {
+                                    "codec": "h264",
+                                    "media": "TIRTC_VIDEO_H264",
+                                    "send_boundary": "annex_b_access_unit",
+                                },
+                                {
+                                    "codec": "h265",
+                                    "media": "TIRTC_VIDEO_H265",
+                                    "send_boundary": "annex_b_access_unit",
+                                },
+                            ],
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         (self.project / "dependencies.lock").write_text(
             "dependencies:\n"
             "  espressif/esp32-camera:\n"
@@ -189,6 +228,157 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
             path = sdk / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"portable fixture\n")
+
+    def write_runtime_fixture(self) -> Path:
+        platform = {
+            "schema_version": 1,
+            "h5": {
+                "audio_up": {
+                    "stream_id": 10,
+                    "codec": "alaw",
+                    "sample_rate_hz": 8000,
+                    "channels": 1,
+                    "media": "TIRTC_AUDIO_ALAW",
+                    "flags": "TIRTC_AUDIOSAMPLE_8K16B1C",
+                },
+                "video_up": {
+                    "stream_id": 11,
+                    "supported_profiles": [
+                        {
+                            "codec": "mjpeg",
+                            "media": "TIRTC_VIDEO_JPEG",
+                            "send_boundary": "complete_jpeg",
+                        },
+                        {
+                            "codec": "h264",
+                            "media": "TIRTC_VIDEO_H264",
+                            "send_boundary": "annex_b_access_unit",
+                        },
+                        {
+                            "codec": "h265",
+                            "media": "TIRTC_VIDEO_H265",
+                            "send_boundary": "annex_b_access_unit",
+                        },
+                    ],
+                },
+                "audio_down": {
+                    "stream_id": 14,
+                    "codec": "alaw",
+                    "sample_rate_hz": 8000,
+                    "channels": 1,
+                    "media": "TIRTC_AUDIO_ALAW",
+                    "flags": "TIRTC_AUDIOSAMPLE_8K16B1C",
+                },
+            },
+            "ai": {
+                "audio_up": {
+                    "stream_id": 1,
+                    "codec": "alaw",
+                    "sample_rate_hz": 8000,
+                    "channels": 1,
+                    "media": "TIRTC_AUDIO_ALAW",
+                    "flags": "TIRTC_AUDIOSAMPLE_8K16B1C",
+                },
+                "audio_down": {
+                    "stream_id": 1,
+                    "codec": "alaw",
+                    "sample_rate_hz": 8000,
+                    "channels": 1,
+                    "media": "TIRTC_AUDIO_ALAW",
+                    "flags": "TIRTC_AUDIOSAMPLE_8K16B1C",
+                },
+                "start_session_response": {
+                    "required_fields": [
+                        "id",
+                        "result.session_id",
+                        "result.input_audio",
+                        "result.output_audio",
+                    ],
+                    "response_formats_authoritative": True,
+                },
+            },
+        }
+        (self.project / "platform-media-contract.json").write_text(
+            json.dumps(platform), encoding="utf-8"
+        )
+        platform_source = self.project / "components/platform_client/src"
+        platform_source.mkdir(parents=True, exist_ok=True)
+        (platform_source / "platform_client.c").write_text(
+            'const char *key = "tirtc-srv";\n'
+            "char *value = s_services.tirtc;\n"
+            "const char *platform_client_tirtc_endpoint(void) { return value; }\n",
+            encoding="utf-8",
+        )
+        main = self.project / "main"
+        main.mkdir(exist_ok=True)
+        (main / "app_main.c").write_text(
+            "void start(void) {\n"
+            " const char *tirtc_endpoint = platform_client_tirtc_endpoint();\n"
+            " cfg = (config_t){.service_endpoint = tirtc_endpoint};\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        tirtc_dir = self.project / "components/starter_tirtc/src"
+        tirtc_dir.mkdir(parents=True, exist_ok=True)
+        callbacks = "\n".join(
+            f"static void {name}(void) {{ }}" for name in (
+                "on_event",
+                "on_conn_error",
+                "on_disconnected",
+                "on_video",
+                "on_command",
+                "on_request_key_frame",
+                "on_subscribe_audio",
+                "on_subscribe_video",
+                "on_unsubscribe_audio",
+                "on_unsubscribe_video",
+            )
+        )
+        (tirtc_dir / "starter_tirtc.c").write_text(
+            callbacks
+            + "\nstatic void on_conn_accepted(void) { defer_disconnect(connection); }\n"
+            + "static void on_ai_connect(void) { defer_disconnect(connection); }\n"
+            + "static void on_audio(void) {\n"
+            + " if (frame->media != TIRTC_AUDIO_ALAW || "
+            + "frame->flags != TIRTC_AUDIOSAMPLE_8K16B1C) return;\n}\n"
+            + "static void deferred_disconnect_task(void) { TiRtcDisconnect(connection); }\n"
+            + "void start(void) { TiRtcSetOption(TIRTC_OPT_SERVICE_ENDPOINT, "
+            + "config->service_endpoint, 1); }\n"
+            + "void send(void) { frame = (F){\n"
+            + " .stream_id = mode == STARTER_TIRTC_H5 ? H5_AUDIO_STREAM : AI_AUDIO_STREAM,\n"
+            + " .media = TIRTC_AUDIO_ALAW,\n"
+            + " .flags = TIRTC_AUDIOSAMPLE_8K16B1C};\n"
+            + " use(TIRTC_VIDEO_JPEG, TIRTC_VIDEO_H264, TIRTC_VIDEO_H265); }\n",
+            encoding="utf-8",
+        )
+        runtime_dir = self.project / "components/starter_runtime/src"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        (runtime_dir / "starter_runtime.c").write_text(
+            "static void handle_ai_command(void) {\n"
+            ' add("input_audio"); add("output_audio");\n'
+            ' add_pair("codec", "alaw"); add_number("sample_rate", 8000);\n'
+            ' add_number("channels", 1); add("session_id");\n'
+            " accepted = ai_audio_format_is_alaw_8k_mono(input_audio) &&\n"
+            "            ai_audio_format_is_alaw_8k_mono(output_audio);\n"
+            " if (has_result && !accepted) fail();\n"
+            ' if (strcmp(method->valuestring, "end_session") == 0) finish();\n'
+            " if (accepted) starter_media_start(STARTER_TIRTC_AI, generation);\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        contract = {
+            "schema_version": 1,
+            "platform_contract": "platform-media-contract.json",
+            "files": {
+                "platform_client": "components/platform_client/src/platform_client.c",
+                "app_main": "main/app_main.c",
+                "starter_tirtc": "components/starter_tirtc/src/starter_tirtc.c",
+                "starter_runtime": "components/starter_runtime/src/starter_runtime.c",
+            },
+        }
+        path = self.project / "tirtc-runtime-contract.json"
+        path.write_text(json.dumps(contract), encoding="utf-8")
+        return path
 
     def test_supported_contract_passes(self) -> None:
         result = verify_contract(self.write_contract(self.contract()), self.project)
@@ -247,6 +437,31 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         requirement = artifact_requirement(data, unrecorded)
         self.assertEqual(requirement[0], "BLOCKED")
         self.assertIn("not present", requirement[1])
+
+    def test_build_artifact_file_must_match_recorded_size_and_hash(self) -> None:
+        artifact = self.project / "artifacts/firmware.elf"
+        artifact.parent.mkdir()
+        artifact.write_bytes(b"exact artifact")
+        digest = sha256_file(artifact)
+        data = {
+            "build_evidence": {
+                "artifacts": [
+                    {
+                        "path": "artifacts/firmware.elf",
+                        "size_bytes": artifact.stat().st_size,
+                        "sha256": digest,
+                    }
+                ]
+            }
+        }
+        self.assertEqual(
+            "SATISFIED",
+            artifact_file_requirement(data, digest, self.project)[0],
+        )
+        artifact.write_bytes(b"changed")
+        stale = artifact_file_requirement(data, digest, self.project)
+        self.assertEqual("BLOCKED", stale[0])
+        self.assertIn("stale", stale[1])
 
     def test_gate_installer_is_idempotent(self) -> None:
         self.write_contract(self.contract())
@@ -319,6 +534,34 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         self.assertFalse(result["ok"])
         self.assertTrue(any("locked dependency mismatch" in item for item in result["errors"]))
 
+    def test_video_contract_rejects_platform_without_board_codec(self) -> None:
+        path = self.write_video_fixture()
+        platform_path = self.project / "platform-media-contract.json"
+        platform = json.loads(platform_path.read_text(encoding="utf-8"))
+        platform["h5"]["video_up"]["supported_profiles"] = [
+            item
+            for item in platform["h5"]["video_up"]["supported_profiles"]
+            if item["codec"] != "mjpeg"
+        ]
+        platform_path.write_text(json.dumps(platform), encoding="utf-8")
+        result = verify_video_contract(path, self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(
+            any("board-selected codec mjpeg" in item for item in result["errors"])
+        )
+
+    def test_video_contract_rejects_mjpeg_with_h264_platform_boundary(self) -> None:
+        path = self.write_video_fixture()
+        platform_path = self.project / "platform-media-contract.json"
+        platform = json.loads(platform_path.read_text(encoding="utf-8"))
+        platform["h5"]["video_up"]["supported_profiles"][0][
+            "send_boundary"
+        ] = "annex_b_access_unit"
+        platform_path.write_text(json.dumps(platform), encoding="utf-8")
+        result = verify_video_contract(path, self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("boundary" in item for item in result["errors"]))
+
     def test_video_gate_installer_is_idempotent(self) -> None:
         self.write_video_fixture()
         install_video(self.project)
@@ -326,6 +569,33 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         cmake = (self.project / "CMakeLists.txt").read_text(encoding="utf-8")
         self.assertEqual(cmake.count(VIDEO_MARKER), 1)
         self.assertTrue((self.project / "tools" / "verify_video_contract.py").is_file())
+
+    def test_supported_runtime_contract_passes(self) -> None:
+        result = verify_runtime_contract(self.write_runtime_fixture(), self.project)
+        self.assertTrue(result["ok"], result["errors"])
+
+    def test_runtime_contract_rejects_lifecycle_call_in_callback(self) -> None:
+        path = self.write_runtime_fixture()
+        source = self.project / "components/starter_tirtc/src/starter_tirtc.c"
+        text = source.read_text(encoding="utf-8")
+        source.write_text(
+            text.replace(
+                "static void on_conn_accepted(void) { defer_disconnect(connection); }",
+                "static void on_conn_accepted(void) { TiRtcDisconnect(connection); }",
+            ),
+            encoding="utf-8",
+        )
+        result = verify_runtime_contract(path, self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("forbidden lifecycle" in item for item in result["errors"]))
+
+    def test_runtime_gate_installer_is_idempotent(self) -> None:
+        self.write_runtime_fixture()
+        install_runtime(self.project)
+        install_runtime(self.project)
+        cmake = (self.project / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertEqual(cmake.count(RUNTIME_MARKER), 1)
+        self.assertTrue((self.project / "tools/verify_runtime_contract.py").is_file())
 
     def test_source_export_is_portable(self) -> None:
         self.write_portable_sdk_inputs()
@@ -353,7 +623,7 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         cache.write_text("CMAKE_HOME_DIRECTORY=/old/machine/project\n", encoding="utf-8")
         result = check_project(self.project, export=True)
         self.assertFalse(result["ok"])
-        self.assertTrue(any("CMakeCache.txt" in item for item in result["errors"]))
+        self.assertTrue(any("build/ directory" in item for item in result["errors"]))
         self.assertTrue(any("executable permission" in item for item in result["errors"]))
 
 

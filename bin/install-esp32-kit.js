@@ -22,6 +22,8 @@ const REQUIRED_FILES = [
   "manifest.json",
   "device-sim/scripts/create_esp32_project.py",
   "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
+  "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
+  "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
   "device-sim/sdk/espressif-esp32s3/2.3.0/include/tirtc/tiRTC.h",
   "device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a",
   "device-sim/sdk/espressif-esp32s3/2.3.0/manifest/build-contract.env",

@@ -16,9 +16,9 @@ Use [the report template](../assets/report-template.md) and preserve separate `P
 | L6 AI | Token, WHIP, `start_session`, bidirectional audio, stop, and H5 recovery work |
 | L7 Stability | Requested weak-network, repeated-session, resource, and soak criteria pass |
 
-Run and record the intake assessment before L0, the build assessment with `--project` and the exact artifact SHA-256 at L1, and the HIL assessment only when matching runtime evidence exists. The L1 hash must already appear in `build_evidence.artifacts[]`; a syntactically valid unrecorded hash is a failure. Missing serial or browser access is a `SKIP` for the affected L2-L7 levels, not an L0/L1 failure.
+Run and record the intake assessment before L0, the build assessment with `--project` and the exact artifact SHA-256 at L1, and the HIL assessment only when matching runtime evidence exists. Before assessment, copy final deliverable BIN/ELF files to project-relative `artifacts/` paths and record their actual byte size and SHA-256 in `build_evidence.artifacts[]`; the assessor reopens the file and rejects stale metadata. Missing serial or browser access is a `SKIP` for the affected L2-L7 levels, not an L0/L1 failure.
 
-Keep `COMPILE_PASS` separate from `BUILD_VERIFIED`. When the compiler succeeds but a requested audio or video semantic gate fails or is missing, record the compiler result and report the feature and project as blocked. H5 image display is L5 evidence, never an inference from L1.
+Keep `COMPILE_PASS` separate from `BUILD_VERIFIED`. When the compiler succeeds but a required runtime, audio, or video semantic gate fails or is missing, record the compiler result and report the feature and project as blocked. After build assessment, remove `build/` without rebuilding and run `project_portability.py --export`; the source deliverable may retain verified `artifacts/` copies but not a machine-bound build tree. H5 image display is L5 evidence, never an inference from L1.
 
 ## Evidence
 

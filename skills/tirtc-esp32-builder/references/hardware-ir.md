@@ -13,6 +13,7 @@ The initializer creates schema v2. The validator still accepts schema v1 for exi
 ## Evidence rules
 
 - Give every source a stable `id`, `kind`, `location`, and revision when available.
+- Use one resolvable location per source. Accept an IR-relative local path or an explicit `https:`, `http:`, `device-kit:`, `managed:`, `official:`, `user-input:`, or `user-supplied:` locator. Reject absolute machine paths, concatenated multi-source strings, invented schemes, missing local paths, and declared SHA-256 values that do not match the referenced local file.
 - Reference source IDs from board facts, selected profiles, onboarding methods, resources, and runtime evidence.
 - Use `null` for unknown facts. Retain contradictory values as explicit issues instead of choosing silently.
 - Hardware revision `unspecified` is valid during intake but blocks reusable-board readiness.
@@ -39,6 +40,7 @@ The IR contains:
 - `hardware_resources` for I2C, I2S/GPIO ownership, audio channel mapping, camera realtime policy, and memory budget;
 - project-relative `hardware_resources.audio_semantic_contract` for every project requesting audio;
 - project-relative `hardware_resources.video_semantic_contract` for every project requesting video;
+- project-relative `hardware_resources.runtime_semantic_contract` for every generated H5/AI project;
 - `onboarding.wifi_credentials` with selectable SoftAP/BLE/SmartConfig/factory/development/custom methods;
 - selectable ThingConnect binding methods plus stored-binding states and reset control;
 - requested features;
@@ -61,7 +63,7 @@ python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
   --artifact-sha256 <64-character-sha256> --strict
 ```
 
-The intake phase returns `READY_TO_PORT`; the build phase returns `BUILD_VERIFIED`. Build assessment only accepts a hash already present in `build_evidence.artifacts[]` and reruns the project-local media contracts through `--project`. Missing serial or browser access does not block either phase.
+The intake phase returns `READY_TO_PORT`; the build phase returns `BUILD_VERIFIED`. Build assessment only accepts a hash already present in `build_evidence.artifacts[]`, reopens that project-relative artifact to verify its byte size and SHA-256, and reruns the project-local audio, video, and runtime contracts through `--project`. Missing serial or browser access does not block either phase.
 
 Run:
 

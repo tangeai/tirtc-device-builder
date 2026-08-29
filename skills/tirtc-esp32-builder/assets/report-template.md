@@ -30,6 +30,10 @@
 
 ## Semantic build gates
 
+- Platform/Web video profiles: `{{PLATFORM_VIDEO_PROFILES}}`
+- Board-selected video profile: `{{BOARD_VIDEO_PROFILE}}`
+- Runtime contract path/SHA-256: `{{RUNTIME_CONTRACT}}`
+- Endpoint/callback/downlink/AI-session result: `{{RUNTIME_GATE}}`
 - Audio contract path/SHA-256: `{{AUDIO_CONTRACT}}`
 - Codec clock-table result: `{{AUDIO_CLOCK_GATE}}`
 - I2S mode/controller/slot/handoff result: `{{AUDIO_TOPOLOGY_GATE}}`
@@ -56,7 +60,7 @@
 ## Firmware and flash record
 
 - Serial port/chip: `{{SERIAL_TARGET}}`
-- Firmware artifacts: `{{FIRMWARE_ARTIFACTS}}`
+- Project-relative firmware artifacts: `{{FIRMWARE_ARTIFACTS}}`
 - Firmware SHA-256: `{{FIRMWARE_SHA256}}`
 - Flash command/result: `{{FLASH_RESULT}}`
 

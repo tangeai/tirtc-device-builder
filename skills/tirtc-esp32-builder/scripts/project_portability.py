@@ -41,8 +41,8 @@ def check_project(project_path: Path, export: bool = False) -> dict[str, Any]:
     missing_sdk = [str(path.relative_to(project)) for path in sdk_required if not path.is_file()]
     if missing_sdk:
         errors.append("bundled TiRTC SDK is incomplete: " + ", ".join(missing_sdk))
-    if export and (project / "build" / "CMakeCache.txt").exists():
-        errors.append("export source contains build/CMakeCache.txt from another machine")
+    if export and (project / "build").exists():
+        errors.append("export source contains a machine-bound build/ directory")
 
     for path in source_files(project):
         relative = path.relative_to(project)

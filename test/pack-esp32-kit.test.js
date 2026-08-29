@@ -31,6 +31,8 @@ function createSource(root) {
     "device-sim/scripts/create_esp32_project.py",
     "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
     "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
+    "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
+    "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
     "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
@@ -114,6 +116,18 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
     assert.equal(manifest.kit_version, "1.0.0");
     assert.equal(manifest.tirtc_sdk_version, "2.3.0");
     assert.equal(manifest.source_commit, COMMIT);
+    assert.equal(
+      existsSync(
+        join(kit, "device-sim/templates/esp32-h5-ai/platform-media-contract.json"),
+      ),
+      true,
+    );
+    assert.equal(
+      existsSync(
+        join(kit, "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json"),
+      ),
+      true,
+    );
     assert.equal(
       existsSync(
         join(

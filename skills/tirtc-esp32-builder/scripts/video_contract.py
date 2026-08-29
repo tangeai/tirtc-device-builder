@@ -17,6 +17,11 @@ VIDEO_MEDIA = {
     "h264": "TIRTC_VIDEO_H264",
     "h265": "TIRTC_VIDEO_H265",
 }
+VIDEO_BOUNDARY = {
+    "mjpeg": "complete_jpeg",
+    "h264": "annex_b_access_unit",
+    "h265": "annex_b_access_unit",
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -94,6 +99,74 @@ def check_dependencies(
                 f"locked dependency mismatch for {name}: "
                 f"expected {expected}, got {locked.get(name, 'missing')}"
             )
+
+
+def check_platform_contract(
+    project: Path,
+    contract: dict[str, Any],
+    errors: list[str],
+    inputs: dict[str, str],
+) -> None:
+    try:
+        path = project_file(
+            project, contract.get("platform_contract"), "platform_contract"
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    if not path.is_file():
+        errors.append(f"platform media contract does not exist: {path}")
+        return
+    try:
+        platform = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"invalid platform media contract: {exc}")
+        return
+    inputs[str(path.relative_to(project))] = sha256_file(path)
+    if not isinstance(platform, dict) or platform.get("schema_version") != 1:
+        errors.append("platform media contract schema_version must be 1")
+        return
+    h5 = platform.get("h5")
+    video = h5.get("video_up") if isinstance(h5, dict) else None
+    if not isinstance(video, dict) or video.get("stream_id") != 11:
+        errors.append("platform media contract must define H5 video_up stream 11")
+        return
+    profiles = video.get("supported_profiles")
+    if not isinstance(profiles, list):
+        errors.append("platform H5 video supported_profiles must be an array")
+        return
+    supported: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(profiles):
+        if not isinstance(item, dict):
+            errors.append(
+                f"platform supported_profiles[{index}] must be an object"
+            )
+            continue
+        codec = item.get("codec")
+        if codec not in VIDEO_MEDIA:
+            errors.append(
+                f"platform supported_profiles[{index}].codec is unsupported"
+            )
+            continue
+        if codec in supported:
+            errors.append(f"platform video profile {codec} is duplicated")
+            continue
+        if item.get("media") != VIDEO_MEDIA[codec]:
+            errors.append(
+                f"platform video profile {codec} media must be {VIDEO_MEDIA[codec]}"
+            )
+        if item.get("send_boundary") != VIDEO_BOUNDARY[codec]:
+            errors.append(
+                f"platform video profile {codec} boundary must be "
+                f"{VIDEO_BOUNDARY[codec]}"
+            )
+        supported[codec] = item
+    camera = contract.get("camera")
+    selected = camera.get("codec") if isinstance(camera, dict) else None
+    if selected in VIDEO_MEDIA and selected not in supported:
+        errors.append(
+            f"board-selected codec {selected} is not supported by platform contract"
+        )
 
 
 def check_scheduler(
@@ -288,6 +361,7 @@ def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
     ):
         errors.append("evidence must contain at least two non-empty source IDs")
     check_dependencies(project, contract, errors, inputs)
+    check_platform_contract(project, contract, errors, inputs)
     check_scheduler(project, contract, errors, inputs)
     check_pipeline(contract, errors)
     check_assertions(project, contract, errors, inputs)

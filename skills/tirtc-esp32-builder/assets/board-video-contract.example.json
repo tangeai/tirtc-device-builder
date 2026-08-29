@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "platform_contract": "platform-media-contract.json",
   "evidence": [
     "lckfb-schematic-v1.0.1",
     "lckfb-camera-example",
@@ -58,7 +59,7 @@
         "#defineVIDEO_MAX_COMPLETE_JPEG_BYTES(192U*1024U)",
         "starter_tirtc_send_buffer_used()>VIDEO_BACKPRESSURE_BYTES",
         "jpeg_length>VIDEO_MAX_COMPLETE_JPEG_BYTES",
-        "starter_tirtc_send_mjpeg((uint32_t)now_ms,jpeg,jpeg_length)>=0",
+        "starter_tirtc_send_jpeg((uint32_t)now_ms,jpeg,jpeg_length)>=0",
         ".pixel_format=PIXFORMAT_RGB565",
         ".fb_count=2",
         "frame2jpg(frame,CAMERA_JPEG_QUALITY,&jpeg,&jpeg_length)"

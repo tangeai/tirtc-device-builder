@@ -17,7 +17,7 @@ A design fact that is still unknown is `NEEDS_CONFIRMATION`; a confirmed missing
 
 ## Selected video profiles
 
-Hardware IR v2 stores one or more `camera.video_profiles` and exactly one selected profile for H5 video:
+The current platform/Web contract supports all three profiles below on video stream 11. Hardware IR v2 separately stores the profiles the board can produce and exactly one selected profile for H5 video:
 
 | Codec | Required output contract |
 |---|---|
@@ -25,7 +25,7 @@ Hardware IR v2 stores one or more `camera.video_profiles` and exactly one select
 | `h264` | `h264_annex_b_access_units`: Annex-B access units with SPS/PPS and IDR request behavior |
 | `h265` | `h265_annex_b_access_units`: Annex-B access units with parameter-set and refresh behavior defined by the coordinated H5 contract |
 
-Available but unselected profiles do not satisfy or block the selected contract. Stream IDs and codec support must come from the applicable ThingConnect/H5 contract, not this table alone.
+Available but unselected board profiles do not satisfy or block the selected contract. A board may select MJPEG even though the platform also accepts H.264 and H.265. Stream IDs and codec support must be verified against the project-local platform contract rather than inferred from board hardware.
 
 ## Phased project gates
 
@@ -36,7 +36,7 @@ The intake phase requires:
 - one evidenced binding method—verification code, factory-bound identity, development credentials, or documented custom flow—plus stored-binding behavior and reset control;
 - feature-specific I2S/GPIO ownership plans, channel/TDM mapping, realtime camera policy, and a static startup/media memory budget.
 
-At intake, `corroborated` on these fields means the design is resolved from authoritative sources and is safe to implement. After compilation, promote a field to `build_verified` only when the generated source, component lock, semantic gate, compile result, or post-link gate establishes it. Build assessment reruns the applicable project-relative [audio contract](audio-contract.md) and [video contract](video-contract.md); self-declared `resolved=true`, `pipeline_safe=true`, or memory-budget booleans cannot replace them. The build phase requires an exact artifact SHA-256 and returns `BUILD_VERIFIED` only when every requested feature passes. Runtime measurements never need to be invented to pass intake or build.
+At intake, `corroborated` on these fields means the design is resolved from authoritative sources and is safe to implement. After compilation, promote a field to `build_verified` only when the generated source, component lock, semantic gate, compile result, or post-link gate establishes it. Build assessment reruns the applicable project-relative [audio contract](audio-contract.md), [video contract](video-contract.md), and mandatory [runtime contract](runtime-contract.md); self-declared `resolved=true`, `pipeline_safe=true`, or memory-budget booleans cannot replace them. The build phase requires an exact on-disk artifact SHA-256 and returns `BUILD_VERIFIED` only when every requested feature passes. Runtime measurements never need to be invented to pass intake or build.
 
 SoftAP is one Wi-Fi option, not a universal requirement. BLE, SmartConfig, factory NVS, development configuration, or a documented custom method can satisfy intake when the selected path is evidenced. Committed plaintext credentials are always `BLOCKED`.
 

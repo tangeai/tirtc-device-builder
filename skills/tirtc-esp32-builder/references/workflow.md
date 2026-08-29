@@ -62,11 +62,13 @@ The adapter owns:
 - DMA buffers, hardware clocks, power, reset, GPIO, refresh/key-frame requests, and realtime task allocation;
 - bounded stop, resource release, and generation-aware flushing.
 
-The stable modules own stream IDs, negotiated/contracted formats, TiRTC callback copying, connection handles, session generation, and H5/AI sequencing.
+The stable modules own the discovered TiRTC service endpoint, stream IDs, negotiated/contracted formats, TiRTC callback copying, connection handles, session generation, and H5/AI sequencing. SDK lifecycle changes such as disconnect run in a worker/state-machine context, never directly inside an SDK callback.
 
 ## Verification loop
 
 Use a bounded loop per layer: diagnose one failing invariant, make the smallest correction, and rerun that layer before moving forward. Change one high-risk variable per HIL comparison. Turn reusable invariants into tests or post-link gates. Stop and report when the remaining failure requires unavailable hardware, credentials, a new SDK binary, a public protocol change, or a user choice.
+
+For every generated H5/AI project, validate `tirtc-runtime-contract.json` and run `install_runtime_gate.py <project>` before the ordinary build. Audio and video projects additionally install their media gates. A build that bypasses any applicable gate is not `BUILD_VERIFIED`.
 
 Run the assessor once per layer:
 

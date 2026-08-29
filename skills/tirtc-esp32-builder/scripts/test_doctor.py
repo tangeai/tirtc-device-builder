@@ -80,6 +80,38 @@ class DoctorTest(unittest.TestCase):
             ["CONFIG_FREERTOS_HZ: expected 1000, got 100"], mismatches
         )
 
+    def test_contract_comparison_accepts_hidden_disabled_child_boolean(self) -> None:
+        contract = {key: "off" for key in MODULE.CONTRACT_KEYS}
+        contract["CONFIG_FREERTOS_HZ"] = "1000"
+        config = {
+            "CONFIG_FREERTOS_HZ": "1000",
+            "CONFIG_FREERTOS_USE_TRACE_FACILITY": "off",
+            "CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS": "off",
+        }
+        self.assertEqual([], MODULE.compare_contract(contract, config))
+
+    def test_contract_comparison_rejects_missing_required_scalar(self) -> None:
+        contract = {key: "off" for key in MODULE.CONTRACT_KEYS}
+        contract["CONFIG_FREERTOS_HZ"] = "1000"
+        mismatches = MODULE.compare_contract(contract, {})
+        self.assertIn(
+            "project does not configure required CONFIG_FREERTOS_HZ=1000",
+            mismatches,
+        )
+
+    def test_contract_comparison_rejects_expected_on_when_missing(self) -> None:
+        contract = {key: "off" for key in MODULE.CONTRACT_KEYS}
+        contract["CONFIG_FREERTOS_HZ"] = "1000"
+        contract["CONFIG_FREERTOS_USE_TRACE_FACILITY"] = "on"
+        mismatches = MODULE.compare_contract(
+            contract, {"CONFIG_FREERTOS_HZ": "1000"}
+        )
+        self.assertIn(
+            "project does not configure required "
+            "CONFIG_FREERTOS_USE_TRACE_FACILITY=on",
+            mismatches,
+        )
+
     def test_workspace_accepts_repository_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)

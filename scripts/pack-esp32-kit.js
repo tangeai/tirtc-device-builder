@@ -46,6 +46,8 @@ const REQUIRED_FILES = [
   "device-sim/scripts/create_esp32_project.py",
   "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
   "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
+  "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
+  "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
   "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
   "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
   "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",

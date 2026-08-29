@@ -12,7 +12,7 @@ TiRTC Device Builder 用于把 ESP32-S3 开发板接入 TiRTC。输入可以只�
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
-- ESP32 Device Kit：[kit-esp32s3-v1.0.0](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.0.0)
+- ESP32 Device Kit：[kit-esp32s3-v1.1.0](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.0)
 
 文档导航：
 
@@ -86,13 +86,14 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 
 目标：
 - 功能：<例如 H5 实时音视频、H5 对讲、AI 双向语音>
-- 视频：<MJPEG/H264/H265/根据合同和硬件证据选择>
+- 平台/Web 视频：MJPEG、H264、H265
+- 板级视频选择：<MJPEG/H264/H265/根据硬件证据选择一种>
 - Wi-Fi：<指定方案/根据 BSP 选择>
 - 设备绑定：<指定方案/根据平台合同选择>
 
 工程：<输出目录或现有工程的工作区相对路径>
 
-请先运行 Doctor，分析全部资料并生成 Hardware IR v2。把未知项区分为可由资料、实现、构建或 HIL 解决，以及必须由用户补充的阻塞项。READY_TO_PORT 表示资料足以开始设计，不要求最终 ELF；随后生成、适配和编译，运行项目内音视频语义门禁，把 artifact SHA-256 写入 build_evidence 后执行 build 阶段评估，并输出 TIRTC_PORTING_REPORT.md。
+请先运行 Doctor，分析全部资料并生成 Hardware IR v2。把未知项区分为可由资料、实现、构建或 HIL 解决，以及必须由用户补充的阻塞项。READY_TO_PORT 表示资料足以开始设计，不要求最终 ELF；随后生成、适配和编译，运行项目内 runtime、音频和视频语义门禁，把项目内 artifacts/ 的真实大小与 SHA-256 写入 build_evidence 后执行 build 阶段评估，并输出 TIRTC_PORTING_REPORT.md。
 本轮不访问串口、不烧录、不擦除 NVS；缺少串口只让 L2-L7 记为 SKIP，不得阻止 L0/L1。不要把任何凭证写入源码或报告。
 ```
 
@@ -139,6 +140,7 @@ Skill 负责：
 - 生成并校验 `hardware-ir.json`，把冲突和未知项留在报告里；
 - 判断视频、上行音频、下行播放和 AI 会话是否具备移植条件；
 - 生成带 TiRTC SDK 的独立 ESP-IDF 工程；
+- 核验发现地址、SDK callback 生命周期、下行格式过滤和 AI 会话响应等运行协议不变量；
 - 把摄像头、所选 MJPEG/H.264/H.265 路径、麦克风、Codec、I2S、功放和按键接到板级 adapter；
 - 运行测试和 `idf.py build`，记录固件路径、版本和 SHA-256；
 - 在用户明确给出芯片、工程和串口后烧录；
@@ -245,7 +247,7 @@ board-materials/
 | ESP-IDF | 5.5.x |
 | 自动安装版本 | ESP-IDF v5.5.4 |
 | TiRTC SDK | `espressif-esp32s3/2.3.0` |
-| ESP32 Device Kit | 1.0.0 |
+| ESP32 Device Kit | 1.1.0 |
 | Node.js | 18 或更高版本 |
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
@@ -284,7 +286,7 @@ H5 和 AI 的端到端验收还需要可访问的 ThingConnect 服务、可用�
 
 ### 媒体约束
 
-H5 视频要先从前端和服务端支持的合同中选择一种 profile。MJPEG 提交完整 JPEG 帧；H.264/H.265 按合同提交 Annex-B access unit、参数集，并实现刷新或关键帧控制。板上有摄像头 Sensor，只能证明图像有来源，不能证明浏览器一定能持续出图。
+ThingConnect 平台和 Web 播放端支持 MJPEG、H.264、H.265；具体开发板必须根据其有证据的媒体路径只选择一种输出 profile。MJPEG 提交完整 JPEG 帧；H.264/H.265 按合同提交 Annex-B access unit、参数集，并实现刷新或关键帧控制。某块板只能输出 MJPEG 不代表平台只支持 MJPEG。板上有摄像头 Sensor，只能证明图像有来源，不能证明浏览器一定能持续出图。
 
 当前音频基线使用 G.711 A-law、8 kHz、单声道。对讲还要有可靠的下行队列、A-law 解码、Codec/I2S/功放播放和会话停止清理。没有可用的全双工和 AEC 证据时，应按半双工设计 AI 对讲。
 
@@ -327,7 +329,7 @@ npx --yes tirtc-device-builder@latest install esp32
 |---|---|
 | Codex Skill | `${CODEX_HOME:-~/.codex}/skills/tirtc-esp32-builder` |
 | 托管根目录 | `~/.tirtc-device-builder` |
-| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.0.0` |
+| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.0` |
 | ESP-IDF | `~/.tirtc-device-builder/esp-idf-v5.5.4` |
 | Espressif 工具 | `~/.tirtc-device-builder/espressif` |
 | 安装记录 | `~/.tirtc-device-builder/config.json` |
@@ -372,7 +374,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.0.0.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.0.tar.gz
 ```
 
 安装器仍会核对固定的 SHA-256、目录结构、清单和每个资源文件，不接受未经验证的同名压缩包。
@@ -464,7 +466,7 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/hardware_ir.py assess \
 | `NEEDS_CONFIRMATION` | 当前阶段的关键事实未知、冲突或证据等级不足 | 按资料、实现、构建、HIL 或用户输入来源继续闭环 |
 | `BLOCKED` | 现有硬件或 SDK 已确认不满足 | 更换硬件，补编码/播放路径，或取得匹配 SDK |
 | `READY_TO_PORT` | 资料足以开始生成和板级实现 | 进入工程生成与编译 |
-| `BUILD_VERIFIED` | 精确 artifact 通过源码、音视频语义、编译和 post-link 门禁 | 记录 BIN/ELF SHA-256；按授权进入实机验收 |
+| `BUILD_VERIFIED` | 精确 artifact 通过 runtime、音频、视频、源码、编译和 post-link 门禁 | 记录项目内 BIN/ELF 的真实大小与 SHA-256；按授权进入实机验收 |
 | `HIL_VERIFIED` | 已完成端到端实机验证 | 固定版本并保存证据 |
 
 `assess --strict` 在条件不足时返回非零，这是门禁在阻止过早生成，不代表脚本损坏。
@@ -738,7 +740,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.0.0.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.0.tar.gz
 ```
 
 安装器会校验 SHA-256 和内部文件清单。如果校验不一致，请重新获取官方 Release 附件，不要跳过校验。
@@ -850,40 +852,28 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 ```bash
 npm run pack:esp32-kit -- \
   --source /absolute/path/tirtc-server-example/thing-connect \
-  --kit-version 1.0.0
+  --kit-version 1.1.0
 ```
 
 输出位于 `dist/`：
 
 ```text
-tirtc-esp32s3-kit-1.0.0.tar.gz
-tirtc-esp32s3-kit-1.0.0.tar.gz.sha256
+tirtc-esp32s3-kit-1.1.0.tar.gz
+tirtc-esp32s3-kit-1.1.0.tar.gz.sha256
 ```
 
-校验后使用独立的 `kit-esp32s3-v<version>` 标签发布 GitHub Release：
+校验后推送独立的 `kit-esp32s3-v<version>` 标签。`publish-kit.yml` 会从 metadata 固定的上游 commit 重建压缩包、核对 SHA-256，并使用 GitHub Actions token 创建 Release：
 
 ```bash
-gh --version
-gh release --help
-
 cd dist
-sha256sum -c tirtc-esp32s3-kit-1.0.0.tar.gz.sha256
+sha256sum -c tirtc-esp32s3-kit-1.1.0.tar.gz.sha256
 cd ..
 
-git tag -a kit-esp32s3-v1.0.0 -m "TiRTC ESP32-S3 Device Kit 1.0.0"
-git push origin kit-esp32s3-v1.0.0
-
-gh release create kit-esp32s3-v1.0.0 \
-  dist/tirtc-esp32s3-kit-1.0.0.tar.gz \
-  dist/tirtc-esp32s3-kit-1.0.0.tar.gz.sha256 \
-  --repo tangeai/tirtc-device-builder \
-  --verify-tag \
-  --latest=false \
-  --title "TiRTC ESP32-S3 Device Kit 1.0.0" \
-  --notes "ESP-IDF 5.5.x；TiRTC SDK 2.3.0；包含 H5/AI 工程生成资源。"
+git tag -a kit-esp32s3-v1.1.0 -m "TiRTC ESP32-S3 Device Kit 1.1.0"
+git push origin kit-esp32s3-v1.1.0
 ```
 
-`gh release --help` 如果提示 `No such command 'release'`，当前系统安装的不是 GitHub 官方 CLI。先按 [GitHub CLI 官方安装说明](https://github.com/cli/cli/blob/trunk/docs/install_linux.md) 安装或替换，再登录并发布 Release。
+metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地可复现打包结果一致；工作流不会从浮动的 `main` 取发布内容。
 
 ### 发布 npm
 
@@ -891,8 +881,8 @@ gh release create kit-esp32s3-v1.0.0 \
 
 ```bash
 npm test
-git tag -a v0.6.0 -m "v0.6.0"
-git push origin v0.6.0
+git tag -a v0.7.0 -m "v0.7.0"
+git push origin v0.7.0
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

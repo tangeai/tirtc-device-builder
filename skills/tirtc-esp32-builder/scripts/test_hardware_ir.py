@@ -179,6 +179,7 @@ def assess_with_semantic_gates(ir: dict, **kwargs: object) -> dict:
         ir,
         audio_gate=SEMANTIC_GATE,
         video_gate=SEMANTIC_GATE,
+        runtime_gate=SEMANTIC_GATE,
         **kwargs,
     )
 
@@ -459,6 +460,31 @@ class HardwareIrV2Test(unittest.TestCase):
         ]
         errors = MODULE.validate_ir(invalid)
         self.assertTrue(any("unknown source" in error for error in errors))
+
+    def test_source_validation_rejects_invented_observation_scheme(self) -> None:
+        invalid = ready_v2()
+        invalid["sources"][0]["location"] = "intake-observed://missing.pdf"
+        errors = MODULE.validate_source_locations(invalid, SCRIPT.parent)
+        self.assertTrue(any("unsupported source scheme" in error for error in errors))
+
+    def test_source_validation_resolves_and_hashes_local_file(self) -> None:
+        valid = ready_v2()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            evidence = root / "evidence.pdf"
+            evidence.write_bytes(b"evidence")
+            valid["sources"][0]["location"] = "evidence.pdf"
+            valid["sources"][0]["sha256"] = MODULE.sha256_file(evidence)
+            self.assertEqual([], MODULE.validate_source_locations(valid, root))
+            valid["sources"][0]["sha256"] = "0" * 64
+            errors = MODULE.validate_source_locations(valid, root)
+            self.assertTrue(any("does not match" in error for error in errors))
+
+    def test_source_validation_rejects_machine_absolute_path(self) -> None:
+        invalid = ready_v2()
+        invalid["sources"][0]["location"] = "/another-machine/docs/board.pdf"
+        errors = MODULE.validate_source_locations(invalid, SCRIPT.parent)
+        self.assertTrue(any("must be IR-relative" in error for error in errors))
 
 
 class HardwareIrV1CompatibilityTest(unittest.TestCase):

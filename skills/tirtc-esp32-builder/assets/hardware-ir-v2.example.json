@@ -77,6 +77,7 @@
     },
     "audio_semantic_contract": "board-audio-contract.json",
     "video_semantic_contract": "board-video-contract.json",
+    "runtime_semantic_contract": "tirtc-runtime-contract.json",
     "audio_channel_mapping": {
       "required": null,
       "resolved": null,

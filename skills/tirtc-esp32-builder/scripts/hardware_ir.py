@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from audio_contract import verify_contract as verify_audio_contract
+from runtime_contract import verify_contract as verify_runtime_contract
 from video_contract import verify_contract as verify_video_contract
 
 
@@ -63,6 +65,16 @@ FEATURE_HIL_LEVEL = {
     "ai_talk": "L6",
 }
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+SOURCE_SCHEME_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*):")
+ALLOWED_SOURCE_SCHEMES = {
+    "http",
+    "https",
+    "device-kit",
+    "managed",
+    "official",
+    "user-input",
+    "user-supplied",
+}
 Requirement = tuple[str, str, int]
 
 
@@ -76,6 +88,62 @@ def load_ir(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("Hardware IR root must be an object")
     return data
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_source_locations(data: dict[str, Any], ir_directory: Path) -> list[str]:
+    """Resolve local evidence and reject invented or machine-bound source locators."""
+    errors: list[str] = []
+    root = ir_directory.expanduser().resolve()
+    sources = data.get("sources")
+    if not isinstance(sources, list):
+        return errors
+    for index, item in enumerate(sources):
+        if not isinstance(item, dict):
+            continue
+        prefix = f"sources[{index}]"
+        location = item.get("location")
+        if not isinstance(location, str) or not location.strip():
+            continue
+        if ";" in location:
+            errors.append(
+                f"{prefix}.location must identify exactly one source, not a semicolon list"
+            )
+            continue
+        scheme_match = SOURCE_SCHEME_RE.match(location)
+        if scheme_match is not None:
+            scheme = scheme_match.group(1).lower()
+            if scheme not in ALLOWED_SOURCE_SCHEMES:
+                errors.append(
+                    f"{prefix}.location uses unsupported source scheme {scheme!r}"
+                )
+            continue
+        relative = Path(location)
+        if relative.is_absolute():
+            errors.append(
+                f"{prefix}.location must be IR-relative or a supported source URI"
+            )
+            continue
+        resolved = (root / relative).resolve()
+        if not resolved.exists():
+            errors.append(
+                f"{prefix}.location does not resolve from the IR directory: {location}"
+            )
+            continue
+        expected_sha = item.get("sha256")
+        if expected_sha is not None:
+            if not resolved.is_file():
+                errors.append(f"{prefix}.sha256 can only describe a regular file")
+            elif sha256_file(resolved).lower() != str(expected_sha).lower():
+                errors.append(f"{prefix}.sha256 does not match {location}")
+    return errors
 
 
 def mapping(value: Any, path: str, errors: list[str]) -> dict[str, Any]:
@@ -244,6 +312,16 @@ def validate_hardware_resources(
     if isinstance(video_contract, str) and Path(video_contract).is_absolute():
         errors.append(
             "hardware_resources.video_semantic_contract must be project-relative"
+        )
+    runtime_contract = resources.get("runtime_semantic_contract")
+    nullable_string(
+        runtime_contract,
+        "hardware_resources.runtime_semantic_contract",
+        errors,
+    )
+    if isinstance(runtime_contract, str) and Path(runtime_contract).is_absolute():
+        errors.append(
+            "hardware_resources.runtime_semantic_contract must be project-relative"
         )
 
     mapping_section = mapping(
@@ -462,6 +540,11 @@ def validate_ir(data: dict[str, Any]) -> list[str]:
             source = mapping(item, prefix, errors)
             for key in ("id", "kind", "location"):
                 nonempty_string(source.get(key), f"{prefix}.{key}", errors)
+            source_sha = source.get("sha256")
+            if source_sha is not None and (
+                not isinstance(source_sha, str) or not SHA256_RE.fullmatch(source_sha)
+            ):
+                errors.append(f"{prefix}.sha256 must be a 64-character SHA-256")
             source_id = source.get("id")
             if isinstance(source_id, str) and source_id:
                 if source_id in source_ids:
@@ -993,12 +1076,46 @@ def artifact_requirement(
     )
 
 
+def artifact_file_requirement(
+    data: dict[str, Any], artifact_sha256: str | None, project: Path
+) -> Requirement:
+    recorded = artifact_requirement(data, artifact_sha256)
+    if recorded[0] != "SATISFIED" or artifact_sha256 is None:
+        return recorded
+    record = matching_build_artifact(data, artifact_sha256)
+    if record is None:
+        return "BLOCKED", "matching build artifact record disappeared", 0
+    value = record.get("path")
+    if not isinstance(value, str) or not value:
+        return "BLOCKED", "matching build artifact path is missing", 0
+    relative = Path(value)
+    if relative.is_absolute():
+        return "BLOCKED", "matching build artifact path is not project-relative", 0
+    root = project.expanduser().resolve()
+    path = (root / relative).resolve()
+    if root != path and root not in path.parents:
+        return "BLOCKED", "matching build artifact path escapes project root", 0
+    if not path.is_file():
+        return "BLOCKED", f"recorded build artifact does not exist: {value}", 0
+    if path.stat().st_size != record.get("size_bytes"):
+        return "BLOCKED", f"recorded build artifact size is stale for {value}", 0
+    if sha256_file(path).lower() != artifact_sha256.lower():
+        return "BLOCKED", f"recorded build artifact SHA-256 is stale for {value}", 0
+    return (
+        "SATISFIED",
+        f"artifact file {value} matches size and SHA-256",
+        VERIFICATION_LEVELS["build_verified"],
+    )
+
+
 def assess_ir(
     data: dict[str, Any],
     artifact_sha256: str | None = None,
     phase: str | None = None,
     audio_gate: Requirement | None = None,
     video_gate: Requirement | None = None,
+    runtime_gate: Requirement | None = None,
+    artifact_gate: Requirement | None = None,
 ) -> dict[str, Any]:
     selected_phase = phase or ("hil" if artifact_sha256 else "intake")
     if selected_phase not in ASSESSMENT_PHASES:
@@ -1043,7 +1160,7 @@ def assess_ir(
         resources = {}
 
     if selected_phase in {"build", "hil"}:
-        project.append(artifact_requirement(data, artifact_sha256))
+        project.append(artifact_gate or artifact_requirement(data, artifact_sha256))
 
     for feature in requested:
         if schema_version == 1:
@@ -1121,6 +1238,15 @@ def assess_ir(
                 or (
                     "NEEDS_CONFIRMATION",
                     "video semantic gate was not executed for this project",
+                    0,
+                )
+            )
+        if selected_phase in {"build", "hil"}:
+            requirements.append(
+                runtime_gate
+                or (
+                    "NEEDS_CONFIRMATION",
+                    "TiRTC runtime semantic gate was not executed for this project",
                     0,
                 )
             )
@@ -1203,7 +1329,7 @@ def command_validate(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    errors = validate_ir(data)
+    errors = validate_ir(data) + validate_source_locations(data, args.path.parent)
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
@@ -1218,7 +1344,7 @@ def command_assess(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    errors = validate_ir(data)
+    errors = validate_ir(data) + validate_source_locations(data, args.path.parent)
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
@@ -1318,6 +1444,50 @@ def command_assess(args: argparse.Namespace) -> int:
                     + "; ".join(video_gate_result.get("errors", [])),
                     0,
                 )
+    runtime_gate: Requirement | None = None
+    runtime_gate_result: dict[str, Any] | None = None
+    if data.get("schema_version") == 2 and selected_phase in {"build", "hil"}:
+        relative_contract = data["hardware_resources"].get(
+            "runtime_semantic_contract"
+        )
+        if not isinstance(relative_contract, str) or not relative_contract:
+            runtime_gate = (
+                "NEEDS_CONFIRMATION",
+                "hardware_resources.runtime_semantic_contract is missing",
+                0,
+            )
+            runtime_gate_result = {
+                "ok": False,
+                "errors": ["TiRTC runtime semantic contract is missing"],
+            }
+        else:
+            contract = (project / relative_contract).resolve()
+            if project != contract and project not in contract.parents:
+                runtime_gate_result = {
+                    "ok": False,
+                    "errors": ["TiRTC runtime semantic contract escapes project root"],
+                }
+            else:
+                runtime_gate_result = verify_runtime_contract(contract, project)
+            if runtime_gate_result["ok"]:
+                runtime_gate = (
+                    "SATISFIED",
+                    "TiRTC runtime semantic gate passed: "
+                    + str(runtime_gate_result.get("summary", "verified")),
+                    VERIFICATION_LEVELS["build_verified"],
+                )
+            else:
+                runtime_gate = (
+                    "BLOCKED",
+                    "TiRTC runtime semantic gate failed: "
+                    + "; ".join(runtime_gate_result.get("errors", [])),
+                    0,
+                )
+    artifact_gate = (
+        artifact_file_requirement(data, args.artifact_sha256, project)
+        if selected_phase in {"build", "hil"}
+        else None
+    )
     try:
         assessment = assess_ir(
             data,
@@ -1325,6 +1495,8 @@ def command_assess(args: argparse.Namespace) -> int:
             phase=selected_phase,
             audio_gate=audio_gate,
             video_gate=video_gate,
+            runtime_gate=runtime_gate,
+            artifact_gate=artifact_gate,
         )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -1333,6 +1505,8 @@ def command_assess(args: argparse.Namespace) -> int:
         assessment["audio_semantic_gate"] = audio_gate_result
     if video_gate_result is not None:
         assessment["video_semantic_gate"] = video_gate_result
+    if runtime_gate_result is not None:
+        assessment["runtime_semantic_gate"] = runtime_gate_result
     print(json.dumps(assessment, ensure_ascii=False, indent=2))
     if args.strict:
         statuses = {item["status"] for item in assessment["features"].values()}

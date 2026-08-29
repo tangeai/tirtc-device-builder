@@ -2,6 +2,14 @@
 
 This project follows Semantic Versioning.
 
+## 0.7.0
+
+- Separate the platform/Web video contract (MJPEG, H.264, and H.265 on stream 11) from the single codec profile selected by a board; keep the LCKFB ESP32-S3 adapter on MJPEG without narrowing platform capability.
+- Add a mandatory runtime semantic gate for service-endpoint wiring, callback-safe lifecycle changes, exact downlink media filtering, authoritative AI session-format validation, and remote session termination.
+- Reject invented, concatenated, absolute, missing, or hash-mismatched Hardware IR source locators and verify recorded build artifacts against the actual project-relative files.
+- Treat the entire ESP-IDF `build/` tree as non-portable, retain verified deliverable copies under `artifacts/`, and strengthen Doctor handling and negative regression tests.
+- Package the hardened generated starter and platform/runtime contracts in ESP32 Device Kit 1.1.0.
+
 ## 0.6.0
 
 - Add project-local audio and video semantic contracts that verify codec clock tables, I2S/TDM topology, selected video framing, dependency locks, scheduler isolation, sensor policy, and memory/backpressure before an artifact can reach `BUILD_VERIFIED`.

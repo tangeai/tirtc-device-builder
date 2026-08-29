@@ -124,8 +124,14 @@ def compare_contract(
         actual = config.get(key)
         if expected is None:
             mismatches.append(f"SDK contract does not declare {key}")
+        elif actual is None and expected.lower() == "off":
+            # ESP-IDF omits some disabled child booleans from the final sdkconfig
+            # when their parent dependency is off. An absent boolean therefore has
+            # the same effective value as "# ... is not set" for this fixed set of
+            # SDK ABI options. Expected-on and scalar values remain strict.
+            continue
         elif actual is None:
-            mismatches.append(f"project does not explicitly configure {key}={expected}")
+            mismatches.append(f"project does not configure required {key}={expected}")
         elif actual.lower() != expected.lower():
             mismatches.append(f"{key}: expected {expected}, got {actual}")
     return mismatches
