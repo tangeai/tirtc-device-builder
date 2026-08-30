@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -38,6 +39,7 @@ class PortableGateTests(unittest.TestCase):
             source.write_text(
                 "static const int coeff[][3] = {\n"
                 "  {4096000, 8000, 1},\n"
+                "  {4096000, 16000, 1},\n"
                 "  {12288000, 48000, 1},\n"
                 "};\n",
                 encoding="utf-8",
@@ -121,6 +123,40 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         path = self.project / "board-audio-contract.json"
         path.write_text(json.dumps(contract), encoding="utf-8")
         return path
+
+    def full_duplex_aec_contract(self) -> dict:
+        contract = self.contract()
+        contract["clock"].update(
+            {"sample_rate_hz": 16000, "mclk_ratio": 256, "mclk_hz": 4096000}
+        )
+        contract["capture"].update(
+            {"controller": 0, "slot_count": 4, "slot_bit_width": 16}
+        )
+        contract["playback"].update(
+            {"controller": 0, "slot_count": 2, "slot_bit_width": 32}
+        )
+        contract["shared_clock"].update(
+            {
+                "directions_simultaneous": True,
+                "handoff": "none",
+                "paired_channels": True,
+            }
+        )
+        contract["echo_cancellation"] = {
+            "enabled": True,
+            "sample_rate_hz": 16000,
+            "microphone_slot": 0,
+            "microphone_signal": "MIC1",
+            "reference_slot": 1,
+            "reference_signal": "REFERENCE",
+        }
+        contract["implementation_assertions"][0]["contains_compact"] = [
+            ".flags.tdm_enable=true",
+            "I2S_TDM_SLOT0|I2S_TDM_SLOT1|I2S_TDM_SLOT2|I2S_TDM_SLOT3",
+            "i2s_channel_reconfig_tdm_gpio",
+            "i2s_channel_reconfig_std_gpio",
+        ]
+        return contract
 
     def video_contract(self) -> dict:
         return {
@@ -219,6 +255,46 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
 
     def write_portable_sdk_inputs(self) -> None:
         (self.project / "dependencies.lock").write_text("dependencies: {}\n", encoding="utf-8")
+        (self.project / "sdkconfig.defaults").write_text(
+            'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"\n',
+            encoding="utf-8",
+        )
+        (self.project / "partitions.csv").write_text(
+            "factory,app,factory,0x10000,0x500000\n", encoding="utf-8"
+        )
+        for name in (
+            "board-audio-contract.json",
+            "board-video-contract.json",
+            "tirtc-runtime-contract.json",
+        ):
+            (self.project / name).write_text("{}\n", encoding="utf-8")
+        artifact = self.project / "artifacts" / "firmware.bin"
+        artifact.parent.mkdir()
+        artifact.write_bytes(b"portable firmware")
+        (self.project / "hardware-ir.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "features": {
+                        "requested": [
+                            "h5_live_audio",
+                            "h5_live_video",
+                            "h5_talkback",
+                            "ai_talk",
+                        ]
+                    },
+                    "hardware_resources": {
+                        "audio_semantic_contract": "board-audio-contract.json",
+                        "video_semantic_contract": "board-video-contract.json",
+                        "runtime_semantic_contract": "tirtc-runtime-contract.json",
+                    },
+                    "build_evidence": {
+                        "artifacts": [{"path": "artifacts/firmware.bin"}]
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         sdk = self.project / "third_party" / "tirtc"
         for relative in (
             "include/tirtc/tiRTC.h",
@@ -397,6 +473,34 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         result = verify_contract(self.write_contract(contract), self.project)
         self.assertFalse(result["ok"])
         self.assertTrue(any("one I2S controller" in item for item in result["errors"]))
+
+    def test_paired_mixed_mode_full_duplex_aec_passes(self) -> None:
+        contract = self.full_duplex_aec_contract()
+        result = verify_contract(self.write_contract(contract), self.project)
+        self.assertTrue(result["ok"], result["errors"])
+        self.assertIn("simultaneous=True", result["summary"])
+        self.assertIn("aec=True", result["summary"])
+
+    def test_paired_mixed_mode_rejects_mismatched_frame_clocks(self) -> None:
+        contract = self.full_duplex_aec_contract()
+        contract["playback"]["slot_bit_width"] = 16
+        result = verify_contract(self.write_contract(contract), self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("equal BCLKs per frame" in item for item in result["errors"]))
+
+    def test_full_duplex_rejects_clock_handoff(self) -> None:
+        contract = self.full_duplex_aec_contract()
+        contract["shared_clock"]["handoff"] = "release_before_claim"
+        result = verify_contract(self.write_contract(contract), self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("must not use a clock handoff" in item for item in result["errors"]))
+
+    def test_aec_reference_must_match_tdm_slot_mapping(self) -> None:
+        contract = self.full_duplex_aec_contract()
+        contract["echo_cancellation"]["reference_slot"] = 2
+        result = verify_contract(self.write_contract(contract), self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("reference_signal" in item for item in result["errors"]))
 
     def test_project_gate_follows_feature_block(self) -> None:
         project_gate = {"status": "BUILD_VERIFIED", "reasons": []}
@@ -607,6 +711,49 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         )
         result = check_project(self.project, export=True)
         self.assertTrue(result["ok"], result["errors"])
+
+    def test_source_export_rejects_missing_hardware_ir(self) -> None:
+        self.write_portable_sdk_inputs()
+        (self.project / "hardware-ir.json").unlink()
+        result = check_project(self.project, export=True)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("hardware-ir.json" in item for item in result["errors"]))
+
+    def test_source_export_rejects_git_ignored_required_inputs(self) -> None:
+        self.write_portable_sdk_inputs()
+        subprocess.run(
+            ["git", "init", "--quiet", str(self.project)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        (self.project / ".gitignore").write_text(
+            "*.json\n*.csv\n/dependencies.lock\n/artifacts/\n",
+            encoding="utf-8",
+        )
+        result = check_project(self.project, export=True)
+        self.assertFalse(result["ok"])
+        ignored = [item for item in result["errors"] if "ignored by Git" in item]
+        self.assertTrue(any("hardware-ir.json" in item for item in ignored))
+        self.assertTrue(any("dependencies.lock" in item for item in ignored))
+        self.assertTrue(any("partitions.csv" in item for item in ignored))
+        self.assertTrue(any("artifacts/firmware.bin" in item for item in ignored))
+
+    def test_source_export_explains_legacy_non_h264_migration(self) -> None:
+        self.write_portable_sdk_inputs()
+        ir = {
+            "schema_version": 1,
+            "features": {"requested": ["h5_live_video"]},
+            "camera": {"h264": {"available": False}},
+            "build_evidence": {"artifacts": [{"path": "artifacts/firmware.bin"}]},
+        }
+        (self.project / "hardware-ir.json").write_text(
+            json.dumps(ir), encoding="utf-8"
+        )
+        result = check_project(self.project, export=True)
+        self.assertFalse(result["ok"])
+        self.assertTrue(
+            any("migrate Hardware IR to schema v2" in item for item in result["errors"])
+        )
 
     def test_source_export_rejects_cache_and_permission_dependent_gate(self) -> None:
         self.write_portable_sdk_inputs()

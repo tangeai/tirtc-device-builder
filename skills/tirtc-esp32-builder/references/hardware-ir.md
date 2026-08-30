@@ -10,6 +10,11 @@ python3 <skill-dir>/scripts/hardware_ir.py init <output>/hardware-ir.json
 
 The initializer creates schema v2. The validator still accepts schema v1 for existing H.264-only projects; update new or materially changed boards to v2.
 
+Schema v1 cannot represent an MJPEG/H.265 selection, semantic-contract paths,
+or artifact-bound v2 HIL. If an existing v1 project requests H5 video without
+an available H.264 path, migrate it to v2 rather than interpreting the legacy
+H.264 assessment failure as a board or platform codec failure.
+
 ## Evidence rules
 
 - Give every source a stable `id`, `kind`, `location`, and revision when available.

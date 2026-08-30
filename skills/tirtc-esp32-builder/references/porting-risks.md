@@ -13,6 +13,17 @@ Record the selected video profile, audio formats and stream IDs, duplex/AEC poli
 - I2S/audio: record controller, GPIO, master/slave mode, clocks, DMA, channel/TDM slot to physical-signal mapping, and shared-signal handoff. A codec name or I2C address does not prove the audio path.
 - Realtime camera path: record DMA/event queues, task core/priority, and competing Wi-Fi work. Treat queue overflows as scheduling or throughput evidence, then change one variable per HIL comparison.
 
+Distinguish the camera driver's event task from an adapter-owned software
+JPEG/H.26x task. Core isolation of the driver does not prove that a CPU-bound
+encoder is isolated. On ESP32-S3, code using floating point can cause an
+unpinned task to become pinned to the first core where it uses the FPU; AEC and
+other DSP tasks therefore need intentional affinity when they would otherwise
+land on the Wi-Fi core. A DMA-fed loop or software encoder that can remain
+continuously runnable must block on a queue/semaphore or yield at a bounded
+frame boundary. Keep the idle-task watchdog enabled, and expose maximum
+processing time plus deadline misses instead of hiding starvation by widening
+or disabling the watchdog.
+
 Turn every discovered invariant that can regress into a focused test or post-link gate. Generate board-specific values with the project; keep the Skill generic.
 
 ## Wi-Fi credentials and device binding
@@ -38,6 +49,13 @@ Platform service discovery and the TiRTC SDK service endpoint are different sett
 
 Define a conservative static budget before implementation using the locked SDK contract, framebuffer geometry, DMA/queue bounds, task stacks, and an internal-memory reserve. Before claiming runtime margin or tuning TiRTC buffers, measure internal free/largest blocks, PSRAM, frame size distribution, queue watermarks, and send/drop rates on the exact artifact. A larger queue can prevent drops, exhaust startup memory, or add buffer latency. If an authorized HTTP baseline exists, stage transport changes separately from media changes and retain the HTTPS requirements as a pending acceptance item.
 
+Treat PSRAM framebuffer placement, direct peripheral DMA into PSRAM, and an
+internal-DMA staging buffer as three separate facts. PSRAM capacity does not
+prove DMA compatibility or frame integrity for a sensor/pixel format. Promote
+direct PSRAM DMA only after artifact-bound HIL checks image boundaries and line
+integrity; otherwise retain the evidenced staging path and budget its internal
+DMA reserve explicitly.
+
 ## Network and media evidence
 
 Disable Wi-Fi power saving for the realtime baseline unless the product contract says otherwise. Record BSSID, channel, RSSI, reconnect/roaming events, media counters, queue watermarks, camera overflows, internal heap, and largest block. Establish a strong, stable AP baseline before controlled weak-network testing.
@@ -47,3 +65,10 @@ Confirm SDK send return semantics and callback payload lifetimes from the select
 ## Artifact discipline
 
 Record BIN/ELF SHA-256 for every build used in HIL. Runtime evidence applies only to the exact artifact. Diagnose one failing invariant, make the smallest correction, rerun that layer, and preserve the comparison in the report.
+
+Local intermediate snapshots may be ignored, but the Hardware IR, semantic
+contracts, `dependencies.lock`, custom partition input, and the artifact named
+by retained build evidence must survive the chosen export mechanism. Broad
+`*.json`, `*.csv`, or `artifacts/` ignore rules are invalid when they hide an
+untracked required input; `project_portability.py --export` checks this when the
+project is inside a Git worktree.

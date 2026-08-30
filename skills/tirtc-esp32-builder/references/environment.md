@@ -58,6 +58,13 @@ python3 <skill-dir>/scripts/project_portability.py <generated-project> --export
 
 Copy source inputs only. Never export `build/`: CMake caches absolute source, toolchain, and Python paths from the originating machine. `managed_components/` may be regenerated from the committed `dependencies.lock`; the bundled `third_party/tirtc` SDK and its build contract must remain in the source package. CMake must invoke shell gates through `bash <script>` so the build does not depend on archive- or filesystem-specific executable bits.
 
+The export check also requires Hardware IR, every requested-feature semantic
+contract, `sdkconfig.defaults`, a referenced custom partition table, and each
+artifact retained in `build_evidence.artifacts[]`. Inside a Git worktree these
+inputs must not be untracked files hidden by `.gitignore`. Ignore local build
+trees and intermediate firmware snapshots, then explicitly include the exact
+validated release bundle used by retained evidence.
+
 ## Required checks
 
 - `python3`, `git`, `idf.py`, and the target compiler are available in the active shell;

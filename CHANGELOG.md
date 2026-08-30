@@ -2,6 +2,16 @@
 
 This project follows Semantic Versioning.
 
+## Unreleased
+
+- Make source export reject missing or Git-ignored Hardware IR, requested-feature
+  contracts, dependency locks, custom partition tables, and retained build
+  artifacts.
+- Support frame-compatible paired standard/TDM full-duplex audio and validate
+  hardware-reference AEC microphone/reference slot mapping.
+- Document ESP32-S3 FPU task affinity, watchdog fairness, software-encoder task
+  isolation, and PSRAM DMA staging as distinct bring-up risks.
+
 ## 0.7.2
 
 - Require the selected managed ESP32 Device Kit manifest to match the pinned Kit version; ignore stale managed references instead of reporting an older structurally complete Kit as ready.

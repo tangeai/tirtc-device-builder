@@ -192,17 +192,113 @@ def check_topology(contract: dict[str, Any], errors: list[str]) -> None:
         )
     if simultaneous is False and handoff == "none":
         errors.append("half-duplex shared clocks require an explicit handoff")
+    if simultaneous is True and handoff != "none":
+        errors.append("simultaneous directions must not use a clock handoff")
+    paired_channels = shared.get("paired_channels", False)
+    if not isinstance(paired_channels, bool):
+        errors.append("shared_clock.paired_channels must be true or false")
+        paired_channels = False
+
+    mixed_paired_ok = False
     if simultaneous is True and capture.get("mode") != playback.get("mode"):
-        errors.append("simultaneous directions cannot use different I2S modes")
+        if paired_channels is not True:
+            errors.append(
+                "simultaneous mixed I2S modes require shared_clock.paired_channels=true"
+            )
+        if capture.get("controller") != playback.get("controller"):
+            errors.append(
+                "simultaneous mixed I2S modes require paired directions on one controller"
+            )
+        frame_bits: dict[str, int] = {}
+        for endpoint, label in ((capture, "capture"), (playback, "playback")):
+            slots = require_positive_int(
+                endpoint.get("slot_count"), f"{label}.slot_count", errors
+            )
+            width = require_positive_int(
+                endpoint.get("slot_bit_width"),
+                f"{label}.slot_bit_width",
+                errors,
+            )
+            if slots is not None and width is not None:
+                frame_bits[label] = slots * width
+        if len(frame_bits) == 2 and frame_bits["capture"] != frame_bits["playback"]:
+            errors.append(
+                "simultaneous mixed I2S modes require equal BCLKs per frame: "
+                f"capture={frame_bits['capture']} playback={frame_bits['playback']}"
+            )
+        mixed_paired_ok = (
+            paired_channels is True
+            and capture.get("controller") == playback.get("controller")
+            and len(frame_bits) == 2
+            and frame_bits["capture"] == frame_bits["playback"]
+        )
     if (
         capture.get("controller") == playback.get("controller")
         and capture.get("mode") != playback.get("mode")
+        and not mixed_paired_ok
         and handoff != "delete_recreate"
     ):
         errors.append(
             "one I2S controller cannot retain different capture/playback modes; "
-            "use distinct controllers or delete_recreate handoff"
+            "use paired frame-compatible directions, distinct controllers, or "
+            "delete_recreate handoff"
         )
+
+    aec_value = contract.get("echo_cancellation")
+    if aec_value is None:
+        return
+    aec = require_mapping(aec_value, "echo_cancellation", errors)
+    enabled = aec.get("enabled")
+    if not isinstance(enabled, bool):
+        errors.append("echo_cancellation.enabled must be true or false")
+        return
+    if not enabled:
+        return
+    if simultaneous is not True:
+        errors.append("echo cancellation requires simultaneous capture and playback")
+    if capture_mode != "tdm":
+        errors.append("echo cancellation reference mapping requires TDM capture")
+    sample_rate = require_positive_int(
+        aec.get("sample_rate_hz"), "echo_cancellation.sample_rate_hz", errors
+    )
+    clock = contract.get("clock", {})
+    if sample_rate is not None and sample_rate != clock.get("sample_rate_hz"):
+        errors.append("echo cancellation sample rate must match the hardware clock")
+
+    microphone_slot = aec.get("microphone_slot")
+    reference_slot = aec.get("reference_slot")
+    microphone_signal = require_nonempty_string(
+        aec.get("microphone_signal"), "echo_cancellation.microphone_signal", errors
+    )
+    reference_signal = require_nonempty_string(
+        aec.get("reference_signal"), "echo_cancellation.reference_signal", errors
+    )
+    slot_signals = capture.get("slot_signals")
+    slot_count = capture.get("slot_count")
+    for slot, signal, label in (
+        (microphone_slot, microphone_signal, "microphone"),
+        (reference_slot, reference_signal, "reference"),
+    ):
+        if (
+            isinstance(slot, bool)
+            or not isinstance(slot, int)
+            or slot < 0
+            or not isinstance(slot_count, int)
+            or slot >= slot_count
+        ):
+            errors.append(
+                f"echo_cancellation.{label}_slot must select an available TDM slot"
+            )
+        elif isinstance(slot_signals, list) and slot < len(slot_signals):
+            if signal != slot_signals[slot]:
+                errors.append(
+                    f"echo_cancellation.{label}_signal does not match "
+                    f"capture.slot_signals at slot {slot}"
+                )
+    if microphone_slot == reference_slot:
+        errors.append("echo cancellation microphone and reference slots must differ")
+    if microphone_signal is not None and microphone_signal == reference_signal:
+        errors.append("echo cancellation microphone and reference signals must differ")
 
 
 def check_assertions(
@@ -277,11 +373,15 @@ def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
     check_topology(contract, errors)
     check_assertions(project, contract, errors, inputs)
     clock = contract.get("clock", {})
+    shared = contract.get("shared_clock", {})
+    aec = contract.get("echo_cancellation", {})
     return {
         "ok": not errors,
         "summary": (
             f"sample_rate={clock.get('sample_rate_hz')}Hz "
-            f"mclk={clock.get('mclk_hz')}Hz ratio={clock.get('mclk_ratio')}"
+            f"mclk={clock.get('mclk_hz')}Hz ratio={clock.get('mclk_ratio')} "
+            f"simultaneous={shared.get('directions_simultaneous')} "
+            f"aec={aec.get('enabled', False)}"
         ),
         "inputs": inputs,
         "errors": errors,

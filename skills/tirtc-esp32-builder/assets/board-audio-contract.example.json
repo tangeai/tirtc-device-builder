@@ -40,6 +40,7 @@
   "shared_clock": {
     "gpios": [38, 14, 13],
     "directions_simultaneous": false,
+    "paired_channels": false,
     "handoff": "release_before_claim"
   },
   "implementation_assertions": [
