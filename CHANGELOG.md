@@ -2,7 +2,7 @@
 
 This project follows Semantic Versioning.
 
-## Unreleased
+## 0.7.3
 
 - Make source export reject missing or Git-ignored Hardware IR, requested-feature
   contracts, dependency locks, custom partition tables, and retained build

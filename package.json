@@ -1,6 +1,6 @@
 {
   "name": "tirtc-device-builder",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Install and run TiRTC device-development skills for Codex.",
   "license": "MIT",
   "author": {
