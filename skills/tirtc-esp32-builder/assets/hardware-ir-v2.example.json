@@ -83,6 +83,12 @@
       "resolved": null,
       "verification": "extracted"
     },
+    "duplex_audio": {
+      "simultaneous_capture_playback": null,
+      "playback_reference_available": null,
+      "aec_implementation_available": null,
+      "verification": "extracted"
+    },
     "camera_realtime": {
       "pipeline_safe": null,
       "verification": "extracted"
@@ -122,7 +128,9 @@
       "h5_live_audio",
       "h5_live_video",
       "h5_talkback",
-      "ai_talk"
+      "ai_talk",
+      "device_call",
+      "wechat_voip"
     ]
   }
 }

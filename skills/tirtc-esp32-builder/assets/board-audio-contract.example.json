@@ -43,6 +43,9 @@
     "paired_channels": false,
     "handoff": "release_before_claim"
   },
+  "echo_cancellation": {
+    "enabled": false
+  },
   "implementation_assertions": [
     {
       "file": "components/starter_media/src/starter_media.c",

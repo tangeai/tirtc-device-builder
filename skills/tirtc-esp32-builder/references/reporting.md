@@ -13,7 +13,7 @@ Use [the report template](../assets/report-template.md) and preserve separate `P
 | L3 Online | Wi-Fi provisioning, binding, MQTT, and TiRTC reach ready state |
 | L4 Media | Camera/microphone/speaker local paths work and counters/measurements are captured |
 | L5 H5 | Browser receives the declared video/audio and talkback reaches the device |
-| L6 AI | Token, WHIP, `start_session`, bidirectional audio, stop, and H5 recovery work |
+| L6 Sessions | AI, device-call and WeChat VoIP requested flows work; simultaneous capture/playback, AEC/double-talk, stop, timeout and H5 recovery are observed separately |
 | L7 Stability | Requested weak-network, repeated-session, resource, and soak criteria pass |
 
 Run and record the intake assessment before L0, the build assessment with `--project` and the exact artifact SHA-256 at L1, and the HIL assessment only when matching runtime evidence exists. Before assessment, copy final deliverable BIN/ELF files to project-relative `artifacts/` paths and record their actual byte size and SHA-256 in `build_evidence.artifacts[]`; the assessor reopens the file and rejects stale metadata. Missing serial or browser access is a `SKIP` for the affected L2-L7 levels, not an L0/L1 failure.

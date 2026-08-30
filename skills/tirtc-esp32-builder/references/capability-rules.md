@@ -9,7 +9,16 @@ Run `hardware_ir.py assess --phase intake --strict` before generation. Hardware 
 | `h5_live_audio` | Microphone path producing G.711 A-law, 8 kHz, mono for stream 10; audio controller/channel ownership and memory budget resolved |
 | `h5_live_video` | Camera plus the selected MJPEG, H.264, or H.265 profile for stream 11; refresh/key-frame control, realtime pipeline, and memory budget resolved |
 | `h5_talkback` | G.711 A-law, 8 kHz downlink decode and speaker path for stream 14; audio controller/GPIO ownership and memory budget resolved |
-| `ai_talk` | A-law 8 kHz microphone and speaker paths for AI stream 1, started only after `start_session`; audio ownership/channel mapping and memory budget resolved |
+| `ai_talk` | A-law 8 kHz microphone and speaker paths for AI stream 1, started only after `start_session`; simultaneous capture/playback, physical reference, enabled AEC, audio ownership/channel mapping and memory budget resolved |
+| `device_call` | Device-call protocol and arbiter contract plus simultaneous A-law capture/playback, physical reference and enabled AEC |
+| `wechat_voip` | WeChat VoIP protocol and arbiter contract plus simultaneous A-law capture/playback, physical reference and enabled AEC |
+
+`ai_talk`, `device_call`, and `wechat_voip` are AEC-required features. They are
+`BLOCKED` when the board cannot capture a playback reference, cannot keep RX/TX
+active together, or has no evidenced AEC implementation. At build time the audio
+contract must explicitly report both simultaneous directions and enabled AEC;
+generic full-duplex labels, a software flag without reference routing, or a
+half-duplex fallback do not satisfy the gate.
 
 Hardware identity, wiring, the selected media contract, and the adapter/resource design must be at least `corroborated` to become `READY_TO_PORT`. At intake, `available=true` means a pinned source path can implement the selected profile; it does not claim that the final adapter or physical media path has run. Implementation composition, final ELF policy, runtime memory margin, browser media, and stability belong to the build or HIL phases.
 
@@ -45,6 +54,7 @@ SoftAP is one Wi-Fi option, not a universal requirement. BLE, SmartConfig, facto
 - Match the TiRTC precompiled SDK platform to the ESP-IDF target and its `manifest/build-contract.env` to the generated configuration.
 - Keep H5 stream IDs and formats stable unless the user explicitly authorizes a coordinated contract change across the server and consumers.
 - Start AI media only after the successful `start_session` response; stop and flush media before disconnecting.
+- Route AI, device-call and WeChat VoIP through the same foreground-session arbiter and keep AEC active for the entire simultaneous capture/playback interval.
 - Copy SDK callback payloads into bounded queues before returning. Perform decoding, playback, HTTP, and lifecycle changes outside callbacks.
 - Use monotonic timestamps and session generation to reject stale frames and delayed callbacks.
 - Record runtime evidence with the exact BIN/ELF SHA-256. Use `assess --phase hil --artifact-sha256 <sha>`; documentation verification alone never becomes v2 `HIL_VERIFIED`.

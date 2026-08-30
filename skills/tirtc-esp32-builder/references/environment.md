@@ -48,6 +48,19 @@ For an explicitly selected legacy workspace, omit `--expected-kit`; otherwise re
 
 The default managed root is `<setup-root>/kits/esp32s3/<kit-version>`. The public ThingConnect workspace remains an optional legacy/development input; the doctor accepts either a Device Kit root, a repository root, or its `thing-connect/` child.
 
+The managed Kit currently contains the ESP32-S3 H5/AI starter. When the requested
+portfolio includes device-to-device calling or WeChat VoIP and the selected Kit
+does not contain `device-sim-c`, `device-call.md`, `device-voip.md`, and the API
+reference, use a full `tirtc-server-example` checkout pinned to a recorded commit
+for the simulator and porting source. Cloning is an external write and requires
+user authorization. Do not track a moving default branch as build evidence.
+
+ESP32-P4 uses a separate `espressif_esp32p4` SDK archive and RISC-V toolchain.
+The managed setup does not install that archive or generate a P4 starter. A P4
+task therefore needs an explicit BSP/network project plus the exact P4 SDK and
+`manifest/build-contract.env`; run Doctor with `--target esp32p4` and never accept
+the packaged S3 archive as a compatible fallback.
+
 SDK resolution is independent after generation: an explicit `--sdk-dir` wins, followed by `<project>/third_party/tirtc`, then the SDK packaged in the resolved Device Kit or legacy workspace. The generated project remains diagnosable after it is moved away from the Kit.
 
 Before copying a generated project to another machine, run:

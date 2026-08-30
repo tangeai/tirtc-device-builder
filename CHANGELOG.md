@@ -2,6 +2,19 @@
 
 This project follows Semantic Versioning.
 
+## 0.8.0
+
+- Add an evidence-backed board identity and curated registry workflow with exact,
+  probable and component-only matching plus reviewable knowledge candidates.
+- Extend Hardware IR and runtime contracts to model device-to-device calls and
+  WeChat VoIP against a pinned business-protocol revision and unified session
+  arbiter.
+- Make simultaneous capture/playback, a physical playback reference and enabled
+  AEC mandatory for AI intercom, device calls and WeChat VoIP at intake, build
+  and artifact-bound HIL assessment.
+- Add conditional ESP32-P4 target/SDK matching while retaining ESP32-S3 as the
+  managed generator path, and document simulator-first four-feature porting.
+
 ## 0.7.3
 
 - Make source export reject missing or Git-ignored Hardware IR, requested-feature

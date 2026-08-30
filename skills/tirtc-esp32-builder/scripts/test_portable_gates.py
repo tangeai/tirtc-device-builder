@@ -451,14 +451,84 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
                 "starter_tirtc": "components/starter_tirtc/src/starter_tirtc.c",
                 "starter_runtime": "components/starter_runtime/src/starter_runtime.c",
             },
+            "business": {
+                "features": [],
+                "protocol_revision": None,
+                "session_arbiter": {},
+                "implementation_assertions": [],
+            },
         }
         path = self.project / "tirtc-runtime-contract.json"
         path.write_text(json.dumps(contract), encoding="utf-8")
         return path
 
+    def add_business_fixture(self, path: Path) -> None:
+        source = self.project / "components" / "business" / "business.c"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        tokens = sorted(
+            {
+                *(
+                    "/v1/call/request",
+                    "/v1/call/device/info",
+                    "/v1/call/reject",
+                    "/v1/call/cancel",
+                    "/v1/call/hangup",
+                    "/v1/call/room",
+                    "call_incoming",
+                    "room_cancel",
+                    "call_reject",
+                ),
+                *(
+                    "/v1/voip/device/profile",
+                    "/v1/voip/device/contacts",
+                    "/v1/voip/device/call",
+                    "callers_update",
+                    "wx_call_id",
+                    "wxcall",
+                ),
+            }
+        )
+        source.write_text("\n".join(f'const char *s{index} = "{token}";' for index, token in enumerate(tokens)), encoding="utf-8")
+        contract = json.loads(path.read_text(encoding="utf-8"))
+        contract["business"] = {
+            "features": ["device_call", "wechat_voip"],
+            "protocol_revision": "1" * 40,
+            "session_arbiter": {
+                "single_foreground_owner": True,
+                "pending_capacity": 1,
+                "generation_guard": True,
+                "monotonic_deadlines": True,
+                "deferred_lifecycle": True,
+                "restore_h5_after_call": True,
+            },
+            "implementation_assertions": [
+                {"file": "components/business/business.c", "contains": tokens}
+            ],
+        }
+        path.write_text(json.dumps(contract), encoding="utf-8")
+
     def test_supported_contract_passes(self) -> None:
         result = verify_contract(self.write_contract(self.contract()), self.project)
         self.assertTrue(result["ok"], result["errors"])
+
+    def test_business_call_and_voip_contract_passes(self) -> None:
+        path = self.write_runtime_fixture()
+        self.add_business_fixture(path)
+        result = verify_runtime_contract(path, self.project)
+        self.assertTrue(result["ok"], result["errors"])
+        self.assertEqual(["device_call", "wechat_voip"], result["business_features"])
+
+    def test_business_contract_rejects_missing_arbiter_guards(self) -> None:
+        path = self.write_runtime_fixture()
+        self.add_business_fixture(path)
+        contract = json.loads(path.read_text(encoding="utf-8"))
+        contract["business"]["session_arbiter"]["generation_guard"] = False
+        path.write_text(json.dumps(contract), encoding="utf-8")
+        result = verify_runtime_contract(path, self.project)
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["base_ok"])
+        self.assertFalse(result["business_ok"])
+        self.assertTrue(any("generation_guard" in item for item in result["errors"]))
 
     def test_unsupported_clock_fails(self) -> None:
         contract = self.contract()
@@ -480,6 +550,8 @@ void gate(void) { i2s_channel_reconfig_tdm_gpio(); i2s_channel_reconfig_std_gpio
         self.assertTrue(result["ok"], result["errors"])
         self.assertIn("simultaneous=True", result["summary"])
         self.assertIn("aec=True", result["summary"])
+        self.assertTrue(result["simultaneous_capture_playback"])
+        self.assertTrue(result["echo_cancellation_enabled"])
 
     def test_paired_mixed_mode_rejects_mismatched_frame_clocks(self) -> None:
         contract = self.full_duplex_aec_contract()

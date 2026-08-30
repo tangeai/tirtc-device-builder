@@ -1,6 +1,6 @@
 # TiRTC runtime protocol contract
 
-Use this gate for every generated H5/AI project. It verifies protocol behavior that is
+Use this gate for every generated H5/AI/call/VoIP project. It verifies protocol behavior that is
 neither a board clock fact nor a camera fact: service discovery wiring, SDK callback
 lifecycle, stream/media metadata, and AI session negotiation.
 
@@ -30,5 +30,15 @@ The gate requires all of the following:
 - AI media starts only after a matching response provides a non-empty session ID and
   authoritative input/output audio formats matching the implemented codec;
 - remote `end_session` converges through the runtime control task.
+- requested device-call/WeChat VoIP endpoints, MQTT event names, `call`/`wxcall`
+  commands and their pinned `tirtc-server-example` protocol revision are present
+  in implementation files;
+- one foreground-session arbiter owns STREAM/AI/CALL/VOIP state, allows one
+  pending request, rejects stale generations, uses monotonic deadlines, defers
+  lifecycle work outside callbacks and restores H5 after foreground calls.
 
-Compilation without this gate is not an H5/AI `BUILD_VERIFIED` result.
+For device-call or WeChat VoIP, populate the example contract's `business`
+section. An empty `business.features` list remains valid for H5/AI-only projects,
+but cannot satisfy Hardware IR that requests `device_call` or `wechat_voip`.
+
+Compilation without this gate is not an H5/AI/call/VoIP `BUILD_VERIFIED` result.

@@ -1,43 +1,143 @@
 ---
 name: tirtc-esp32-builder
-description: Check or set up ESP-IDF, then generate, port, build, flash, and validate ThingConnect TiRTC ESP32 projects from a board model, schematic, BSP, pin map, or peripheral examples when H5 live view/talkback or AI intercom is requested. Use for environment diagnosis, supported-board generation, and new-board hardware intake; exclude Linux device-sim-c and server-only work.
+description: Identify, generate, port, build, flash, validate, and capture reusable knowledge for TiRTC ESP32-S3 or ESP32-P4 boards from a model, schematic, BSP, pin map, peripheral examples, or an existing ESP-IDF project. Use for H5 live view/talkback, AI intercom, device-to-device calls, WeChat VoIP, board detection, memory/AEC bring-up, or reusable board registration; exclude server-only work and unrelated embedded projects.
 ---
 
-# TiRTC Embedded Builder
+# TiRTC ESP32 Builder
 
-Turn board evidence into an evidence-backed ESP-IDF project. Treat the Hardware IR as the single handoff between probabilistic document extraction and deterministic capability, generation, build, and verification steps.
+Turn board evidence into a verified ESP-IDF product port. Hardware IR is the
+handoff from probabilistic document extraction to deterministic generation and
+gates. The curated board registry preserves reusable results without treating a
+past build as proof for a new artifact.
 
-## Start
+## 1. Establish the platform and inputs
 
-1. Read this Skill's `VERSION` file and [environment.md](references/environment.md). Record the `VERSION` value as the installed Skill version; never infer it from the prompt or an npm command run elsewhere. For a first-time setup or a request to check/install prerequisites, prefer `npx tirtc-device-builder@latest setup esp32`. Run its `--install` mode only when the user explicitly authorizes installation at the displayed destinations. The installer may create user-space files but never grants permission for `sudo` or persistent shell-profile edits.
-2. Locate the versioned ESP32 Device Kit root containing `device-sim/` using the explicit input, `TIRTC_THING_CONNECT_ROOT`, the managed setup configuration, or workspace discovery. For a managed Kit, read `manifest.json`, require its exact expected `kit_version`, and treat its manifest and packaged protocol documents as generation facts. An older but structurally complete Kit is not compatible. If the user explicitly supplies an unversioned full ThingConnect source workspace, treat it as legacy input and also read its applicable `AGENTS.md`.
-3. Run the Doctor through the managed environment helper when one exists; otherwise run `python3 <skill-dir>/scripts/doctor.py --expected-idf 5.5 --target esp32s3`. Add `--expected-kit <kit-version> --require-workspace` for managed-Kit generation; a self-contained generated project can instead resolve its bundled SDK through `--project`. Resolve every required failure before claiming build readiness.
-4. Read [workflow.md](references/workflow.md). Select the registered-board, new-board intake, or existing-project branch. The branch is selected when every supplied artifact has been accounted for and the exact board revision is known or explicitly unresolved.
-5. Read [hardware-ir.md](references/hardware-ir.md) when a Hardware IR must be created or updated. New intake uses schema v2; schema v1 remains readable for existing H.264 projects. Record a source and verification level for every hardware fact that affects a requested feature.
-6. Run `python3 <skill-dir>/scripts/hardware_ir.py validate <hardware-ir.json>` and then `assess --phase intake --strict`. `READY_TO_PORT` means the evidence is sufficient to design the adapter without guessing wiring or changing an unapproved public contract; it does not require a final ELF or runtime measurements.
+1. Read this Skill's `VERSION`, then read [environment.md](references/environment.md),
+   [workflow.md](references/workflow.md), and
+   [TiRTC platform contract](references/tirtc-platform.md). Record the installed
+   Skill version rather than inferring it from a prompt or npm output.
+2. Freeze the requested product features independently: H5 live audio/video and
+   talkback, AI intercom, device-to-device calling, and WeChat VoIP. Do not
+   silently remove a requested feature because the current starter lacks it.
+3. Resolve a versioned source of truth. The managed ESP32-S3 Device Kit is the
+   default for its packaged capabilities. Device-call/WeChat simulation or
+   protocol porting requires a pinned full `tirtc-server-example` checkout when
+   those sources are absent from the selected Kit. Clone or download it only
+   when the user authorizes that external write. Read applicable repository
+   instructions and the exact business documents routed by `workflow.md`.
+4. Run Doctor for the exact target and SDK package. Managed generation currently
+   automates ESP32-S3. ESP32-P4 is valid only with an evidenced P4 BSP/network
+   path and the matching `espressif_esp32p4` SDK/build contract; never link the
+   S3 archive into a P4 image.
 
-Before stopping on `NEEDS_CONFIRMATION`, classify every unresolved fact as `source_resolvable`, `implementation_resolvable`, `build_resolvable`, `hil_resolvable`, or `user_blocked`. Resolve source facts by inspection. For implementation/build facts, record the evidenced design plan at `corroborated`, generate a compile-safe adapter, and verify it at L1. Defer HIL-only measurements to L2-L7 when hardware access is unavailable. Stop before implementation only for `user_blocked` facts such as unknown wiring or identity, a missing product choice, an unavailable SDK, or a required public-contract change.
+## 2. Identify the board and query knowledge
 
-## Build the project
+Read [board-knowledge.md](references/board-knowledge.md). Combine developer-
+declared vendor/model/PCB revision with safe observations such as SoC, module,
+Flash/PSRAM, camera PID and codec IDs. The SoC cannot determine carrier-board
+wiring or PCB revision by itself.
 
-Run `<device-kit-root>/device-sim/scripts/create_esp32_project.py` for the current ESP32-S3 H5/AI starter. Keep ThingConnect onboarding, H5, AI, TiRTC lifecycle, callback, stream, and generation behavior in the existing deep modules. Put board-specific camera, microphone, encoder, codec, amplifier, GPIO, DMA, and task behavior behind the `starter_media` seam or a board media adapter owned by it.
+Run `board_registry.py match` before selecting a workflow branch. Only an exact
+identity with `safe_registered_reuse=true` selects the registered-board branch.
+A probable match supplies hypotheses; a component match supplies only component
+lessons. Any identity conflict creates a new variant and keeps concrete GPIO,
+clock, DMA and task values unresolved.
 
-Before changing media code, read [capability-rules.md](references/capability-rules.md) and [porting-risks.md](references/porting-risks.md), then read the repository documents they route to. For requested audio, read [audio-contract.md](references/audio-contract.md); for requested video, read [video-contract.md](references/video-contract.md); for any H5 or AI project, read [runtime-contract.md](references/runtime-contract.md). Complete every applicable project-local semantic gate. Treat platform/Web codec support and board codec selection as separate facts: the current platform contract accepts MJPEG, H.264, and H.265, while each board contract selects exactly one evidenced output profile. A camera sensor alone does not establish H5 video support. Choose half duplex for AI when the supplied hardware and BSP do not establish a usable full-duplex/AEC path.
+## 3. Prove the business flows before board porting
 
-Keep the Skill board-agnostic. The prompt supplies product intent and artifact locations; Hardware IR stores evidence; the generated board adapter owns concrete sensors, codecs, pins, clocks, slots, DMA, and task allocation. Never add one board's values to Skill defaults to make an assessment pass.
+When device-call or WeChat VoIP is requested, first build and run the pinned
+Linux C simulator with file-backed media. Verify the requested H5, AI, `call
+<device_id> [video|audio]`, and `wxcall [N] [video|audio]` paths plus accept,
+reject, cancel, hangup, timeout and recovery behavior. This establishes the
+business protocol and state model; it does not verify ESP32 hardware.
 
-Run focused tests before ESP-IDF build. Resolve the TiRTC SDK target and `manifest/build-contract.env` against the generated `sdkconfig`; a mismatched precompiled SDK is a blocked build, not a code-generation problem. Resolve managed components with `idf.py reconfigure`, then validate and install every applicable audio, video, and runtime contract gate. The runtime gate is mandatory for generated H5/AI projects and must prove service-endpoint wiring, deferred lifecycle operations, exact stream/media filtering, AI response validation, and remote `end_session` handling. A value copied from a “typical” header comment or a different sample rate is not clock evidence. A self-declared camera realtime or memory boolean is not video evidence.
+Preserve one process-wide TiRTC lifecycle and one unified Router → Arbiter →
+Coordinator path. STREAM is the H5 baseline; VOIP, AI and CALL are foreground
+owners unless the product contract explicitly proves parallel resources.
+Callbacks enqueue bounded events. A single state-owning task handles HTTP,
+MQTT, connection lifecycle, generation checks and monotonic deadlines.
 
-After a successful build, promote only facts actually established by source, compile, semantic, or post-link gates to `build_verified`. Copy the final BIN/ELF needed for delivery into a project-relative `artifacts/` directory, record the actual file path, byte size, and SHA-256 under `build_evidence.artifacts[]`, and run `hardware_ir.py assess --phase build --project <project> --artifact-sha256 <sha256> --strict`. The assessment reopens the recorded file and rejects a missing, stale, size-mismatched, or hash-mismatched artifact. A design plan at `corroborated` can pass intake but cannot pass the build phase. Report a successful compiler invocation as `COMPILE_PASS` when any requested feature gate is blocked; project-wide `BUILD_VERIFIED` requires every requested feature to pass.
+## 4. Create and assess Hardware IR
 
-## Flash and verify
+For a new or changed board, read [hardware-ir.md](references/hardware-ir.md),
+create schema v2, validate it, and run strict intake assessment. Record a source
+and verification level for every identity, pin, clock, slot, media, memory,
+onboarding and business fact. Keep contradictions and unknowns explicit.
 
-Flash only when the user requested hardware mutation and the exact serial port and chip have been resolved. When more than one candidate device exists, obtain the target choice before writing. Keep credentials outside generated files and redact device keys, Wi-Fi passwords, MQTT/WHIP tokens, and user media from logs and reports.
+Classify unresolved facts as `source_resolvable`, `implementation_resolvable`,
+`build_resolvable`, `hil_resolvable`, or `user_blocked`. Resolve all safe source,
+implementation and build facts. Stop before code only for a genuine user choice,
+unknown wiring/identity, unavailable matching SDK, or required public-contract
+change.
 
-Read [reporting.md](references/reporting.md) before end-to-end verification. Report every acceptance level as `PASS`, `FAIL`, or `SKIP`, with commands and evidence. Bind HIL observations to the exact firmware SHA-256 with `assess --phase hil --artifact-sha256`; an older artifact cannot verify a newer build. A build-only result is not H5 or AI completion; missing hardware, browser, account, service, or network evidence remains an explicit `SKIP` or blocker.
+## 5. Generate and port
 
-For HIL assessment, run `hardware_ir.py assess --phase hil --artifact-sha256 <sha256> --strict`. The HIL phase first requires build-verified paths, then promotes only features whose L5/L6 runtime evidence matches that exact artifact.
+Generate a new project without overwriting an existing path. Keep platform
+onboarding, MQTT, TiRTC lifecycle, session routing/arbitration and stream
+contracts in stable modules. Put camera, microphone, encoder, codec, amplifier,
+GPIO, DMA, AEC and realtime task behavior behind `starter_media` or its board
+adapter.
 
-## Finish
+Treat AEC as mandatory for `ai_talk`, `device_call`, and `wechat_voip`. Do not
+certify those features through a half-duplex fallback. Hardware IR must prove
+simultaneous capture/playback, a physical playback-reference path, and an
+available AEC implementation. The build gate must additionally prove
+`shared_clock.directions_simultaneous=true` and
+`echo_cancellation.enabled=true`; otherwise the affected feature is `BLOCKED`.
+H5 talkback alone may remain half-duplex only when the requested product
+contract explicitly permits it.
 
-After the final assessment, remove the machine-bound `build/` tree without rebuilding, then run `project_portability.py <project> --export` against the source plus the project-relative `artifacts/` copies. Resolve every missing or Git-ignored required input reported by that check; local intermediate artifacts may remain ignored, but retained build evidence must survive export. Return the generated project path, Hardware IR, capability assessment, build artifacts, flash record when applicable, and `TIRTC_PORTING_REPORT.md`. The task is complete only when every requested feature is either verified at the requested level or named as a blocker with the smallest next action that can resolve it.
+Follow the lifecycle from the locked C header: configure pre-init-only options
+such as `TIRTC_OPT_MAX_SEND_BUFFER`, call `TiRtcInit()`, set the device secret and
+client ID from an untracked runtime source, call `TiRtcStart()`, and wait for
+`TIRTC_EVENT_SYS_STARTED`. `TiRtcStart()` returning zero is not readiness.
+
+Before media work, read [capability-rules.md](references/capability-rules.md) and
+[porting-risks.md](references/porting-risks.md). For requested audio, video or
+H5/AI/call runtime behavior, read and install the applicable semantic contracts.
+Keep concrete board values in Hardware IR, contracts and adapter files rather
+than Skill defaults.
+
+## 6. Build and assess
+
+Run focused tests, resolve managed components, validate the exact SDK
+`manifest/build-contract.env`, install every applicable semantic gate, then run
+the ordinary ESP-IDF build. Requested call/VoIP features must be represented by
+the runtime/business contract and the unified arbiter implementation; an H5/AI-
+only starter cannot reach `BUILD_VERIFIED` for those features.
+
+Copy final BIN/ELF deliverables into project-relative `artifacts/`, record actual
+size and SHA-256 in Hardware IR, then run strict build assessment with `--project`
+and that exact hash. Compiler success with a missing feature gate is
+`COMPILE_PASS`, not product completion.
+
+## 7. Flash, verify, and learn
+
+Flash only with explicit authorization and an exact serial target. Read
+[reporting.md](references/reporting.md). Record every level as PASS, FAIL or SKIP
+and bind HIL observations to the exact artifact SHA-256. Verify local media,
+H5, AI, device-call, WeChat VoIP, AEC/double-talk when requested, recovery,
+weak-network behavior and stability separately.
+
+For every AEC-required flow, run speaker-active near-end speech, far-end-only,
+double-talk, rapid session switching and reconnect cases. Watchdog survival or
+clean audio in one mode cannot substitute for these per-mode observations.
+
+After assessment, generate a project-local board-knowledge candidate. Promotion
+is a reviewed repository change: classify lessons as generic, component or exact
+board; attach artifact evidence; add regression tests for generic invariants;
+then publish a new Skill/registry version. Never let an installed Skill mutate
+itself from conversation history.
+
+Remove machine-bound `build/` after the final assessment, retain verified
+project-relative artifacts, run `project_portability.py --export`, and return the
+project, Hardware IR, identity match, capability result, artifacts and report.
+
+## Security boundary
+
+Keep AccessKey, SecretKey, device keys, Wi-Fi passwords, MQTT/WHIP tokens,
+certificates, MAC-derived identifiers and user media outside source, prompts,
+registries and reports. Inject secrets through an untracked configuration,
+provisioning store, secure NVS or a product keystore. Redact logs. Installation,
+cloning, flashing, erasing NVS, browser/account use and registry promotion each
+retain their own authorization boundary.

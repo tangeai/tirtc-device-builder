@@ -36,6 +36,14 @@ directions are active, uses the hardware clock rate, and maps two distinct TDM
 signals. Implementation assertions must still bind the contract to the paired
 channel setup, AEC library configuration, and exact slot extraction code.
 
+AEC is not optional when Hardware IR requests `ai_talk`, `device_call`, or
+`wechat_voip`. For those features, `echo_cancellation.enabled=false`, missing
+playback-reference wiring, or non-simultaneous capture/playback is a hard
+`BLOCKED` result. Do not silently downgrade the product to push-to-talk. The
+contract verifier exports structured `simultaneous_capture_playback` and
+`echo_cancellation_enabled` results so the Hardware IR assessor enforces this
+rule rather than trusting summary text.
+
 ## Mandatory gate
 
 Run the gate before claiming an audio-capable build:

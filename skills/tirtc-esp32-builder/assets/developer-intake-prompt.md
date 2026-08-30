@@ -20,10 +20,10 @@ $tirtc-esp32-builder
 - <原理图、BSP/厂商示例、数据手册、产品页等工作区相对路径或固定链接；一行一个>
 
 目标：
-- <例如：H5 实时视频和声音、H5 语音对讲、AI 双向语音对讲>
+- <例如：H5 实时音视频/对讲、AI 对讲、设备呼设备、微信 VoIP>
 - 平台/Web 视频能力：<例如 MJPEG、H264、H265；按平台合同填写>
 - 板级视频选择：<MJPEG/H264/H265/根据硬件证据选择一种>
-- 双工或 AEC 的硬要求：<无，初版可半双工/必须全双工或 AEC/未知>
+- 双工或 AEC 的硬要求：AI 对讲、设备呼设备、微信 VoIP 必须全双工并启用 AEC；仅 H5 对讲是否允许半双工：<是/否>
 
 接入方式：
 - Wi-Fi：<选择一种，或写“根据 BSP 选择”>
@@ -37,7 +37,7 @@ $tirtc-esp32-builder
 2. 把每个未知项标为 source_resolvable、implementation_resolvable、build_resolvable、hil_resolvable 或 user_blocked。先通过资料和固定版本源码解决 source_resolvable；只有 user_blocked 会阻止开始 adapter 开发。
 3. READY_TO_PORT 表示硬件身份、连接、媒体合同和资源设计已经有证据，足以开始实现；它不要求最终 ELF 或实机数据。可通过实现或构建解决的项目必须继续生成 compile-safe adapter、锁定依赖、运行门禁并编译。
 4. 移植前核对平台媒体合同、板级选择、板级资源、静态内存预算、配网和绑定状态。音频工程必须生成项目内 `board-audio-contract.json`，在依赖解析后核验每个 codec 的 `(MCLK, sample rate)` 表、I2S mode/controller、TDM slot/物理信号和共享 GPIO handoff；视频工程必须生成项目内 `board-video-contract.json` 并引用 `platform-media-contract.json`，分别证明平台可接受的 profiles 与该板选中的唯一 profile，再核验锁定 camera 组件、传感器白名单、Wi-Fi/camera CPU 隔离、完整帧边界、frame buffers、TiRTC send buffer 和 backpressure。
-5. 所有 H5/AI 工程必须生成 `tirtc-runtime-contract.json`，核验服务发现 endpoint 确实传给 SDK、callback 内不直接调用生命周期 API、下行 stream/media 精确过滤、AI 响应格式和远端 `end_session`。runtime、audio、video 三类适用门禁都要接入普通 `idf.py build`。`resolved=true`、`pipeline_safe=true` 或编译成功不能替代门禁。
+5. 所有 H5/AI/设备呼叫/微信 VoIP 工程必须生成 `tirtc-runtime-contract.json`，核验服务发现 endpoint 确实传给 SDK、callback 内不直接调用生命周期 API、下行 stream/media 精确过滤、AI 响应格式、远端 `end_session` 和统一会话仲裁。设备呼叫/微信 VoIP 还要固定业务协议 revision 并校验 endpoint、MQTT 事件和 `call`/`wxcall` 命令。AI、设备呼叫和微信 VoIP 必须在 Hardware IR 中证明同时采集播放、真实回采参考与可用 AEC，并由 `board-audio-contract.json` 证明 `directions_simultaneous=true`、`echo_cancellation.enabled=true`；缺任一项直接 BLOCKED，不得自动降级半双工。runtime、audio、video 三类适用门禁都要接入普通 `idf.py build`。`resolved=true`、`pipeline_safe=true` 或编译成功不能替代门禁。
 6. 将最终 BIN/ELF 复制到项目内 `artifacts/`，记录真实相对路径、大小和 SHA-256，将所评估的 SHA 写入 Hardware IR 的 `build_evidence.artifacts[]`，再使用 `--project` 运行 build 阶段评估并输出 TIRTC_PORTING_REPORT.md。评估后移除机器绑定的 `build/`，运行 `project_portability.py --export`，不得再次构建。区分 `COMPILE_PASS`、请求能力 `BUILD_VERIFIED` 和 L2-L7 实机验收。
 7. 本轮不访问串口、不烧录、不擦除 NVS；因此缺少启动、浏览器、实体声音和运行时资源数据时，把相应 L2-L7 标为 SKIP，不得阻止 L0/L1。
 8. Wi-Fi 密码、设备密钥、token、私钥和用户音视频不能写入工程或报告。

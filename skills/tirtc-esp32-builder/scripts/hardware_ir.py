@@ -22,8 +22,18 @@ FEATURES = {
     "h5_live_video",
     "h5_talkback",
     "ai_talk",
+    "device_call",
+    "wechat_voip",
 }
-AUDIO_FEATURES = {"h5_live_audio", "h5_talkback", "ai_talk"}
+AUDIO_FEATURES = {
+    "h5_live_audio",
+    "h5_talkback",
+    "ai_talk",
+    "device_call",
+    "wechat_voip",
+}
+AEC_REQUIRED_FEATURES = {"ai_talk", "device_call", "wechat_voip"}
+BUSINESS_FEATURES = {"device_call", "wechat_voip"}
 VIDEO_FEATURES = {"h5_live_video"}
 VERIFICATION_LEVELS = {
     "extracted": 1,
@@ -63,6 +73,8 @@ FEATURE_HIL_LEVEL = {
     "h5_live_video": "L5",
     "h5_talkback": "L5",
     "ai_talk": "L6",
+    "device_call": "L6",
+    "wechat_voip": "L6",
 }
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 SOURCE_SCHEME_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*):")
@@ -344,6 +356,28 @@ def validate_hardware_resources(
         "hardware_resources.audio_channel_mapping.verification",
         errors,
     )
+
+    duplex = mapping(
+        resources.get("duplex_audio", {}),
+        "hardware_resources.duplex_audio",
+        errors,
+    )
+    for field in (
+        "simultaneous_capture_playback",
+        "playback_reference_available",
+        "aec_implementation_available",
+    ):
+        nullable_bool(
+            duplex.get(field),
+            f"hardware_resources.duplex_audio.{field}",
+            errors,
+        )
+    if "verification" in duplex:
+        validate_verification(
+            duplex.get("verification"),
+            "hardware_resources.duplex_audio.verification",
+            errors,
+        )
 
     realtime = mapping(
         resources.get("camera_realtime"),
@@ -826,6 +860,27 @@ def audio_mapping_requirement(
     )
 
 
+def aec_capability_requirement(
+    resources: dict[str, Any], minimum_verification: str = "corroborated"
+) -> Requirement:
+    duplex = resources.get("duplex_audio", {})
+    for field, label in (
+        ("simultaneous_capture_playback", "simultaneous capture and playback"),
+        ("playback_reference_available", "physical playback-reference capture path"),
+        ("aec_implementation_available", "AEC processor implementation"),
+    ):
+        requirement = verified_bool_requirement(
+            duplex, field, label, minimum_verification
+        )
+        if requirement[0] != "SATISFIED":
+            return requirement
+    return (
+        "SATISFIED",
+        "full-duplex audio, playback reference, and AEC implementation are resolved",
+        VERIFICATION_LEVELS.get(duplex.get("verification"), 0),
+    )
+
+
 def camera_realtime_requirement(
     resources: dict[str, Any], minimum_verification: str = "corroborated"
 ) -> Requirement:
@@ -979,20 +1034,22 @@ def project_requirements(data: dict[str, Any]) -> list[Requirement]:
         )
 
     target = data["soc"]["target"].strip().lower()
-    if target != "esp32s3":
+    if target not in {"esp32s3", "esp32p4"}:
         requirements.append(
             (
                 "BLOCKED",
-                f"current starter generator supports esp32s3, not {target}",
+                f"TiRTC ESP32 workflow supports esp32s3 or esp32p4, not {target}",
                 0,
             )
         )
     else:
-        requirements.append(("SATISFIED", "ESP32-S3 starter is available", 2))
+        requirements.append(
+            ("SATISFIED", f"{target} is a supported TiRTC target", 2)
+        )
 
     platform = data["toolchain"]["tirtc"]["platform"].strip().lower()
-    expected_platform = "espressif-esp32s3"
-    if target == "esp32s3" and platform != expected_platform:
+    expected_platform = f"espressif-{target}"
+    if target in {"esp32s3", "esp32p4"} and platform != expected_platform:
         requirements.append(
             (
                 "BLOCKED",
@@ -1113,6 +1170,8 @@ def assess_ir(
     artifact_sha256: str | None = None,
     phase: str | None = None,
     audio_gate: Requirement | None = None,
+    aec_gate: Requirement | None = None,
+    business_gate: Requirement | None = None,
     video_gate: Requirement | None = None,
     runtime_gate: Requirement | None = None,
     artifact_gate: Requirement | None = None,
@@ -1189,6 +1248,14 @@ def assess_ir(
                         audio_output, "audio_output", minimum_verification
                     ),
                 ]
+            if feature in AEC_REQUIRED_FEATURES:
+                requirements.append(
+                    (
+                        "NEEDS_CONFIRMATION",
+                        "AEC-required sessions need Hardware IR v2 duplex_audio evidence",
+                        0,
+                    )
+                )
             result[feature] = combine_requirements(
                 requirements,
                 success_status=success_status,
@@ -1223,12 +1290,25 @@ def assess_ir(
                 audio_mapping_requirement(resources, minimum_verification),
                 memory_requirement(resources, minimum_verification),
             ]
+        if feature in AEC_REQUIRED_FEATURES:
+            requirements.append(
+                aec_capability_requirement(resources, minimum_verification)
+            )
         if feature in AUDIO_FEATURES and selected_phase in {"build", "hil"}:
             requirements.append(
                 audio_gate
                 or (
                     "NEEDS_CONFIRMATION",
                     "audio semantic gate was not executed for this project",
+                    0,
+                )
+            )
+        if feature in AEC_REQUIRED_FEATURES and selected_phase in {"build", "hil"}:
+            requirements.append(
+                aec_gate
+                or (
+                    "BLOCKED",
+                    "AEC semantic gate did not prove simultaneous full-duplex audio and enabled echo cancellation",
                     0,
                 )
             )
@@ -1247,6 +1327,15 @@ def assess_ir(
                 or (
                     "NEEDS_CONFIRMATION",
                     "TiRTC runtime semantic gate was not executed for this project",
+                    0,
+                )
+            )
+        if feature in BUSINESS_FEATURES and selected_phase in {"build", "hil"}:
+            requirements.append(
+                business_gate
+                or (
+                    "BLOCKED",
+                    "business runtime gate did not prove the requested call/VoIP protocol and session arbiter",
                     0,
                 )
             )
@@ -1359,6 +1448,7 @@ def command_assess(args: argparse.Namespace) -> int:
     )
     project = (args.project or args.path.parent).expanduser().resolve()
     audio_gate: Requirement | None = None
+    aec_gate: Requirement | None = None
     audio_gate_result: dict[str, Any] | None = None
     if (
         data.get("schema_version") == 2
@@ -1394,6 +1484,24 @@ def command_assess(args: argparse.Namespace) -> int:
                     + str(audio_gate_result.get("summary", "verified")),
                     VERIFICATION_LEVELS["build_verified"],
                 )
+                if AEC_REQUIRED_FEATURES.intersection(
+                    data["features"]["requested"]
+                ):
+                    if (
+                        audio_gate_result.get("simultaneous_capture_playback") is True
+                        and audio_gate_result.get("echo_cancellation_enabled") is True
+                    ):
+                        aec_gate = (
+                            "SATISFIED",
+                            "AEC gate proved simultaneous capture/playback with echo cancellation enabled",
+                            VERIFICATION_LEVELS["build_verified"],
+                        )
+                    else:
+                        aec_gate = (
+                            "BLOCKED",
+                            "AI/call/VoIP requires simultaneous capture/playback and echo_cancellation.enabled=true",
+                            0,
+                        )
             else:
                 audio_gate = (
                     "BLOCKED",
@@ -1445,6 +1553,7 @@ def command_assess(args: argparse.Namespace) -> int:
                     0,
                 )
     runtime_gate: Requirement | None = None
+    business_gate: Requirement | None = None
     runtime_gate_result: dict[str, Any] | None = None
     if data.get("schema_version") == 2 and selected_phase in {"build", "hil"}:
         relative_contract = data["hardware_resources"].get(
@@ -1469,13 +1578,41 @@ def command_assess(args: argparse.Namespace) -> int:
                 }
             else:
                 runtime_gate_result = verify_runtime_contract(contract, project)
-            if runtime_gate_result["ok"]:
+            if runtime_gate_result.get("base_ok", runtime_gate_result["ok"]):
+                requested_business = (
+                    set(data["features"]["requested"]) & BUSINESS_FEATURES
+                )
+                verified_business = set(
+                    runtime_gate_result.get("business_features", [])
+                )
+                missing_business = requested_business - verified_business
                 runtime_gate = (
                     "SATISFIED",
-                    "TiRTC runtime semantic gate passed: "
+                    "TiRTC base runtime semantic gate passed: "
                     + str(runtime_gate_result.get("summary", "verified")),
                     VERIFICATION_LEVELS["build_verified"],
                 )
+                if requested_business and (
+                    runtime_gate_result.get("business_ok") is not True
+                    or missing_business
+                ):
+                    details = list(runtime_gate_result.get("business_errors", []))
+                    if missing_business:
+                        details.append(
+                            "missing features: " + ", ".join(sorted(missing_business))
+                        )
+                    business_gate = (
+                        "BLOCKED",
+                        "TiRTC business runtime gate failed: " + "; ".join(details),
+                        0,
+                    )
+                elif requested_business:
+                    business_gate = (
+                        "SATISFIED",
+                        "TiRTC business runtime gate verified: "
+                        + ", ".join(sorted(requested_business)),
+                        VERIFICATION_LEVELS["build_verified"],
+                    )
             else:
                 runtime_gate = (
                     "BLOCKED",
@@ -1494,6 +1631,8 @@ def command_assess(args: argparse.Namespace) -> int:
             artifact_sha256=args.artifact_sha256,
             phase=selected_phase,
             audio_gate=audio_gate,
+            aec_gate=aec_gate,
+            business_gate=business_gate,
             video_gate=video_gate,
             runtime_gate=runtime_gate,
             artifact_gate=artifact_gate,

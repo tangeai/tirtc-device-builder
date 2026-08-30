@@ -4,13 +4,18 @@
 
 ### Registered board
 
-Use this branch when a board and exact hardware revision already have a Hardware IR plus a matching board media adapter.
+Use this branch only when `board_registry.py match` returns `exact` with
+`safe_registered_reuse=true` and the package has a Hardware IR plus matching
+board adapter.
 
-1. Validate and assess the saved Hardware IR against the requested features.
-2. Confirm that its BSP, ESP-IDF, TiRTC SDK, and adapter revisions are still resolvable.
-3. Generate a new starter project without overwriting an existing path.
-4. Install the matching board adapter and configuration overlay.
-5. Build, optionally flash, execute the requested acceptance levels, and issue a fresh report.
+1. Recheck every required runtime probe and reject a changed sensor/codec as a
+   new variant.
+2. Validate and assess the saved Hardware IR against the requested features.
+3. Confirm that its BSP, ESP-IDF, TiRTC SDK, business protocol, and adapter
+   revisions are still resolvable.
+4. Generate a new starter project without overwriting an existing path.
+5. Install the matching board adapter and configuration overlay.
+6. Build, optionally flash, execute the requested acceptance levels, and issue a fresh report.
 
 The branch is complete when the new run has its own build and verification evidence; an older board report is provenance, not proof of the new artifact.
 
@@ -18,7 +23,10 @@ The branch is complete when the new run has its own build and verification evide
 
 Use this branch when the user supplies a board model, vendor URL, schematic, BOM, pin map, BSP, datasheets, photographs, or peripheral example projects without a verified adapter.
 
-1. Resolve the full model, module, PCB marking, and hardware revision. Treat different revisions as different boards.
+1. Create `board-identity.json`, combine the developer's full model/PCB marking
+   with safe SoC/component probes, and query the board registry. Treat different
+   revisions or conflicting required probes as different variants. A probable
+   or component match supplies hypotheses only.
 2. Freeze the user-supplied product contract: selected video profile, audio/stream formats, duplex/AEC policy, supported Wi-Fi credential methods, selected onboarding method, transport staging, output path, and mutation boundary. Use `unknown` where the prompt lacks an answer.
 3. Prefer official schematic/BOM and BSP facts. For a PDF schematic, inspect page labels and net names; prefer an exported netlist, pin CSV, or vendor board definition when available.
 4. Cross-check critical pins, clocks, power enables, reset lines, sensor/codec variants, ESP-IDF version, resource ownership, and onboarding behavior across at least two independent artifacts when possible.
@@ -46,13 +54,16 @@ Read only the documents for the active branch, but read each selected document c
 - ESP32 starter or adapter work: `device-sim/device-sim-esp32/README.md`, `device-sim/ESP32_STARTER.md`, the selected SDK package README, and the generated template README.
 - H5 live view or talkback: `device-h5-live.md`.
 - AI intercom: `device-ai.md`.
+- Device-to-device call: `device-call.md` and the applicable API reference.
+- WeChat VoIP: `device-voip.md`, the mini-program integration document, and the
+  applicable API reference.
 - H5/AI switching, delayed callbacks, ownership, or timeouts: `device-session-model.md` and `device-session-arbiter.md`.
 - Onboarding, binding, MQTT, token, or identity: `device-integration.md`.
 - Public HTTP field or error changes: `api-reference.md` and `error-response-policy.md`.
 
 ## Generation and board seam
 
-The runtime-facing `starter_media` interface stays stable. A reusable board integration should implement an internal `BoardMediaAdapterV1`-style adapter owned by `starter_media` rather than editing H5, AI, `starter_runtime`, or `starter_tirtc` for each board.
+The runtime-facing `starter_media` interface stays stable. A reusable board integration should implement an internal `BoardMediaAdapterV1`-style adapter owned by `starter_media` rather than editing H5, AI, CALL, VOIP, `starter_runtime`, or `starter_tirtc` for each board.
 
 The adapter owns:
 
@@ -62,13 +73,22 @@ The adapter owns:
 - DMA buffers, hardware clocks, power, reset, GPIO, refresh/key-frame requests, and realtime task allocation;
 - bounded stop, resource release, and generation-aware flushing.
 
-The stable modules own the discovered TiRTC service endpoint, stream IDs, negotiated/contracted formats, TiRTC callback copying, connection handles, session generation, and H5/AI sequencing. SDK lifecycle changes such as disconnect run in a worker/state-machine context, never directly inside an SDK callback.
+The stable modules own the discovered TiRTC service endpoint, stream IDs,
+negotiated/contracted formats, HTTP/MQTT business fields, TiRTC callback copying,
+connection handles, pending calls, monotonic deadlines, session generation, and
+H5/AI/CALL/VOIP sequencing. SDK lifecycle changes such as disconnect run in a
+worker/state-machine context, never directly inside an SDK callback.
 
 ## Verification loop
 
 Use a bounded loop per layer: diagnose one failing invariant, make the smallest correction, and rerun that layer before moving forward. Change one high-risk variable per HIL comparison. Turn reusable invariants into tests or post-link gates. Stop and report when the remaining failure requires unavailable hardware, credentials, a new SDK binary, a public protocol change, or a user choice.
 
-For every generated H5/AI project, validate `tirtc-runtime-contract.json` and run `install_runtime_gate.py <project>` before the ordinary build. Audio and video projects additionally install their media gates. A build that bypasses any applicable gate is not `BUILD_VERIFIED`.
+For every generated H5/AI/call/VoIP project, validate `tirtc-runtime-contract.json` and run `install_runtime_gate.py <project>` before the ordinary build. Audio and video projects additionally install their media gates. AI/call/VoIP also require the full-duplex AEC result from the audio gate. A build that bypasses any applicable gate is not `BUILD_VERIFIED`.
+
+When CALL or VOIP is requested, the runtime contract must also bind the project
+to the pinned business protocol and unified session arbiter. First prove those
+flows with the Linux C simulator. Simulator success establishes the protocol
+baseline but cannot replace the ESP32 build or HIL levels.
 
 Run the assessor once per layer:
 

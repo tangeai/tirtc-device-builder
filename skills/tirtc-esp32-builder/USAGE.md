@@ -20,7 +20,8 @@ $tirtc-esp32-builder
 资料：
 - <原理图、BSP/厂商示例、数据手册和产品页；一行一个>
 
-目标：<H5 实时音视频、H5 对讲、AI 双向语音等>
+目标：<H5 实时音视频/对讲、AI 对讲、设备互呼、微信 VoIP>
+AEC：AI、设备互呼、微信 VoIP 必须全双工并启用 AEC
 视频：<MJPEG/H264/H265/根据证据选择>
 Wi-Fi 与设备绑定：<指定方案/根据 BSP 和平台合同选择>
 工程：<输出目录或现有工程的绝对路径>
@@ -53,7 +54,7 @@ $tirtc-esp32-builder 分析 <厂商> <型号> <硬件版本>，目标是 H5 实�
 提供本地资料：
 
 ```text
-$tirtc-esp32-builder 使用原理图 /path/board.pdf、BSP /path/vendor-project 和一键安装的 Device Kit，为该板生成 TiRTC H5/AI ESP-IDF 工程并编译。
+$tirtc-esp32-builder 使用原理图 /path/board.pdf、BSP /path/vendor-project 和一键安装的 Device Kit，为该板生成 TiRTC H5/AI/CALL/VOIP ESP-IDF 工程并编译；AI/CALL/VOIP 必须通过 AEC 门禁。
 ```
 
 完整实机流程：

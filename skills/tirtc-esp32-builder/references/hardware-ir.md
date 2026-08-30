@@ -42,15 +42,22 @@ The IR contains:
 - exact board identity, module, Flash/PSRAM, ESP-IDF, TiRTC SDK and build contract;
 - camera identity evidence plus `video_profiles[]` and `selected_video_profile`;
 - audio input/output paths;
-- `hardware_resources` for I2C, I2S/GPIO ownership, audio channel mapping, camera realtime policy, and memory budget;
+- `hardware_resources` for I2C, I2S/GPIO ownership, audio channel mapping,
+  full-duplex/AEC capability, camera realtime policy, and memory budget;
 - project-relative `hardware_resources.audio_semantic_contract` for every project requesting audio;
 - project-relative `hardware_resources.video_semantic_contract` for every project requesting video;
-- project-relative `hardware_resources.runtime_semantic_contract` for every generated H5/AI project;
+- project-relative `hardware_resources.runtime_semantic_contract` for every generated H5/AI/call/VoIP project;
 - `onboarding.wifi_credentials` with selectable SoftAP/BLE/SmartConfig/factory/development/custom methods;
 - selectable ThingConnect binding methods plus stored-binding states and reset control;
 - requested features;
 - optional `runtime_evidence[]`, each bound to a full firmware SHA-256.
 - `build_evidence.artifacts[]` containing each accepted BIN/ELF path, byte size, and full SHA-256.
+
+When `ai_talk`, `device_call`, or `wechat_voip` is requested,
+`hardware_resources.duplex_audio` must establish simultaneous capture/playback,
+an actual playback-reference signal, and an AEC implementation. Unknown values
+remain `NEEDS_CONFIRMATION`; a confirmed missing value is `BLOCKED`. Build/HIL
+assessment also requires the project audio semantic gate to prove enabled AEC.
 
 The selected Wi-Fi method must be available and corroborated, credentials must remain outside tracked source, and reprovisioning must be defined. A board without SoftAP is valid when another selected method meets those conditions.
 
@@ -77,7 +84,9 @@ python3 <skill-dir>/scripts/hardware_ir.py assess hardware-ir.json \
   --phase hil --artifact-sha256 <64-character-sha256> --strict
 ```
 
-H5 features require matching L5 evidence; AI requires matching L6 evidence. Evidence from an older firmware remains provenance but does not verify the current artifact.
+H5 features require matching L5 evidence; AI, device-call and WeChat VoIP
+require matching L6 evidence. Evidence from an older firmware remains
+provenance but does not verify the current artifact.
 
 ## Intake quality
 

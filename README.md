@@ -1,14 +1,14 @@
 # TiRTC Device Builder
 
-TiRTC Device Builder 用于把 ESP32-S3 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Codex Skill 会先检查环境、整理有依据的硬件事实，再生成独立的 ESP-IDF 工程并完成板级移植和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
+TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Codex Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立的 ESP-IDF 工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
 
 当前仓库提供一个 Skill：
 
 | Skill | 平台 | 主要用途 |
 |---|---|---|
-| `tirtc-esp32-builder` | ESP32-S3、ESP-IDF 5.5.x | 环境检查、Hardware IR、工程生成、板级媒体移植、编译、烧录和分层验收 |
+| `tirtc-esp32-builder` | ESP32-S3 / ESP32-P4、ESP-IDF 5.5.x | 板型识别、Hardware IR、工程生成/移植、H5/AI/设备互呼/微信 VoIP、AEC 门禁、编译烧录和分层验收 |
 
-开发者不需要克隆 `tirtc-server-example`，也不用登录 npm。工程模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装命令会自动下载并校验。
+H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。设备互呼或微信 VoIP 的模拟/移植若超出当前 Kit 内容，则需要在用户授权后使用固定 commit 的 `tirtc-server-example` 完整仓库。ESP32-P4 必须使用匹配的 P4 SDK、BSP 与网络方案，不能复用 S3 预编译库。
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
@@ -85,11 +85,12 @@ Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 
 - <原理图、BSP/厂商示例、数据手册或产品页；一行一个>
 
 目标：
-- 功能：<例如 H5 实时音视频、H5 对讲、AI 双向语音>
+- 功能：<例如 H5 实时音视频/对讲、AI 对讲、设备呼设备、微信 VoIP>
 - 平台/Web 视频：MJPEG、H264、H265
 - 板级视频选择：<MJPEG/H264/H265/根据硬件证据选择一种>
 - Wi-Fi：<指定方案/根据 BSP 选择>
 - 设备绑定：<指定方案/根据平台合同选择>
+- AEC：AI 对讲、设备呼设备、微信 VoIP 必须全双工并启用 AEC
 
 工程：<输出目录或现有工程的工作区相对路径>
 
@@ -110,6 +111,35 @@ H5 对讲和 AI 双向对讲。
 
 只有型号时，Skill 会先调查公开资料并列出缺口，不会猜测 GPIO、器件或媒体能力。要进入代码移植，通常还需要准确的板卡版本、原理图，以及能在实物上运行的 BSP 或外设示例。
 
+### 示例对话
+
+新板卡、先做资料评审：
+
+```text
+用户：$tirtc-esp32-builder
+      这是 XX 厂商 ESP32-S3 Camera Board Rev.B，资料在 boards/xx-revb/。
+      目标是 H5 音视频、AI 对讲、设备互呼和微信 VoIP；后三项必须 AEC。
+      先识别板型、生成 Hardware IR 并告诉我还缺什么，不烧录。
+
+Codex：我会先运行 Doctor，读取原理图/BSP/数据手册，生成 board identity，
+       查询已验证板型注册表；无法从 SoC 判断的 PCB 引脚仍保持未知。
+       随后分别评估四类业务能力，并对 AI/CALL/VOIP 强制检查全双工、
+       回采参考和 AEC，不满足时返回 BLOCKED，不自动降级半双工。
+```
+
+同板型复用并完成真机验证：
+
+```text
+用户：$tirtc-esp32-builder
+      使用 boards/identity.json 匹配已验证板型，工程输出到 ports/xx-revb。
+      允许构建和烧录 /dev/ttyACM0，验证 call 另一台设备和 wxcall。
+
+Codex：只有 exact identity 且 safe_registered_reuse=true 才复用板级包。
+       我会重新运行 runtime/audio/video 门禁、构建并绑定新 artifact SHA，
+       然后在该串口验证 AI、设备互呼、微信 VoIP 的 AEC/double-talk、
+       会话切换和重连；旧固件的 HIL 结果不会继承给新固件。
+```
+
 ## 工作范围
 
 整个流程从板卡资料核对开始，以分层验收报告结束：
@@ -121,7 +151,7 @@ H5 对讲和 AI 双向对讲。
       Hardware IR：硬件事实、来源和未知项
                   │
                   ▼
-       能力门禁：能否支持 H5 / AI
+       能力门禁：H5 / AI / CALL / VOIP / AEC
                   │
                   ▼
       独立 ESP-IDF 工程与板级媒体适配
@@ -138,13 +168,13 @@ Skill 负责：
 - 检查 Node.js 之外的 ESP-IDF、编译器、TiRTC SDK、工程配置和串口；
 - 从原理图、BSP、数据手册和实测示例中提取有来源的硬件事实；
 - 生成并校验 `hardware-ir.json`，把冲突和未知项留在报告里；
-- 判断视频、上行音频、下行播放和 AI 会话是否具备移植条件；
+- 判断视频、上行音频、下行播放、AI、设备互呼、微信 VoIP 与 AEC 是否具备移植条件；
 - 生成带 TiRTC SDK 的独立 ESP-IDF 工程；
 - 核验发现地址、SDK callback 生命周期、下行格式过滤和 AI 会话响应等运行协议不变量；
 - 把摄像头、所选 MJPEG/H.264/H.265 路径、麦克风、Codec、I2S、功放和按键接到板级 adapter；
 - 运行测试和 `idf.py build`，记录固件路径、版本和 SHA-256；
 - 在用户明确给出芯片、工程和串口后烧录；
-- 分别验证启动、上线、本地媒体、H5、AI 和稳定性；
+- 分别验证启动、上线、本地媒体、H5、AI、设备互呼、微信 VoIP、AEC/double-talk 和稳定性；
 - 输出 `TIRTC_PORTING_REPORT.md`，每一层都标成 `PASS`、`FAIL` 或 `SKIP`。
 
 ### Skill 不猜硬件
@@ -252,7 +282,7 @@ board-materials/
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
 
-当前生成器只支持 ESP32-S3。Flash 或 PSRAM 不是 16 MB / 8 MB 时，需要重新评估 `sdkconfig.defaults`、分区表、DMA 和媒体缓存预算。名称相近的芯片不会被自动当作 ESP32-S3 处理。
+当前托管自动生成器只提供 ESP32-S3 模板。ESP32-P4 可由 Skill 在已有、证据完整的 P4 BSP/工程上移植，但必须使用 `espressif-esp32p4` SDK、匹配的构建合同和明确的 ESP-Hosted 或以太网方案。Flash 或 PSRAM 容量变化时，需要重新评估 `sdkconfig.defaults`、分区表、DMA 和媒体缓存预算。
 
 ### 本机软件
 
@@ -288,7 +318,7 @@ H5 和 AI 的端到端验收还需要可访问的 ThingConnect 服务、可用�
 
 ThingConnect 平台和 Web 播放端支持 MJPEG、H.264、H.265；具体开发板必须根据其有证据的媒体路径只选择一种输出 profile。MJPEG 提交完整 JPEG 帧；H.264/H.265 按合同提交 Annex-B access unit、参数集，并实现刷新或关键帧控制。某块板只能输出 MJPEG 不代表平台只支持 MJPEG。板上有摄像头 Sensor，只能证明图像有来源，不能证明浏览器一定能持续出图。
 
-当前音频基线使用 G.711 A-law、8 kHz、单声道。对讲还要有可靠的下行队列、A-law 解码、Codec/I2S/功放播放和会话停止清理。没有可用的全双工和 AEC 证据时，应按半双工设计 AI 对讲。
+当前音频基线使用 G.711 A-law、8 kHz、单声道。对讲还要有可靠的下行队列、A-law 解码、Codec/I2S/功放播放和会话停止清理。AI 对讲、设备互呼和微信 VoIP 强制要求全双工、真实播放参考和 AEC；没有证据时必须标记为 `BLOCKED`，不能自动降级为半双工。只有单独请求的 H5 talkback 可在产品合同明确允许时采用半双工。
 
 ## 安装方式和目录
 
@@ -621,7 +651,7 @@ Wi-Fi 配网和 ThingConnect 设备绑定是两套独立流程。绑定可以选
 | L3 Online | 所选 Wi-Fi 凭证和设备绑定流程、MQTT 与 TiRTC 就绪 |
 | L4 Media | 摄像头、麦克风、扬声器的本地路径和计数正常 |
 | L5 H5 | 浏览器持续收到声明的音视频，下行对讲到达实体扬声器 |
-| L6 AI | token、WHIP、`start_session`、双向音频、停止和 H5 恢复正常 |
+| L6 AI/CALL/VOIP/AEC | AI、设备互呼、微信 VoIP 的双向音频、AEC/double-talk、停止/超时和 H5 恢复分别通过 |
 | L7 Stability | 按需求完成反复会话、弱网、资源和长稳测试 |
 
 一份完整交付通常包含：
@@ -782,7 +812,7 @@ WSL 默认不一定能看到 USB 设备。按 [Microsoft WSL USB 连接说明](h
 - 上行：麦克风、采样率、声道、G.711 A-law 编码、发送时机；
 - 下行：stream 14、队列边界、A-law 解码、I2S/Codec、功放使能、扬声器；
 - AI：`start_session` 成功后才发送音频，停止时清理旧 generation 数据；
-- 全双工：没有 AEC 和硬件证据时先验证半双工。
+- 全双工：AI、设备互呼和微信 VoIP 缺少回采参考或 AEC 证据时直接阻塞；仅 H5 talkback 可按明确的产品合同验证半双工。
 
 ### 原生 Windows 无法自动安装 ESP-IDF
 
@@ -822,7 +852,7 @@ Skill、Device Kit 和 ESP-IDF 会写到 npm 包目录之外，也可能占用�
 
 ### 能支持 ESP32 之外的芯片吗？
 
-仓库允许每个平台使用独立 Skill，但当前公开版本只实现 ESP32-S3。泰芯或其他平台需要新增 `skills/<platform-skill>/`，并分别维护 SDK、工具链、板级 adapter 和验收约束。
+仓库允许每个平台使用独立 Skill。当前公开 Skill 覆盖 ESP32-S3，并支持在证据完整的已有工程上移植 ESP32-P4；托管一键生成仍是 S3。泰芯或其他平台需要新增 `skills/<platform-skill>/`，并分别维护 SDK、工具链、板级 adapter 和验收约束。
 
 ## 给仓库维护者
 
@@ -881,8 +911,8 @@ metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地
 
 ```bash
 npm test
-git tag -a v0.7.3 -m "v0.7.3"
-git push origin v0.7.3
+git tag -a v0.8.0 -m "v0.8.0"
+git push origin v0.8.0
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

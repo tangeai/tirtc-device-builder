@@ -47,6 +47,14 @@ def ready_resources(ir: dict) -> None:
             "verification": "corroborated",
         }
     )
+    resources["duplex_audio"].update(
+        {
+            "simultaneous_capture_playback": True,
+            "playback_reference_available": True,
+            "aec_implementation_available": True,
+            "verification": "corroborated",
+        }
+    )
     resources["camera_realtime"].update(
         {"pipeline_safe": True, "verification": "corroborated"}
     )
@@ -155,6 +163,7 @@ def mark_build_verified(ir: dict) -> None:
         "i2c",
         "i2s",
         "audio_channel_mapping",
+        "duplex_audio",
         "camera_realtime",
         "memory",
     ):
@@ -178,6 +187,8 @@ def assess_with_semantic_gates(ir: dict, **kwargs: object) -> dict:
     return MODULE.assess_ir(
         ir,
         audio_gate=SEMANTIC_GATE,
+        aec_gate=SEMANTIC_GATE,
+        business_gate=SEMANTIC_GATE,
         video_gate=SEMANTIC_GATE,
         runtime_gate=SEMANTIC_GATE,
         **kwargs,
@@ -286,6 +297,49 @@ class HardwareIrV2Test(unittest.TestCase):
             "BLOCKED", assessment["features"]["h5_talkback"]["status"]
         )
 
+    def test_aec_required_features_block_without_reference_path(self) -> None:
+        blocked = ready_v2()
+        blocked["hardware_resources"]["duplex_audio"][
+            "playback_reference_available"
+        ] = False
+        assessment = MODULE.assess_ir(blocked)
+        for feature in ("ai_talk", "device_call", "wechat_voip"):
+            self.assertEqual("BLOCKED", assessment["features"][feature]["status"])
+
+    def test_aec_required_features_need_explicit_build_gate(self) -> None:
+        built = ready_v2()
+        mark_build_verified(built)
+        record_build_artifacts(built, ARTIFACT_A)
+        assessment = MODULE.assess_ir(
+            built,
+            artifact_sha256=ARTIFACT_A,
+            phase="build",
+            audio_gate=SEMANTIC_GATE,
+            video_gate=SEMANTIC_GATE,
+            runtime_gate=SEMANTIC_GATE,
+        )
+        for feature in ("ai_talk", "device_call", "wechat_voip"):
+            self.assertEqual("BLOCKED", assessment["features"][feature]["status"])
+
+    def test_business_gate_blocks_calls_without_blocking_h5(self) -> None:
+        built = ready_v2()
+        mark_build_verified(built)
+        record_build_artifacts(built, ARTIFACT_A)
+        assessment = MODULE.assess_ir(
+            built,
+            artifact_sha256=ARTIFACT_A,
+            phase="build",
+            audio_gate=SEMANTIC_GATE,
+            aec_gate=SEMANTIC_GATE,
+            video_gate=SEMANTIC_GATE,
+            runtime_gate=SEMANTIC_GATE,
+            business_gate=("BLOCKED", "business gate failed", 0),
+        )
+        for feature in ("h5_live_audio", "h5_live_video", "h5_talkback", "ai_talk"):
+            self.assertEqual("BUILD_VERIFIED", assessment["features"][feature]["status"])
+        for feature in ("device_call", "wechat_voip"):
+            self.assertEqual("BLOCKED", assessment["features"][feature]["status"])
+
     def test_missing_binding_state_handling_blocks_project(self) -> None:
         blocked = ready_v2()
         blocked["onboarding"]["device_binding"][
@@ -379,6 +433,8 @@ class HardwareIrV2Test(unittest.TestCase):
                     "h5_live_video",
                     "h5_talkback",
                     "ai_talk",
+                    "device_call",
+                    "wechat_voip",
                 ],
                 "source_refs": ["board-materials"],
             }
@@ -513,10 +569,11 @@ class HardwareIrV1CompatibilityTest(unittest.TestCase):
         )
         ready_audio(ready)
         assessment = MODULE.assess_ir(ready)
-        statuses = {
-            item["status"] for item in assessment["features"].values()
-        }
-        self.assertEqual({"READY_TO_PORT"}, statuses)
+        self.assertEqual(
+            "NEEDS_CONFIRMATION", assessment["features"]["ai_talk"]["status"]
+        )
+        for feature in ("h5_live_audio", "h5_live_video", "h5_talkback"):
+            self.assertEqual("READY_TO_PORT", assessment["features"][feature]["status"])
 
     def test_mismatched_tirtc_platform_blocks_project(self) -> None:
         invalid_target = copy.deepcopy(self.ir)
@@ -525,6 +582,14 @@ class HardwareIrV1CompatibilityTest(unittest.TestCase):
         invalid_target["toolchain"]["tirtc"]["platform"] = "espressif-esp32p4"
         assessment = MODULE.assess_ir(invalid_target)
         self.assertEqual("BLOCKED", assessment["project_gate"]["status"])
+
+    def test_esp32p4_accepts_only_matching_sdk_platform(self) -> None:
+        ready = ready_v2()
+        ready["soc"]["target"] = "esp32p4"
+        ready["soc"]["module"] = "ESP32-P4"
+        ready["toolchain"]["tirtc"]["platform"] = "espressif-esp32p4"
+        assessment = MODULE.assess_ir(ready)
+        self.assertEqual("READY_TO_PORT", assessment["project_gate"]["status"])
 
 
 if __name__ == "__main__":

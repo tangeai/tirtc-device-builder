@@ -202,6 +202,16 @@ def validate_skills(errors: list[str]) -> None:
                     f"{openai_yaml.relative_to(ROOT)} default prompt must mention ${name}",
                 )
 
+        if skill_dir.name == "tirtc-esp32-builder":
+            for relative in (
+                "knowledge/board-registry.json",
+                "scripts/board_registry.py",
+                "assets/board-identity.example.json",
+                "references/board-knowledge.md",
+            ):
+                if not (skill_dir / relative).is_file():
+                    error(errors, f"{skill_dir.relative_to(ROOT)} is missing {relative}")
+
 
 def validate_repository_files(errors: list[str]) -> None:
     required = (

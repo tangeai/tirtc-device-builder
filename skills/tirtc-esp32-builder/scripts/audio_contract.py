@@ -383,6 +383,8 @@ def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
             f"simultaneous={shared.get('directions_simultaneous')} "
             f"aec={aec.get('enabled', False)}"
         ),
+        "simultaneous_capture_playback": shared.get("directions_simultaneous") is True,
+        "echo_cancellation_enabled": aec.get("enabled") is True,
         "inputs": inputs,
         "errors": errors,
     }

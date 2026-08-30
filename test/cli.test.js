@@ -172,6 +172,40 @@ test("doctor delegates to the packaged Python helper", () => {
   assert.match(result.stdout, /--expected-kit/);
 });
 
+test("boards validates the packaged registry", () => {
+  const result = run(["boards", "esp32", "validate"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /valid board registry/);
+});
+
+test("boards creates and matches a project-local identity", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const identity = join(directory, "board-identity.json");
+    const created = run([
+      "boards",
+      "esp32",
+      "init-identity",
+      "--output",
+      identity,
+    ]);
+    assert.equal(created.status, 0, created.stderr);
+    assert.equal(existsSync(identity), true);
+
+    const value = JSON.parse(readFileSync(identity, "utf8"));
+    value.declared.model = "Unregistered Board";
+    writeFileSync(identity, JSON.stringify(value), "utf8");
+    const matched = run([
+      "boards",
+      "esp32",
+      "match",
+      "--identity",
+      identity,
+    ]);
+    assert.equal(matched.status, 0, matched.stderr);
+    assert.equal(JSON.parse(matched.stdout).result, "none");
+  });
+});
+
 test("setup help documents check and automatic installation", () => {
   const result = run(["setup", "esp32", "--help"]);
   assert.equal(result.status, 0, result.stderr);

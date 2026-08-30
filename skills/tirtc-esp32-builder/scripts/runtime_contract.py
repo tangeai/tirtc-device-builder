@@ -37,6 +37,30 @@ VIDEO_PROFILES = {
     "h264": ("TIRTC_VIDEO_H264", "annex_b_access_unit"),
     "h265": ("TIRTC_VIDEO_H265", "annex_b_access_unit"),
 }
+BUSINESS_FEATURES = {"device_call", "wechat_voip"}
+BUSINESS_PROTOCOL_TOKENS = {
+    "device_call": (
+        "/v1/call/request",
+        "/v1/call/device/info",
+        "/v1/call/reject",
+        "/v1/call/cancel",
+        "/v1/call/hangup",
+        "/v1/call/room",
+        "call_incoming",
+        "room_cancel",
+        "call_reject",
+    ),
+    "wechat_voip": (
+        "/v1/voip/device/profile",
+        "/v1/voip/device/contacts",
+        "/v1/voip/device/call",
+        "call_incoming",
+        "callers_update",
+        "wx_call_id",
+        "wxcall",
+    ),
+}
+GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def sha256_file(path: Path) -> str:
@@ -148,6 +172,89 @@ def check_platform_contract(platform: Any, errors: list[str]) -> None:
         errors.append(
             "platform AI contract must make session_id and response audio formats authoritative"
         )
+
+
+def check_business_contract(
+    contract: dict[str, Any],
+    project: Path,
+    errors: list[str],
+    inputs: dict[str, str],
+) -> set[str]:
+    business = contract.get("business")
+    if business is None:
+        return set()
+    if not isinstance(business, dict):
+        errors.append("business must be an object")
+        return set()
+    features = business.get("features", [])
+    if not isinstance(features, list) or any(
+        not isinstance(feature, str) for feature in features
+    ):
+        errors.append("business.features must be an array of feature names")
+        return set()
+    selected = set(features)
+    unknown = selected - BUSINESS_FEATURES
+    if unknown:
+        errors.append(
+            "business.features contains unsupported features: "
+            + ", ".join(sorted(unknown))
+        )
+    if not selected:
+        return set()
+
+    revision = business.get("protocol_revision")
+    if not isinstance(revision, str) or not GIT_SHA_RE.fullmatch(revision):
+        errors.append(
+            "business.protocol_revision must pin the 40-character tirtc-server-example commit"
+        )
+    arbiter = business.get("session_arbiter")
+    if not isinstance(arbiter, dict):
+        errors.append("business.session_arbiter must be an object")
+    else:
+        for field in (
+            "single_foreground_owner",
+            "generation_guard",
+            "monotonic_deadlines",
+            "deferred_lifecycle",
+            "restore_h5_after_call",
+        ):
+            if arbiter.get(field) is not True:
+                errors.append(f"business.session_arbiter.{field} must be true")
+        if arbiter.get("pending_capacity") != 1:
+            errors.append("business.session_arbiter.pending_capacity must be 1")
+
+    assertions = business.get("implementation_assertions")
+    combined = ""
+    if not isinstance(assertions, list) or not assertions:
+        errors.append("business.implementation_assertions must be a non-empty array")
+    else:
+        for index, assertion in enumerate(assertions):
+            label = f"business.implementation_assertions[{index}]"
+            if not isinstance(assertion, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            try:
+                source = project_file(project, assertion.get("file"), f"{label}.file")
+            except ValueError as exc:
+                errors.append(str(exc))
+                continue
+            if not source.is_file():
+                errors.append(f"{label}.file does not exist: {source}")
+                continue
+            text = source.read_text(encoding="utf-8", errors="replace")
+            combined += "\n" + text
+            inputs[str(source.relative_to(project))] = sha256_file(source)
+            for token in assertion.get("contains", []):
+                if not isinstance(token, str) or not token:
+                    errors.append(f"{label}.contains must contain non-empty strings")
+                elif token not in text:
+                    errors.append(f"{label} is missing token: {token}")
+
+    for feature in sorted(selected & BUSINESS_FEATURES):
+        for token in BUSINESS_PROTOCOL_TOKENS[feature]:
+            if token not in combined:
+                errors.append(f"business {feature} is missing protocol token: {token}")
+    return selected & BUSINESS_FEATURES
 
 
 def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
@@ -275,9 +382,23 @@ def verify_contract(contract_path: Path, project_path: Path) -> dict[str, Any]:
     ):
         errors.append("AI media must start only from the validated command handler")
 
+    base_errors = list(errors)
+    business_errors: list[str] = []
+    business_features = check_business_contract(
+        contract, project, business_errors, inputs
+    )
+    errors.extend(business_errors)
+
     return {
         "ok": not errors,
-        "summary": "endpoint + callbacks + H5/AI stream and negotiation contract",
+        "base_ok": not base_errors,
+        "business_ok": not business_errors,
+        "summary": (
+            "endpoint + callbacks + H5/AI stream and negotiation contract; "
+            f"business={','.join(sorted(business_features)) or 'none'}"
+        ),
+        "business_features": sorted(business_features),
+        "business_errors": business_errors,
         "inputs": inputs,
         "errors": errors,
     }

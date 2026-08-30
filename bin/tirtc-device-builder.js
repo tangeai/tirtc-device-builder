@@ -38,6 +38,7 @@ Usage:
   tirtc-device-builder install <platform> [--skills-dir <path>] [--force]
   tirtc-device-builder setup <platform> [setup options]
   tirtc-device-builder doctor <platform> [doctor options]
+  tirtc-device-builder boards <platform> <list|validate|match|init-identity|candidate> [options]
   tirtc-device-builder --version
 
 Platforms:
@@ -49,6 +50,7 @@ Examples:
   npx tirtc-device-builder setup esp32 --install
   npx tirtc-device-builder install esp32 --skills-dir /absolute/path/skills
   npx tirtc-device-builder doctor esp32 --project /absolute/path/project
+  npx tirtc-device-builder boards esp32 match --identity ./board-identity.json
 
 Install defaults to ${"$"}{CODEX_HOME:-~/.codex}/skills. Existing skills are
 preserved unless --force is explicitly supplied. Setup checks are read-only;
@@ -175,6 +177,28 @@ function runDoctor(platform, args) {
   return Number.isInteger(result.status) ? result.status : 1;
 }
 
+function runBoardRegistry(platform, args) {
+  const script = join(
+    PACKAGE_ROOT,
+    "skills",
+    platform.skill,
+    "scripts",
+    "board_registry.py",
+  );
+  if (!existsSync(script)) {
+    return fail(`package is missing board registry script for ${platform.name}`);
+  }
+
+  const python = process.env.PYTHON || "python3";
+  const result = spawnSync(python, [script, ...args], {
+    stdio: "inherit",
+  });
+  if (result.error) {
+    return fail(`could not run ${python}: ${result.error.message}`);
+  }
+  return Number.isInteger(result.status) ? result.status : 1;
+}
+
 function main(args) {
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     printHelp();
@@ -192,7 +216,12 @@ function main(args) {
   }
 
   const [command, identifier, ...rest] = args;
-  if (command !== "install" && command !== "doctor" && command !== "setup") {
+  if (
+    command !== "install" &&
+    command !== "doctor" &&
+    command !== "setup" &&
+    command !== "boards"
+  ) {
     return fail(`unknown command: ${command}; run with --help`);
   }
   if (!identifier) {
@@ -205,6 +234,9 @@ function main(args) {
 
   if (command === "doctor") {
     return runDoctor(platform, rest);
+  }
+  if (command === "boards") {
+    return runBoardRegistry(platform, rest);
   }
   if (command === "setup") {
     if (platform.name !== "esp32") {

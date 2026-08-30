@@ -27,6 +27,9 @@
 | H5 live video |  |  |
 | H5 talkback |  |  |
 | AI intercom |  |  |
+| Device-to-device call |  |  |
+| WeChat VoIP |  |  |
+| Full-duplex AEC/reference path |  |  |
 
 ## Semantic build gates
 
@@ -37,6 +40,8 @@
 - Audio contract path/SHA-256: `{{AUDIO_CONTRACT}}`
 - Codec clock-table result: `{{AUDIO_CLOCK_GATE}}`
 - I2S mode/controller/slot/handoff result: `{{AUDIO_TOPOLOGY_GATE}}`
+- Simultaneous capture/playback and AEC result: `{{AEC_GATE}}`
+- Device-call/WeChat protocol and arbiter result: `{{BUSINESS_RUNTIME_GATE}}`
 - Video contract path/SHA-256: `{{VIDEO_CONTRACT}}`
 - Camera lock/PID/CPU/frame/backpressure result: `{{VIDEO_GATE}}`
 - Final ELF I2C driver-family result: `{{I2C_ELF_GATE}}`
@@ -54,7 +59,7 @@
 | L3 Online |  |  |
 | L4 Media |  |  |
 | L5 H5 |  |  |
-| L6 AI |  |  |
+| L6 AI/CALL/VOIP/AEC |  |  |
 | L7 Stability |  |  |
 
 ## Firmware and flash record

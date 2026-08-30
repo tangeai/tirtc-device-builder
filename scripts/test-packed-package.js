@@ -162,6 +162,14 @@ try {
   assert.match(doctor.stdout, /--thing-connect-root/);
   assert.match(doctor.stdout, /--expected-kit/);
 
+  const registry = run(process.execPath, [
+    cli,
+    "boards",
+    "esp32",
+    "validate",
+  ]);
+  assert.match(registry.stdout, /valid board registry/);
+
   const setup = run(process.execPath, [cli, "setup", "esp32", "--help"]);
   assert.match(setup.stdout, /setup esp32 --install/);
   assert.equal(
