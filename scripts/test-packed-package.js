@@ -137,6 +137,25 @@ try {
   const platforms = run(process.execPath, [cli, "list"]);
   assert.match(platforms.stdout, /esp32\s+tirtc-esp32-builder/);
 
+  const clients = run(process.execPath, [cli, "clients"]);
+  for (const client of [
+    "codex",
+    "claude-code",
+    "opencode",
+    "gemini",
+    "copilot",
+    "qwen-code",
+    "windsurf",
+    "cline",
+    "kiro",
+  ]) {
+    assert.match(clients.stdout, new RegExp(`^${client}\\s`, "m"));
+  }
+  assert.equal(
+    existsSync(join(installedPackage, "bin", "agent-clients.js")),
+    true,
+  );
+
   const skillsDir = join(temporary, "skills");
   run(process.execPath, [
     cli,
@@ -155,6 +174,21 @@ try {
       "utf8",
     ).trim(),
     packageMetadata.version,
+  );
+
+  const qwenSkillsDir = join(temporary, "qwen-skills");
+  run(process.execPath, [
+    cli,
+    "install",
+    "esp32",
+    "--client",
+    "qwen-code",
+    "--skills-dir",
+    qwenSkillsDir,
+  ]);
+  assert.equal(
+    existsSync(join(qwenSkillsDir, "tirtc-esp32-builder", "SKILL.md")),
+    true,
   );
 
   const doctor = run(process.execPath, [cli, "doctor", "esp32", "--help"]);

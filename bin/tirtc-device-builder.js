@@ -9,9 +9,15 @@ import {
   renameSync,
   rmSync,
 } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  clientSessionHint,
+  DEFAULT_AGENT_CLIENT,
+  defaultSkillsDir,
+  listAgentClients,
+  requireAgentClient,
+} from "./agent-clients.js";
 import { runEsp32Setup } from "./setup-esp32.js";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,7 +41,8 @@ function printHelp() {
 
 Usage:
   tirtc-device-builder list
-  tirtc-device-builder install <platform> [--skills-dir <path>] [--force]
+  tirtc-device-builder clients
+  tirtc-device-builder install <platform> [--client <name>] [--skills-dir <path>] [--force]
   tirtc-device-builder setup <platform> [setup options]
   tirtc-device-builder doctor <platform> [doctor options]
   tirtc-device-builder boards <platform> <list|validate|match|init-identity|candidate> [options]
@@ -46,15 +53,18 @@ Platforms:
 
 Examples:
   npx tirtc-device-builder install esp32
+  npx tirtc-device-builder install esp32 --client qwen-code
   npx tirtc-device-builder setup esp32
-  npx tirtc-device-builder setup esp32 --install
+  npx tirtc-device-builder setup esp32 --install --client gemini
   npx tirtc-device-builder install esp32 --skills-dir /absolute/path/skills
   npx tirtc-device-builder doctor esp32 --project /absolute/path/project
   npx tirtc-device-builder boards esp32 match --identity ./board-identity.json
 
-Install defaults to ${"$"}{CODEX_HOME:-~/.codex}/skills. Existing skills are
-preserved unless --force is explicitly supplied. Setup checks are read-only;
-setup --install installs missing user-space components without running sudo.`);
+Install defaults to the selected client's user Skill directory; Codex is the
+default client. Run "clients" to list supported names and resolved directories.
+Existing skills are preserved unless --force is explicitly supplied. Setup
+checks are read-only; setup --install installs missing user-space components
+without running sudo.`);
 }
 
 function fail(message) {
@@ -71,23 +81,26 @@ function resolvePlatform(identifier) {
   return null;
 }
 
-function defaultSkillsDir() {
-  const codexHome = process.env.CODEX_HOME
-    ? resolve(process.env.CODEX_HOME)
-    : join(homedir(), ".codex");
-  return join(codexHome, "skills");
-}
-
 function parseInstallOptions(args) {
   const options = {
+    client: requireAgentClient(DEFAULT_AGENT_CLIENT),
     force: false,
-    skillsDir: defaultSkillsDir(),
+    skillsDir: null,
   };
 
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--force") {
       options.force = true;
+      continue;
+    }
+    if (argument === "--client") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("--client requires a name");
+      }
+      options.client = requireAgentClient(value);
+      index += 1;
       continue;
     }
     if (argument === "--skills-dir") {
@@ -102,6 +115,7 @@ function parseInstallOptions(args) {
     throw new Error(`unknown install option: ${argument}`);
   }
 
+  options.skillsDir ??= defaultSkillsDir(options.client);
   return options;
 }
 
@@ -151,8 +165,10 @@ function installSkill(platform, options) {
   if (movedExisting && existsSync(backup)) {
     rmSync(backup, { force: true, recursive: true });
   }
-  console.log(`Installed ${platform.skill} ${PACKAGE.version} to ${target}`);
-  console.log(`Start a new Codex session, then invoke $${platform.skill}.`);
+  console.log(
+    `Installed ${platform.skill} ${PACKAGE.version} for ${options.client.displayName} to ${target}`,
+  );
+  console.log(clientSessionHint(options.client, platform.skill));
 }
 
 function runDoctor(platform, args) {
@@ -214,6 +230,15 @@ function main(args) {
     }
     return 0;
   }
+  if (args[0] === "clients") {
+    for (const client of listAgentClients()) {
+      const marker = client.id === DEFAULT_AGENT_CLIENT ? " (default)" : "";
+      console.log(
+        `${client.id}\t${client.displayName}${marker}\t${defaultSkillsDir(client)}`,
+      );
+    }
+    return 0;
+  }
 
   const [command, identifier, ...rest] = args;
   if (
@@ -244,7 +269,7 @@ function main(args) {
     }
     return runEsp32Setup(rest, {
       cliPath: fileURLToPath(import.meta.url),
-      defaultSkillsDir: defaultSkillsDir(),
+      defaultClient: requireAgentClient(DEFAULT_AGENT_CLIENT),
       packageRoot: PACKAGE_ROOT,
       packageVersion: PACKAGE.version,
       platform,

@@ -2,6 +2,15 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.0
+
+- Add native Skill-directory installation for Codex, Claude Code, OpenCode,
+  Gemini CLI, GitHub Copilot, Qwen Code, Windsurf Cascade, Cline, and Kiro.
+- Add `--client` support to both `install` and the resumable `setup` workflow,
+  plus a `clients` command that reports resolved user directories.
+- Keep one portable `SKILL.md` and supporting resource tree across clients,
+  while preserving explicit replacement and hardware-operation approvals.
+
 ## 0.8.1
 
 - Separate rapid `idf.py flash` iteration from portable evidence-bundle export,

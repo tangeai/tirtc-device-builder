@@ -10,6 +10,13 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
+import {
+  clientSessionHint,
+  DEFAULT_AGENT_CLIENT,
+  defaultSkillsDir,
+  listAgentClients,
+  requireAgentClient,
+} from "./agent-clients.js";
 import { ESP32_KIT } from "./esp32-kit-metadata.js";
 
 const EXPECTED_IDF_LINE = "5.5";
@@ -43,10 +50,10 @@ function setupRootFrom(environment) {
   );
 }
 
-function takeValue(args, index, option) {
+function takeValue(args, index, option, kind = "a path") {
   const value = args[index + 1];
   if (!value || value.startsWith("--")) {
-    throw new Error(`${option} requires a path`);
+    throw new Error(`${option} requires ${kind}`);
   }
   return value;
 }
@@ -54,13 +61,15 @@ function takeValue(args, index, option) {
 export function parseSetupOptions(args, defaults = {}) {
   const environment = defaults.environment ?? process.env;
   const options = {
+    client:
+      defaults.client ?? requireAgentClient(DEFAULT_AGENT_CLIENT),
     forceSkill: false,
     help: false,
     idfDir: null,
     install: false,
     kitArchive: null,
     rootDir: setupRootFrom(environment),
-    skillsDir: defaults.skillsDir,
+    skillsDir: null,
     thingConnectRoot: null,
   };
 
@@ -76,6 +85,13 @@ export function parseSetupOptions(args, defaults = {}) {
     }
     if (argument === "--force-skill") {
       options.forceSkill = true;
+      continue;
+    }
+    if (argument === "--client") {
+      options.client = requireAgentClient(
+        takeValue(args, index, argument, "a name"),
+      );
+      index += 1;
       continue;
     }
     if (
@@ -103,9 +119,7 @@ export function parseSetupOptions(args, defaults = {}) {
     throw new Error(`unknown setup option: ${argument}`);
   }
 
-  if (!options.skillsDir) {
-    throw new Error("setup requires a default skills directory");
-  }
+  options.skillsDir ??= defaultSkillsDir(options.client, environment);
   if (options.forceSkill && !options.install) {
     throw new Error("--force-skill requires --install");
   }
@@ -123,8 +137,9 @@ Usage:
 
 Options:
   --install                    Install missing user-space components
+  --client <name>              Agent client (default: codex)
   --root <path>                Managed files (default: ~/.tirtc-device-builder)
-  --skills-dir <path>          Codex skills directory
+  --skills-dir <path>          Override the selected client's Skill directory
   --thing-connect-root <path>  Reuse an existing Device Kit or legacy workspace
   --kit-archive <path>         Install from a local verified Kit archive
   --idf-dir <path>             Reuse or install ESP-IDF at this path
@@ -133,12 +148,13 @@ Options:
 
 Examples:
   npx tirtc-device-builder setup esp32
-  npx tirtc-device-builder setup esp32 --install
+  npx tirtc-device-builder setup esp32 --install --client gemini
   npx tirtc-device-builder setup esp32 --install --root /opt/tirtc-dev
 
 Check mode is read-only. --install downloads the pinned ESP32 Device Kit,
 may clone ESP-IDF v5.5.4, runs Espressif's user-space tool installer, and
-installs the Codex Skill. It does not run sudo or edit shell profiles.`);
+installs the Agent Skill. It does not run sudo or edit shell profiles.
+Supported clients: ${listAgentClients().map((client) => client.id).join(", ")}.`);
 }
 
 function printCheck(status, name, detail) {
@@ -420,6 +436,7 @@ function writeManagedEnvironment(context, packageVersion) {
     device_kit_version: context.deviceKit.version,
     device_kit_root: context.thingConnectRoot,
     thing_connect_root: context.thingConnectRoot,
+    client: context.client.id,
     skills_dir: context.skillsDir,
   };
   writeAtomic(
@@ -542,6 +559,7 @@ function setupContext(options, runtime) {
   const skillVersion = readSkillVersion(skillTarget);
   return {
     activeIdf: active,
+    client: options.client,
     configPath,
     idf,
     idfDir,
@@ -569,8 +587,8 @@ function printState(context, runtime) {
   printCheck("INFO", "setup root", context.rootDir);
   printCheck(
     context.skillReady ? "PASS" : "MISS",
-    "Codex Skill",
-    `${context.skillTarget} (version ${
+    "Agent Skill",
+    `${context.client.displayName}: ${context.skillTarget} (version ${
       context.skillVersion || "missing"
     }; expected ${runtime.packageVersion})`,
   );
@@ -639,13 +657,13 @@ function installSkill(options, context, runtime) {
   const present = existsSync(join(context.skillTarget, "SKILL.md"));
   if (present && context.skillReady && !options.forceSkill) {
     console.log(
-      `SKIP  Codex Skill ${runtime.packageVersion} already exists: ${context.skillTarget}`,
+      `SKIP  ${context.client.displayName} Skill ${runtime.packageVersion} already exists: ${context.skillTarget}`,
     );
     return;
   }
   if (present && !options.forceSkill) {
     throw new Error(
-      `Codex Skill at ${context.skillTarget} has version ${
+      `${context.client.displayName} Skill at ${context.skillTarget} has version ${
         context.skillVersion || "missing"
       }, expected ${runtime.packageVersion}; rerun with --force-skill to replace it`,
     );
@@ -654,6 +672,8 @@ function installSkill(options, context, runtime) {
     runtime.cliPath,
     "install",
     runtime.platform.name,
+    "--client",
+    context.client.id,
     "--skills-dir",
     options.skillsDir,
   ];
@@ -830,8 +850,8 @@ export function runEsp32Setup(args, input) {
   let options;
   try {
     options = parseSetupOptions(args, {
+      client: input.defaultClient,
       environment: runtime.environment,
-      skillsDir: input.defaultSkillsDir,
     });
   } catch (error) {
     console.error(
@@ -849,8 +869,12 @@ export function runEsp32Setup(args, input) {
   if (!options.install) {
     if (!isReady(context)) {
       console.log("OVERALL: NEEDS_SETUP");
+      const clientOption =
+        context.client.id === "codex"
+          ? ""
+          : ` --client ${context.client.id}`;
       console.log(
-        `NEXT: npx tirtc-device-builder@${runtime.packageVersion} setup esp32 --install`,
+        `NEXT: npx tirtc-device-builder@${runtime.packageVersion} setup esp32 --install${clientOption}`,
       );
       return 1;
     }
@@ -867,7 +891,9 @@ export function runEsp32Setup(args, input) {
     return 1;
   }
   console.log("INSTALL PLAN:");
-  console.log(`  Skill:        ${context.skillTarget}`);
+  console.log(
+    `  Skill:        ${context.skillTarget} (${context.client.displayName})`,
+  );
   console.log(`  Device Kit:   ${context.thingConnectRoot} (${ESP32_KIT.version})`);
   console.log(`  ESP-IDF:      ${context.idfDir} (${PINNED_IDF_VERSION})`);
   console.log(`  IDF tools:    ${context.idfToolsPath || "existing default"}`);
@@ -917,6 +943,6 @@ export function runEsp32Setup(args, input) {
   }
   console.log("SETUP: READY");
   console.log(`Environment helper: ${join(context.rootDir, "env.sh")}`);
-  console.log("Start a new Codex session and invoke $tirtc-esp32-builder.");
+  console.log(clientSessionHint(context.client, runtime.platform.skill));
   return 0;
 }

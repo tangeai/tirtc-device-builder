@@ -5,7 +5,7 @@
 ## 精简模板
 
 ```text
-$tirtc-esp32-builder
+请使用 tirtc-esp32-builder Skill。
 
 请为下面这块开发板完成 ThingConnect TiRTC ESP32 接入。
 

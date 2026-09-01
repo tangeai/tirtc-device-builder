@@ -1,7 +1,7 @@
 {
   "name": "tirtc-device-builder",
-  "version": "0.8.1",
-  "description": "Install and run TiRTC device-development skills for Codex.",
+  "version": "0.9.0",
+  "description": "Install and run TiRTC device-development Agent Skills across popular coding clients.",
   "license": "MIT",
   "author": {
     "name": "TangeAI",
@@ -30,6 +30,10 @@
   },
   "keywords": [
     "codex",
+    "agent-skills",
+    "claude-code",
+    "gemini-cli",
+    "qwen-code",
     "skill",
     "tirtc",
     "esp32",

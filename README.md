@@ -1,6 +1,6 @@
 # TiRTC Device Builder
 
-TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Codex Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立的 ESP-IDF 工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
+TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Agent Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立的 ESP-IDF 工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
 
 当前仓库提供一个 Skill：
 
@@ -43,9 +43,15 @@ npm --version
 npx --yes tirtc-device-builder@latest setup esp32 --install
 ```
 
+默认安装到 Codex。使用其他客户端时增加 `--client`，例如：
+
+```bash
+npx --yes tirtc-device-builder@latest setup esp32 --install --client qwen-code
+```
+
 这条命令会：
 
-- 把 `tirtc-esp32-builder` 安装到 Codex Skill 目录；
+- 把 `tirtc-esp32-builder` 安装到所选 Agent 客户端的 Skill 目录；
 - 下载 ESP32 Device Kit 并校验 SHA-256；
 - 复用当前可用的 ESP-IDF 5.5.x，找不到时安装 ESP-IDF 5.5.4；
 - 安装 Espressif 管理的 ESP32-S3 工具链；
@@ -59,21 +65,21 @@ npx --yes tirtc-device-builder@latest setup esp32 --install
 ```text
 OVERALL: PASS
 SETUP: READY
-Start a new Codex session and invoke $tirtc-esp32-builder.
+Start a new Codex session, then ask it to use tirtc-esp32-builder.
 ```
 
 如果看到 `OVERALL: NEEDS_SETUP`、`MISS` 或 `FAIL`，先看[常见问题](#常见问题)。
 
-### 3. 重新打开 Codex
+### 3. 重新打开 Agent 客户端
 
-Skill 在 Codex 会话启动时被发现。安装完成后，关闭当前 Codex 会话，再打开一个新会话。
+Skill 通常在 Agent 会话启动时被发现。安装完成后，关闭当前会话，再打开一个新会话。
 
-### 4. 把板卡和目标告诉 Codex
+### 4. 把板卡和目标告诉 Agent
 
 把你已经掌握的信息填进下面的提示词即可，不用先查齐所有硬件参数。先指定工作区根目录，本地路径尽量相对工作区填写；不确定的内容写“未知”。可直接复制的版本见[开发板接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
 
 ```text
-请使用 $tirtc-esp32-builder 完成这块开发板的 TiRTC 移植。
+请使用 tirtc-esp32-builder Skill 完成这块开发板的 TiRTC 移植。
 
 开发板：
 - 厂商、完整型号、PCB/硬件版本：<填写>
@@ -339,25 +345,52 @@ tirtc-device-builder setup esp32 --install
 
 安装命令是 `npm install`，不要写成 `npm --install`。
 
-只执行 `npm install --global tirtc-device-builder` 会安装 CLI，不会准备完整开发环境。随后还要运行 `setup esp32 --install`，由它安装 Codex Skill、下载 Device Kit，并在需要时安装 ESP-IDF。npm 包没有 `preinstall`、`install` 或 `postinstall` 生命周期脚本，因此不会在安装 CLI 时改动这些目录。
+只执行 `npm install --global tirtc-device-builder` 会安装 CLI，不会准备完整开发环境。随后还要运行 `setup esp32 --install`，由它安装 Agent Skill、下载 Device Kit，并在需要时安装 ESP-IDF。npm 包没有 `preinstall`、`install` 或 `postinstall` 生命周期脚本，因此不会在安装 CLI 时改动这些目录。
 
 安装公开包不需要执行 `npm login`；这个命令只和维护者发布新版本有关。
 
 ### 只安装 Skill
 
-如果 ESP-IDF 和 Device Kit 已经由团队统一准备，可以只复制 Codex Skill：
+如果 ESP-IDF 和 Device Kit 已经由团队统一准备，可以只复制 Agent Skill：
 
 ```bash
 npx --yes tirtc-device-builder@latest install esp32
+npx --yes tirtc-device-builder@latest install esp32 --client gemini
 ```
 
 这条命令不安装 ESP-IDF，也不下载 Device Kit。完整的新用户环境仍建议使用 `setup esp32 --install`。
+
+### 支持的 Agent 客户端
+
+同一个 `tirtc-esp32-builder` Skill 会完整复制到所选客户端的原生目录，不维护客户端专用的内容副本。先用下面的命令查看当前机器解析出的目录：
+
+```bash
+npx --yes tirtc-device-builder@latest clients
+```
+
+| `--client` | 客户端 | 默认 Skill 根目录 |
+|---|---|---|
+| `codex` | Codex（默认） | `${CODEX_HOME:-~/.codex}/skills` |
+| `claude-code` | Claude Code | `~/.claude/skills` |
+| `opencode` | OpenCode | `${XDG_CONFIG_HOME:-~/.config}/opencode/skills` |
+| `gemini` | Gemini CLI | `~/.gemini/skills` |
+| `copilot` | GitHub Copilot | `~/.copilot/skills` |
+| `qwen-code` | Qwen Code | `~/.qwen/skills` |
+| `windsurf` | Windsurf Cascade | `~/.codeium/windsurf/skills` |
+| `cline` | Cline | `~/.cline/skills` |
+| `kiro` | Kiro | `~/.kiro/skills` |
+
+也可以使用 `claude`、`gemini-cli`、`github-copilot`、`qwen`、`cascade`、`kiro-cli` 等别名。`--skills-dir` 的优先级高于默认目录，适合项目级安装或客户端使用非默认配置目录的情况。
+
+`--client` 只选择 Skill 的安装目录和提示文案，不绑定模型服务。DeepSeek、Qwen、GLM、Kimi、OpenAI 或 Claude 等模型仍在对应客户端中配置；只要客户端能发现 Skill 并允许文件、终端等所需工具，就继续使用同一份工作流。
+
+Cline 当前还需要在 `Settings → Features → Enable Skills` 中启用实验性 Skills 功能；安装器不会修改客户端自身的权限或功能开关。
 
 ### 默认目录
 
 | 内容 | 默认位置 |
 |---|---|
-| Codex Skill | `${CODEX_HOME:-~/.codex}/skills/tirtc-esp32-builder` |
+| Agent Skill | 上表中所选目录下的 `tirtc-esp32-builder` |
 | 托管根目录 | `~/.tirtc-device-builder` |
 | Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.1` |
 | ESP-IDF | `~/.tirtc-device-builder/esp-idf-v5.5.4` |
@@ -436,6 +469,7 @@ npx --yes tirtc-device-builder@latest setup esp32
 ```bash
 npx --yes tirtc-device-builder@latest --help
 npx --yes tirtc-device-builder@latest list
+npx --yes tirtc-device-builder@latest clients
 npx --yes tirtc-device-builder@latest setup esp32 --help
 ```
 
@@ -759,15 +793,16 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 
 如果指定目录已存在但内容不完整或版本错误，安装器会拒绝覆盖。换一个空的新路径，或先人工备份原目录。
 
-### 安装完成后 Codex 找不到 Skill
+### 安装完成后 Agent 客户端找不到 Skill
 
-关闭当前 Codex 会话并重新打开。再检查默认文件是否存在：
+关闭当前 Agent 会话并重新打开。先查看客户端目录，再检查对应文件是否存在：
 
 ```bash
-ls -l ~/.codex/skills/tirtc-esp32-builder/SKILL.md
+npx --yes tirtc-device-builder@latest clients
+ls -l <skills-dir>/tirtc-esp32-builder/SKILL.md
 ```
 
-设置过 `CODEX_HOME` 或 `--skills-dir` 时，要检查对应目录。不要同时把 Skill 安装到多个位置。
+确认安装和启动的是同一个客户端，例如 Qwen Code 要使用 `--client qwen-code`。设置过 `CODEX_HOME`、`XDG_CONFIG_HOME` 或 `--skills-dir` 时，要检查对应目录。项目级目录由客户端自身规则决定，可以用 `--skills-dir` 显式指定。
 
 ### 已有 Skill，安装器拒绝覆盖
 
@@ -926,8 +961,8 @@ metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地
 
 ```bash
 npm test
-git tag -a v0.8.1 -m "v0.8.1"
-git push origin v0.8.1
+git tag -a v0.9.0 -m "v0.9.0"
+git push origin v0.9.0
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

@@ -1,28 +1,30 @@
-$tirtc-esp32-builder
+请使用 tirtc-esp32-builder Skill。
 
 请在当前工作区完成一次立创·实战派 ESP32-S3 的 ThingConnect TiRTC clean-room L-1/L0/L1 接入验证。
 
 这是 Skill、提示词和开发板资料的独立有效性测试。允许访问外网。
 
-前置条件（必须由开发者在启动本次 Codex 会话前完成，不属于本提示词内的操作）：
+前置条件（必须由开发者在启动本次 Agent 会话前完成，不属于本提示词内的操作）：
 
 ```bash
-npx --yes tirtc-device-builder@0.8.1 setup esp32 --install --force-skill
+export TIRTC_AGENT_CLIENT=codex
+npx --yes tirtc-device-builder@0.9.0 setup esp32 --install \
+  --client "$TIRTC_AGENT_CLIENT" --force-skill
 ```
 
-该命令只允许在当前用户目录安装固定版本的 Skill、managed ESP32 Device Kit、ESP-IDF 和工具链；禁止 sudo、系统级包变更和修改 shell profile。安装完成后，开发者必须关闭原 Codex 会话，再从本 clean-room 工作区启动一个新会话，然后粘贴本提示词。
+把 `TIRTC_AGENT_CLIENT` 改为 `clients` 命令列出的目标客户端名称。该命令只允许在当前用户目录安装固定版本的 Skill、managed ESP32 Device Kit、ESP-IDF 和工具链；禁止 sudo、系统级包变更和修改 shell profile。安装完成后，开发者必须关闭原 Agent 会话，再从本 clean-room 工作区启动一个新会话，然后粘贴本提示词。
 
 本轮第一步先只读运行：
 
 ```bash
-npx --yes tirtc-device-builder@0.8.1 --version
-npx --yes tirtc-device-builder@0.8.1 setup esp32
+npx --yes tirtc-device-builder@0.9.0 --version
+npx --yes tirtc-device-builder@0.9.0 setup esp32 --client "$TIRTC_AGENT_CLIENT"
 ```
 
-必须根据命令的实际输出和本机文件确认：npm 包为 0.8.1、已安装 Skill 的 `VERSION` 为 0.8.1、所选 Device Kit 的 `manifest.json` 中 `kit_version` 为 1.1.1，并且 Doctor 对 `--expected-kit 1.1.1` 输出 `OVERALL: PASS`。Plugin manifest 不属于这种 npm 安装方式的运行时前置条件，不得把不可访问的 Plugin 版本当作阻塞项。如果版本不一致、Skill 是在当前会话启动后才安装，或环境检查未通过，停止并报告前置条件不成立；不要在当前会话中替换 Skill 后继续生成工程。
+必须根据命令的实际输出和本机文件确认：npm 包为 0.9.0、已安装 Skill 的 `VERSION` 为 0.9.0、所选 Device Kit 的 `manifest.json` 中 `kit_version` 为 1.1.1，并且 Doctor 对 `--expected-kit 1.1.1` 输出 `OVERALL: PASS`。Plugin manifest 不属于这种 npm 安装方式的运行时前置条件，不得把不可访问的 Plugin 版本当作阻塞项。如果版本不一致、Skill 是在当前会话启动后才安装，或环境检查未通过，停止并报告前置条件不成立；不要在当前会话中替换 Skill 后继续生成工程。
 
 工作区与 clean-room 边界：
-- 将启动 Codex 时的当前目录定义为 `WORKSPACE_ROOT`。
+- 将启动 Agent 客户端时的当前目录定义为 `WORKSPACE_ROOT`。
 - 所有工程输入和输出必须位于 `WORKSPACE_ROOT`。
 - 不得读取 `WORKSPACE_ROOT` 之外的项目、兄弟目录、父目录项目、备份、旧构建、日志、报告或 artifact。
 - 如果目标输出目录已经存在，停止并报告 clean-room 条件不成立；不要读取、覆盖或删除该目录。

@@ -11,6 +11,11 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  defaultSkillsDir,
+  listAgentClients,
+  requireAgentClient,
+} from "../bin/agent-clients.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(ROOT, "bin", "tirtc-device-builder.js");
@@ -85,6 +90,45 @@ test("list exposes the ESP32 skill", () => {
   assert.match(result.stdout, /esp32\s+tirtc-esp32-builder/);
 });
 
+test("clients lists every supported Agent client", () => {
+  const result = run(["clients"]);
+  assert.equal(result.status, 0, result.stderr);
+  for (const client of listAgentClients()) {
+    assert.match(result.stdout, new RegExp(`^${client.id}\\s`, "m"));
+  }
+  assert.match(result.stdout, /^codex\s+Codex \(default\)/m);
+});
+
+test("client defaults resolve to native user Skill directories", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const environment = {
+      CODEX_HOME: "",
+      HOME: directory,
+      USERPROFILE: directory,
+      XDG_CONFIG_HOME: join(directory, "xdg"),
+    };
+    const expected = {
+      codex: join(directory, ".codex", "skills"),
+      "claude-code": join(directory, ".claude", "skills"),
+      opencode: join(directory, "xdg", "opencode", "skills"),
+      gemini: join(directory, ".gemini", "skills"),
+      copilot: join(directory, ".copilot", "skills"),
+      "qwen-code": join(directory, ".qwen", "skills"),
+      windsurf: join(directory, ".codeium", "windsurf", "skills"),
+      cline: join(directory, ".cline", "skills"),
+      kiro: join(directory, ".kiro", "skills"),
+    };
+
+    for (const [client, path] of Object.entries(expected)) {
+      assert.equal(defaultSkillsDir(client, environment), path);
+    }
+    assert.equal(requireAgentClient("gemini-cli").id, "gemini");
+    assert.equal(requireAgentClient("github-copilot").id, "copilot");
+    assert.equal(requireAgentClient("qwen").id, "qwen-code");
+    assert.equal(requireAgentClient("cascade").id, "windsurf");
+  });
+});
+
 test("install copies a complete skill to an explicit skills directory", async () => {
   await withTemporaryDirectory(async (directory) => {
     const skillsDir = join(directory, "skills");
@@ -119,6 +163,37 @@ test("install respects CODEX_HOME", async () => {
       true,
     );
   });
+});
+
+test("install supports every Agent client through --client", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    for (const client of listAgentClients()) {
+      const skillsDir = join(directory, client.id, "skills");
+      const result = run([
+        "install",
+        "esp32",
+        "--client",
+        client.id,
+        "--skills-dir",
+        skillsDir,
+      ]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(
+        existsSync(join(skillsDir, "tirtc-esp32-builder", "SKILL.md")),
+        true,
+      );
+      assert.match(result.stdout, new RegExp(`for ${client.displayName}`));
+      if (client.id === "cline") {
+        assert.match(result.stdout, /Enable Skills/);
+      }
+    }
+  });
+});
+
+test("install rejects an unsupported Agent client", () => {
+  const result = run(["install", "esp32", "--client", "unknown-agent"]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unsupported client: unknown-agent/);
 });
 
 test("install preserves an existing skill unless --force is supplied", async () => {
@@ -211,7 +286,41 @@ test("setup help documents check and automatic installation", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /setup esp32 --install/);
   assert.match(result.stdout, /--kit-archive/);
+  assert.match(result.stdout, /--client <name>/);
+  assert.match(result.stdout, /qwen-code/);
   assert.match(result.stdout, /does not run sudo or edit shell profiles/);
+});
+
+test("setup uses the selected client's default Skill directory", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const result = run(
+      [
+        "setup",
+        "esp32",
+        "--client",
+        "qwen-code",
+        "--root",
+        join(directory, "managed"),
+        "--thing-connect-root",
+        join(directory, "missing-kit"),
+        "--idf-dir",
+        join(directory, "missing-idf"),
+      ],
+      {
+        HOME: directory,
+        USERPROFILE: directory,
+        TIRTC_THING_CONNECT_ROOT: "",
+      },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /Qwen Code/);
+    assert.match(
+      result.stdout,
+      new RegExp(join(directory, ".qwen", "skills").replaceAll("\\", "\\\\")),
+    );
+    assert.match(result.stdout, /--install --client qwen-code/);
+  });
 });
 
 test("setup check is read-only and reports the automatic next action", async () => {

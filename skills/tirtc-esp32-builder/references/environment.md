@@ -37,7 +37,7 @@ Add `--project <generated-project>` after generation so the doctor can compare `
 
 The automatic setup downloads a versioned minimal Kit instead of cloning the ThingConnect server repository. A managed Kit is ready only when its generator and SDK files exist and `manifest.json` declares the exact pinned `kit_version`. A stale environment or managed configuration that points at an older Kit is ignored in favor of the current versioned managed path. The setup configuration records the version read from that manifest; it never substitutes the desired version for the actual one.
 
-The installed Skill has its own `<skill-dir>/VERSION` marker. Setup requires it to equal the npm package version and reports both values. Replacing a missing or mismatched marker requires the explicit `--install --force-skill` flow and a new Codex session.
+The installed Skill has its own `<skill-dir>/VERSION` marker. Setup requires it to equal the npm package version and reports both values. Replacing a missing or mismatched marker requires the explicit `--install --force-skill` flow and a new session in the selected Agent client.
 
 For an explicitly selected legacy workspace, omit `--expected-kit`; otherwise resolve the generation root in this order:
 

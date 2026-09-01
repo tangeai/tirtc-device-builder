@@ -5,14 +5,15 @@
 ```bash
 npx tirtc-device-builder@latest setup esp32
 npx tirtc-device-builder@latest setup esp32 --install
+npx tirtc-device-builder@latest clients
 ```
 
-第一条命令只检查；第二条命令自动安装用户目录内缺失的 Skill、带校验的 ESP32 Device Kit、ESP-IDF 5.5.4 和 ESP32-S3 工具链，最后复跑 Doctor。它不执行 `sudo`，也不修改 shell 配置。安装完成后新开 Codex 会话即可调用 Skill。
+第一条命令只检查；第二条命令自动安装用户目录内缺失的 Skill、带校验的 ESP32 Device Kit、ESP-IDF 5.5.4 和 ESP32-S3 工具链，最后复跑 Doctor。它不执行 `sudo`，也不修改 shell 配置。默认客户端是 Codex；Gemini CLI、GitHub Copilot、Qwen Code、Windsurf、Cline、Kiro、Claude Code 和 OpenCode 可通过 `--client <name>` 选择，第三条命令会列出名称和实际安装目录。安装完成后重新启动所选 Agent 客户端。
 
-安装后可在 Codex 中显式调用：
+安装后可直接要求 Agent 使用该 Skill：
 
 ```text
-$tirtc-esp32-builder
+请使用 tirtc-esp32-builder Skill。
 
 开发板：<厂商、完整型号、PCB 版本>
 资料与实物对应：<是/否/未知>
@@ -48,24 +49,24 @@ printf '%s\n' "$TIRTC_THING_CONNECT_ROOT"
 只有板卡型号：
 
 ```text
-$tirtc-esp32-builder 分析 <厂商> <型号> <硬件版本>，目标是 H5 实时视频、talkback 和 AI 对讲。先输出缺失资料与能力结论。
+请使用 tirtc-esp32-builder Skill 分析 <厂商> <型号> <硬件版本>，目标是 H5 实时视频、talkback 和 AI 对讲。先输出缺失资料与能力结论。
 ```
 
 提供本地资料：
 
 ```text
-$tirtc-esp32-builder 使用原理图 /path/board.pdf、BSP /path/vendor-project 和一键安装的 Device Kit，为该板生成 TiRTC H5/AI/CALL/VOIP ESP-IDF 工程并编译；AI/CALL/VOIP 必须通过 AEC 门禁。
+请使用 tirtc-esp32-builder Skill、原理图 /path/board.pdf、BSP /path/vendor-project 和一键安装的 Device Kit，为该板生成 TiRTC H5/AI/CALL/VOIP ESP-IDF 工程并编译；AI/CALL/VOIP 必须通过 AEC 门禁。
 ```
 
 完整实机流程：
 
 ```text
-$tirtc-esp32-builder 使用 /path/hardware-ir.json 生成工程，编译后烧录到 /dev/ttyACM0，验证绑定、H5 和 AI，并生成 TIRTC_PORTING_REPORT.md。
+请使用 tirtc-esp32-builder Skill 和 /path/hardware-ir.json 生成工程，编译后烧录到 /dev/ttyACM0，验证绑定、H5 和 AI，并生成 TIRTC_PORTING_REPORT.md。
 ```
 
 ## ESP-IDF 环境检查
 
-将 `<skill-dir>` 替换为安装后的 Skill 路径，例如 `~/.codex/skills/tirtc-esp32-builder`。
+将 `<skill-dir>` 替换为 `clients` 命令显示的 Skill 根目录下的 `tirtc-esp32-builder`，例如 `~/.qwen/skills/tirtc-esp32-builder`。
 
 生成工程前检查工作区和开发环境：
 
