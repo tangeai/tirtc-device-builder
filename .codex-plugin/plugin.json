@@ -1,6 +1,6 @@
 {
   "name": "tirtc-device-builder",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Codex workflows for building and validating TiRTC device firmware across supported chip platforms.",
   "author": {
     "name": "TangeAI",

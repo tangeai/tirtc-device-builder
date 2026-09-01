@@ -73,11 +73,16 @@ When the selected method is SoftAP:
 - assign the AP netif, gateway and provisioning server `192.168.6.1/24`, serve
   the setup page at `http://192.168.6.1`, and lease clients from that subnet.
   With ESP-IDF, stop DHCP before changing the AP netif IP information and
-  restart it afterward.
+  restart it afterward;
+- enable captive portal discovery with DHCP option 114, wildcard DNS resolving
+  names to `192.168.6.1`, and an HTTP fallback redirect to the setup page. Keep
+  the direct HTTP address documented because client auto-popup is not
+  guaranteed and HTTPS cannot be transparently redirected.
 
 Record these values on the selected SoftAP method as `ssid_prefix: "TiRTC-"`,
-`auth_mode: "open"`, and `ipv4_address: "192.168.6.1"`. The Hardware IR gate
-returns `NEEDS_CONFIRMATION` when one is missing and `BLOCKED` when one differs.
+`auth_mode: "open"`, `ipv4_address: "192.168.6.1"`, and
+`captive_portal: true`. The Hardware IR gate returns `NEEDS_CONFIRMATION` when
+one is missing and `BLOCKED` when one differs.
 Keep the provisioning endpoints available only while onboarding is active, and
 disable the AP or restart into STA mode after credentials are accepted.
 

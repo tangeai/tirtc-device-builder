@@ -1,6 +1,6 @@
 {
   "name": "tirtc-device-builder",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Install and run TiRTC device-development Agent Skills across popular coding clients.",
   "license": "MIT",
   "author": {

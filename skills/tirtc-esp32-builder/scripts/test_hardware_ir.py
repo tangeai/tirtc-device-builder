@@ -75,6 +75,7 @@ def ready_onboarding(ir: dict) -> None:
                     "ssid_prefix": "TiRTC-",
                     "auth_mode": "open",
                     "ipv4_address": "192.168.6.1",
+                    "captive_portal": True,
                     "available": True,
                     "verification": "corroborated",
                     "source_refs": ["board-materials"],
@@ -387,6 +388,7 @@ class HardwareIrV2Test(unittest.TestCase):
             "ssid_prefix": "Other-",
             "auth_mode": "wpa2_psk",
             "ipv4_address": "192.168.4.1",
+            "captive_portal": False,
         }
         for field, invalid_value in cases.items():
             with self.subTest(field=field):
@@ -409,6 +411,18 @@ class HardwareIrV2Test(unittest.TestCase):
         )
         self.assertIn(
             "192.168.6.1", " ".join(assessment["project_gate"]["reasons"])
+        )
+
+    def test_missing_captive_portal_needs_confirmation(self) -> None:
+        incomplete = ready_v2()
+        method = incomplete["onboarding"]["wifi_credentials"]["methods"][0]
+        del method["captive_portal"]
+        assessment = MODULE.assess_ir(incomplete)
+        self.assertEqual(
+            "NEEDS_CONFIRMATION", assessment["project_gate"]["status"]
+        )
+        self.assertIn(
+            "captive portal", " ".join(assessment["project_gate"]["reasons"])
         )
 
     def test_credentials_committed_to_source_block_project(self) -> None:

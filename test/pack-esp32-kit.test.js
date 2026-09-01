@@ -37,6 +37,7 @@ function createSource(root) {
     "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
     "device-sim/sdk/espressif-esp32s3/2.3.0/include/tirtc/tiRTC.h",
     "device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a",
     "device-sim/sdk/espressif-esp32s3/2.3.0/manifest/build-contract.env",
@@ -59,12 +60,27 @@ function createSource(root) {
 #define WIFI_SETUP_IP_D 1
 const char *ssid_format = "TiRTC-%02X%02X";
 void configure(void) { ap.ap.authmode = WIFI_AUTH_OPEN; }
+void captive(void) {
+  esp_netif_dhcps_option(ap, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, 0, 0);
+  wifi_captive_dns_start(0);
+  httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, redirect);
+}
 `,
   );
   writeFixture(
     thingConnect,
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.c",
+    "#define DNS_FLAG_RESPONSE 0x8000U\nconst char *log_line = \"wildcard DNS listening\";\n",
+  );
+  writeFixture(
+    thingConnect,
+    "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
+    'idf_component_register(SRCS "src/wifi_manager.c" "src/wifi_captive_dns.c" PRIV_REQUIRES lwip)\n',
+  );
+  writeFixture(
+    thingConnect,
     "device-sim/templates/esp32-h5-ai/README.md",
-    "设备启动 TiRTC-XXXX 开放 SoftAP，无需密码；打开 http://192.168.6.1 配网。\n",
+    "设备启动 TiRTC-XXXX 开放 SoftAP，无需密码；通过 captive portal 自动打开 http://192.168.6.1 配网。\n",
   );
   writeFixture(root, "LICENSE", "fixture license\n");
   return thingConnect;
@@ -236,6 +252,37 @@ const char *ssid_format = "TiRTC-Setup-%02X%02X";
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /SoftAP contract/);
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("pack:esp32-kit rejects a missing captive portal implementation", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-test-"));
+  try {
+    const source = createSource(join(temporary, "source"));
+    writeFixture(
+      source,
+      "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.c",
+      "/* missing wildcard DNS responder */\n",
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        "--source",
+        source,
+        "--kit-version",
+        "1.0.0",
+        "--source-commit",
+        COMMIT,
+        "--output",
+        join(temporary, "dist"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /DNS response handling/);
   } finally {
     rmSync(temporary, { force: true, recursive: true });
   }

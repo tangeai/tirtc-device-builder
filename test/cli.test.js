@@ -363,14 +363,14 @@ test("setup ignores a stale managed Kit reference and selects the pinned Kit", a
   await withTemporaryDirectory(async (directory) => {
     const root = join(directory, "managed");
     const oldKit = join(root, "kits", "esp32s3", "1.0.0");
-    const expectedKit = join(root, "kits", "esp32s3", "1.1.2");
+    const expectedKit = join(root, "kits", "esp32s3", "1.1.3");
     createDeviceKit(oldKit, "1.0.0");
     mkdirSync(root, { recursive: true });
     writeFileSync(
       join(root, "config.json"),
       JSON.stringify({
         device_kit_root: oldKit,
-        device_kit_version: "1.1.2",
+        device_kit_version: "1.1.3",
       }),
       "utf8",
     );
@@ -392,7 +392,7 @@ test("setup ignores a stale managed Kit reference and selects the pinned Kit", a
     assert.equal(result.status, 1);
     assert.match(result.stdout, /ignored stale Kit reference/);
     assert.match(result.stdout, new RegExp(expectedKit.replaceAll("\\", "\\\\")));
-    assert.match(result.stdout, /expected 1\.1\.2/);
+    assert.match(result.stdout, /expected 1\.1\.3/);
   });
 });
 
@@ -400,7 +400,7 @@ test("setup ignores a stale Kit selected by the managed environment", async () =
   await withTemporaryDirectory(async (directory) => {
     const root = join(directory, "managed");
     const oldKit = join(root, "kits", "esp32s3", "1.0.0");
-    const expectedKit = join(root, "kits", "esp32s3", "1.1.2");
+    const expectedKit = join(root, "kits", "esp32s3", "1.1.3");
     createDeviceKit(oldKit, "1.0.0");
 
     const result = run(
@@ -445,7 +445,7 @@ test("setup does not accept an explicit older Kit as the pinned Kit", async () =
     );
 
     assert.equal(result.status, 1);
-    assert.match(result.stdout, /version 1\.0\.0; expected 1\.1\.2/);
+    assert.match(result.stdout, /version 1\.0\.0; expected 1\.1\.3/);
     assert.match(result.stdout, /OVERALL: NEEDS_SETUP/);
   });
 });

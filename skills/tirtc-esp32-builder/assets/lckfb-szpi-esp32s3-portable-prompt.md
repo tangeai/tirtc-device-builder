@@ -8,7 +8,7 @@
 
 ```bash
 export TIRTC_AGENT_CLIENT=codex
-npx --yes tirtc-device-builder@0.9.1 setup esp32 --install \
+npx --yes tirtc-device-builder@0.9.2 setup esp32 --install \
   --client "$TIRTC_AGENT_CLIENT" --force-skill
 ```
 
@@ -17,11 +17,11 @@ npx --yes tirtc-device-builder@0.9.1 setup esp32 --install \
 本轮第一步先只读运行：
 
 ```bash
-npx --yes tirtc-device-builder@0.9.1 --version
-npx --yes tirtc-device-builder@0.9.1 setup esp32 --client "$TIRTC_AGENT_CLIENT"
+npx --yes tirtc-device-builder@0.9.2 --version
+npx --yes tirtc-device-builder@0.9.2 setup esp32 --client "$TIRTC_AGENT_CLIENT"
 ```
 
-必须根据命令的实际输出和本机文件确认：npm 包为 0.9.1、已安装 Skill 的 `VERSION` 为 0.9.1、所选 Device Kit 的 `manifest.json` 中 `kit_version` 为 1.1.2，并且 Doctor 对 `--expected-kit 1.1.2` 输出 `OVERALL: PASS`。Plugin manifest 不属于这种 npm 安装方式的运行时前置条件，不得把不可访问的 Plugin 版本当作阻塞项。如果版本不一致、Skill 是在当前会话启动后才安装，或环境检查未通过，停止并报告前置条件不成立；不要在当前会话中替换 Skill 后继续生成工程。
+必须根据命令的实际输出和本机文件确认：npm 包为 0.9.2、已安装 Skill 的 `VERSION` 为 0.9.2、所选 Device Kit 的 `manifest.json` 中 `kit_version` 为 1.1.3，并且 Doctor 对 `--expected-kit 1.1.3` 输出 `OVERALL: PASS`。Plugin manifest 不属于这种 npm 安装方式的运行时前置条件，不得把不可访问的 Plugin 版本当作阻塞项。如果版本不一致、Skill 是在当前会话启动后才安装，或环境检查未通过，停止并报告前置条件不成立；不要在当前会话中替换 Skill 后继续生成工程。
 
 工作区与 clean-room 边界：
 - 将启动 Agent 客户端时的当前目录定义为 `WORKSPACE_ROOT`。

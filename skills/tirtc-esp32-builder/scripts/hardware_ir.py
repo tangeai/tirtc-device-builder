@@ -64,6 +64,7 @@ WIFI_METHOD_TYPES = {
 SOFTAP_SSID_PREFIX = "TiRTC-"
 SOFTAP_AUTH_MODE = "open"
 SOFTAP_IPV4_ADDRESS = "192.168.6.1"
+SOFTAP_CAPTIVE_PORTAL = True
 BINDING_METHOD_TYPES = {
     "verification_code",
     "factory_bound",
@@ -450,6 +451,11 @@ def validate_onboarding(
             if method_type == "softap":
                 for field in ("ssid_prefix", "auth_mode", "ipv4_address"):
                     nullable_string(method.get(field), f"{prefix}.{field}", errors)
+                nullable_bool(
+                    method.get("captive_portal"),
+                    f"{prefix}.captive_portal",
+                    errors,
+                )
             nullable_bool(method.get("available"), f"{prefix}.available", errors)
             validate_verification(
                 method.get("verification"), f"{prefix}.verification", errors
@@ -937,6 +943,7 @@ def wifi_requirement(onboarding: dict[str, Any]) -> Requirement:
             ("ssid_prefix", SOFTAP_SSID_PREFIX, "SSID prefix"),
             ("auth_mode", SOFTAP_AUTH_MODE, "authentication mode"),
             ("ipv4_address", SOFTAP_IPV4_ADDRESS, "IPv4 address"),
+            ("captive_portal", SOFTAP_CAPTIVE_PORTAL, "captive portal"),
         )
         for field, expected, label in softap_fields:
             value = method.get(field)

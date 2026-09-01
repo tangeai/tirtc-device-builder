@@ -51,6 +51,9 @@ const REQUIRED_FILES = [
   "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
   "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
   "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
+  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.c",
+  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
   `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/include/tirtc/tiRTC.h`,
   `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/lib/libTiRTC.a`,
   `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/manifest/build-contract.env`,
@@ -306,8 +309,21 @@ function assertSoftApContract(root) {
     root,
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
   );
+  const dnsPath = join(
+    root,
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.c",
+  );
+  const cmakePath = join(
+    root,
+    "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
+  );
   const readmePath = join(root, "device-sim/templates/esp32-h5-ai/README.md");
-  if (!existsSync(sourcePath) || !existsSync(readmePath)) {
+  if (
+    !existsSync(sourcePath) ||
+    !existsSync(dnsPath) ||
+    !existsSync(cmakePath) ||
+    !existsSync(readmePath)
+  ) {
     throw new Error("SoftAP contract sources are missing from the Device Kit");
   }
 
@@ -319,14 +335,26 @@ function assertSoftApContract(root) {
   assertContains(source, "#define WIFI_SETUP_IP_C 6", "IPv4 third octet");
   assertContains(source, "#define WIFI_SETUP_IP_D 1", "IPv4 fourth octet");
   assertContains(source, '"http://192.168.6.1"', "provisioning URL");
+  assertContains(source, "ESP_NETIF_CAPTIVEPORTAL_URI", "DHCP option 114");
+  assertContains(source, "wifi_captive_dns_start", "wildcard DNS startup");
+  assertContains(source, "httpd_register_err_handler", "HTTP fallback redirect");
   assertOmits(source, "WIFI_SETUP_PASSWORD", "a SoftAP password");
   assertOmits(source, "TiRTC-Setup-", "the legacy SSID prefix");
   assertOmits(source, "192.168.4.1", "the legacy provisioning address");
+
+  const dns = readFileSync(dnsPath, "utf8");
+  assertContains(dns, "DNS_FLAG_RESPONSE", "DNS response handling");
+  assertContains(dns, "wildcard DNS listening", "DNS server startup");
+
+  const cmake = readFileSync(cmakePath, "utf8");
+  assertContains(cmake, '"src/wifi_captive_dns.c"', "DNS component source");
+  assertContains(cmake, "lwip", "DNS socket dependency");
 
   const readme = readFileSync(readmePath, "utf8");
   assertContains(readme, "TiRTC-XXXX", "documented SSID prefix");
   assertContains(readme, "无需密码", "documented open authentication");
   assertContains(readme, "http://192.168.6.1", "documented provisioning URL");
+  assertContains(readme, "captive portal", "documented automatic portal discovery");
   assertOmits(readme, "192.168.4.1", "the legacy documented address");
 }
 

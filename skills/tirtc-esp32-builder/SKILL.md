@@ -70,9 +70,9 @@ implementation and build facts. Stop before code only for a genuine user choice,
 unknown wiring/identity, unavailable matching SDK, or required public-contract
 change.
 
-When SoftAP is the selected Wi-Fi method, carry the fixed SSID, open-auth and
-IPv4 [product contract](references/hardware-ir.md#softap-product-contract) into
-the IR, generated adapter, user-facing instructions and build checks.
+When SoftAP is the selected Wi-Fi method, carry the fixed SSID, open-auth, IPv4
+and captive-portal [product contract](references/hardware-ir.md#softap-product-contract)
+into the IR, generated adapter, user-facing instructions and build checks.
 
 ## 5. Generate and port
 

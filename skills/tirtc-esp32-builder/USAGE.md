@@ -74,7 +74,7 @@ printf '%s\n' "$TIRTC_THING_CONNECT_ROOT"
 python3 <skill-dir>/scripts/doctor.py \
   --expected-idf 5.5 \
   --target esp32s3 \
-  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.1.2 \
+  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.1.3 \
   --require-workspace
 ```
 

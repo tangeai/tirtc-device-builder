@@ -2,6 +2,14 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.2
+
+- Pin ESP32 Device Kit 1.1.3 with captive portal discovery through DHCP option
+  114, wildcard DNS, and HTTP fallback redirects.
+- Require `captive_portal: true` in the selected SoftAP Hardware IR contract and
+  reject Kit packaging when the runtime, component wiring, or instructions omit
+  automatic portal discovery.
+
 ## 0.9.1
 
 - Pin ESP32 Device Kit 1.1.2 with an open `TiRTC-` SoftAP and provisioning at
