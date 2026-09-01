@@ -102,6 +102,20 @@ python3 <skill-dir>/scripts/hardware_ir.py assess --phase hil \
 
 `init` 默认创建 schema v2；v1 仅用于兼容已有 H.264 IR。`BLOCKED` 表示资料已确认硬件/合同/资源或凭证策略不满足；`NEEDS_CONFIRMATION` 表示当前阶段仍有未知项或证据不足；`READY_TO_PORT` 表示可以生成并实现板级适配；`BUILD_VERIFIED` 表示精确 artifact 已通过源码、编译和 post-link 门禁；`HIL_VERIFIED` 还要求同一 SHA-256 的 L5/L6 运行证据。
 
+## 固件身份与烧录方式
+
+顶层 `CMakeLists.txt` 应在 `project()` 前设置明确的 `PROJECT_VER`。编译后
+核对应用 BIN 中的版本和完整 ELF SHA-256：
+
+```bash
+python3 <skill-dir>/scripts/firmware_identity.py build/<app>.bin \
+  --elf build/<app>.elf --expect-version <expected-version>
+```
+
+按 [firmware-delivery.md](references/firmware-delivery.md) 选择快速真机迭代或
+可移植证据包；模式转换时必须同步迁移 Hardware IR 与报告中的 artifact
+路径。普通开发烧录命令为 `idf.py -p <exact-port> flash monitor`。
+
 ## 当前边界
 
 ThingConnect 仓库提供 ESP32-S3 H5/AI 模板和生成器，但默认媒体适配器不包含特定开发板的摄像头、麦克风、选定视频路径、Wi-Fi 凭证方法和扬声器驱动。模板生成和编译成功只证明工程与协议骨架可用，不代表 Web 已经出图或 AI 音频已经通过实机验收。

@@ -2,6 +2,19 @@
 
 This project follows Semantic Versioning.
 
+## 0.8.1
+
+- Separate rapid `idf.py flash` iteration from portable evidence-bundle export,
+  so active development keeps the normal `build/` tree and does not require a
+  new multi-BIN archive for every device test.
+- Add deterministic ESP-IDF application-descriptor inspection for explicit
+  firmware versions, application-BIN SHA-256, and full ELF SHA-256 matching.
+- Add product-control rules that distinguish MCU buttons, boot straps, reset
+  lines and PMIC/power-latch keys across baseboard and battery-carrier variants,
+  and route button gestures through the runtime's intent queue.
+- Add trace-based diagnosis for repeated AI/H5 downlink audio across SDK
+  callbacks, bounded queues, playback, resampling, and codec/I2S writes.
+
 ## 0.8.0
 
 - Add an evidence-backed board identity and curated registry workflow with exact,

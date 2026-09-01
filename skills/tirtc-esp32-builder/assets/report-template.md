@@ -64,9 +64,12 @@
 
 ## Firmware and flash record
 
+- Delivery mode (`development flash` or `evidence bundle`): `{{DELIVERY_MODE}}`
+- Application project/version: `{{FIRMWARE_PROJECT_VERSION}}`
 - Serial port/chip: `{{SERIAL_TARGET}}`
 - Project-relative firmware artifacts: `{{FIRMWARE_ARTIFACTS}}`
-- Firmware SHA-256: `{{FIRMWARE_SHA256}}`
+- Application-BIN SHA-256: `{{FIRMWARE_BIN_SHA256}}`
+- Descriptor/full ELF SHA-256: `{{FIRMWARE_ELF_SHA256}}`
 - Flash command/result: `{{FLASH_RESULT}}`
 
 ## Artifact-bound runtime evidence

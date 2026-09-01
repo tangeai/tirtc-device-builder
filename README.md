@@ -549,7 +549,19 @@ python3 ~/.codex/skills/tirtc-esp32-builder/scripts/install_video_gate.py .
 idf.py build
 ```
 
-只安装实际请求能力的门禁。编译后把 BIN/ELF 的路径、大小和 SHA-256 写入 Hardware IR 的 `build_evidence.artifacts[]`，再运行 build 阶段评估。编译成功但语义门禁缺失或失败时只能记录 `COMPILE_PASS / CAPABILITY_BLOCKED`。
+只安装实际请求能力的门禁。编译后先核对固件内嵌版本、应用 BIN
+SHA-256 和完整 ELF SHA-256：
+
+```bash
+python3 ~/.codex/skills/tirtc-esp32-builder/scripts/firmware_identity.py \
+  build/<app>.bin --elf build/<app>.elf --expect-version <expected-version>
+```
+
+随后按
+[`firmware-delivery.md`](skills/tirtc-esp32-builder/references/firmware-delivery.md)
+选择快速真机迭代或可移植证据包；该文档也规定从 `build/` 记录迁移到
+`artifacts/` 时如何保持 Hardware IR 和报告一致。编译成功但语义门禁缺失
+或失败时只能记录 `COMPILE_PASS / CAPABILITY_BLOCKED`。
 
 生成器会把 TiRTC SDK 复制到工程的 `third_party/tirtc/`。此后工程不再依赖 `tirtc-server-example`，但换机编译仍需准备兼容的 ESP-IDF 5.5.x 工具链。
 
@@ -599,7 +611,10 @@ cd /absolute/path/my-esp32-device
 idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-使用 `Ctrl+]` 退出 ESP-IDF Monitor。多个串口同时存在时，需要通过 USB 拔插、设备标识或芯片探测确认目标，不能默认烧录第一个端口。
+普通开发烧录优先使用这一条命令，让 ESP-IDF 从当前构建目录解析
+bootloader、分区表和应用镜像；无需手工维护多条 `esptool.py` 地址参数。
+使用 `Ctrl+]` 退出 ESP-IDF Monitor。多个串口同时存在时，需要通过 USB
+拔插、设备标识或芯片探测确认目标，不能默认烧录第一个端口。
 
 ### Wi-Fi 凭证和设备绑定
 
@@ -911,8 +926,8 @@ metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地
 
 ```bash
 npm test
-git tag -a v0.8.0 -m "v0.8.0"
-git push origin v0.8.0
+git tag -a v0.8.1 -m "v0.8.1"
+git push origin v0.8.1
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

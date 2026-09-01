@@ -62,9 +62,37 @@ Disable Wi-Fi power saving for the realtime baseline unless the product contract
 
 Confirm SDK send return semantics and callback payload lifetimes from the selected SDK version. Keep SDK callbacks bounded and copy payloads before returning.
 
+## Repeated or duplicated downlink audio
+
+Do not label a build as a fix merely because it adds logs or makes the symptom
+less frequent. First produce a self-identifying reproduction build, then count
+the same frame across four boundaries: TiRTC receive callback, accepted queue
+item, playback dequeue, and codec/I2S write. Include mode and connection
+generation, stream/media type, payload length, bounded queue depth/drop counters,
+and an available transport sequence or timestamp. Sample payload hashes only as
+diagnostic evidence; do not blindly discard equal hashes because silence or
+legitimately repeated encoded frames may be identical.
+
+Carry one local trace ID from the accepted callback through queue and playback,
+and record write offset, requested bytes, returned bytes, and cumulative bytes.
+Multiple codec/I2S writes are valid when a frame is deliberately chunked or a
+partial write advances the offset; a local duplication exists only when the
+same byte/sample range is committed more than once or cumulative output exceeds
+the frame's decoded contract. Repeated callbacks with the same available
+transport identity point upstream or into SDK delivery. Unique downlink frames
+heard repeatedly require checking resampling, DMA/I2S replay and acoustic
+feedback separately. On stop/reconnect, reject stale generations and drain or
+invalidate queued audio. Verify the correction with repeated AI sessions, rapid
+stop/start, delayed callbacks and H5 recovery against the exact reproduction and
+candidate-fix firmware identities.
+
 ## Artifact discipline
 
-Record BIN/ELF SHA-256 for every build used in HIL. Runtime evidence applies only to the exact artifact. Diagnose one failing invariant, make the smallest correction, rerun that layer, and preserve the comparison in the report.
+Follow [firmware-delivery.md](firmware-delivery.md). Record the explicit firmware
+version, application-BIN SHA-256 and descriptor/full ELF SHA-256 for every build
+used in HIL. Runtime evidence applies only to the exact artifact. Diagnose one
+failing invariant, make the smallest correction, rerun that layer, and preserve
+the comparison in the report.
 
 Local intermediate snapshots may be ignored, but the Hardware IR, semantic
 contracts, `dependencies.lock`, custom partition input, and the artifact named

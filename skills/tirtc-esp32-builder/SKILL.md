@@ -98,18 +98,29 @@ H5/AI/call runtime behavior, read and install the applicable semantic contracts.
 Keep concrete board values in Hardware IR, contracts and adapter files rather
 than Skill defaults.
 
+When the product request includes a physical button, touch input, reset, power
+key, wake source or enclosure label, read
+[product-controls.md](references/product-controls.md). Treat the exact physical
+product as baseboard plus any carrier, PMIC and enclosure controls. Board input
+code emits bounded intents to the state-owning runtime; it does not own session
+lifecycle.
+
 ## 6. Build and assess
 
-Run focused tests, resolve managed components, validate the exact SDK
+Read [firmware-delivery.md](references/firmware-delivery.md) and select
+`development flash` or `evidence bundle` from the user's current goal. Run
+focused tests, resolve managed components, validate the exact SDK
 `manifest/build-contract.env`, install every applicable semantic gate, then run
 the ordinary ESP-IDF build. Requested call/VoIP features must be represented by
 the runtime/business contract and the unified arbiter implementation; an H5/AI-
 only starter cannot reach `BUILD_VERIFIED` for those features.
 
-Copy final BIN/ELF deliverables into project-relative `artifacts/`, record actual
-size and SHA-256 in Hardware IR, then run strict build assessment with `--project`
-and that exact hash. Compiler success with a missing feature gate is
-`COMPILE_PASS`, not product completion.
+Set an explicit firmware version, verify the application descriptor and full
+ELF identity with `firmware_identity.py`, and record the application-BIN hash
+with its exact label. Follow the selected delivery mode's artifact paths and
+retention rules, record actual size and SHA-256 in Hardware IR, then run strict
+build assessment with `--project` and that exact hash. Compiler success with a
+missing feature gate is `COMPILE_PASS`, not product completion.
 
 ## 7. Flash, verify, and learn
 
@@ -129,9 +140,9 @@ board; attach artifact evidence; add regression tests for generic invariants;
 then publish a new Skill/registry version. Never let an installed Skill mutate
 itself from conversation history.
 
-Remove machine-bound `build/` after the final assessment, retain verified
-project-relative artifacts, run `project_portability.py --export`, and return the
-project, Hardware IR, identity match, capability result, artifacts and report.
+Complete the selected mode's retention or export checks from
+`firmware-delivery.md`. Return the project, Hardware IR, identity match,
+capability result, exact artifacts, flash command when applicable, and report.
 
 ## Security boundary
 

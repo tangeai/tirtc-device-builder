@@ -206,8 +206,11 @@ def validate_skills(errors: list[str]) -> None:
             for relative in (
                 "knowledge/board-registry.json",
                 "scripts/board_registry.py",
+                "scripts/firmware_identity.py",
                 "assets/board-identity.example.json",
                 "references/board-knowledge.md",
+                "references/firmware-delivery.md",
+                "references/product-controls.md",
             ):
                 if not (skill_dir / relative).is_file():
                     error(errors, f"{skill_dir.relative_to(ROOT)} is missing {relative}")
