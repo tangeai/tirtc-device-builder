@@ -61,6 +61,9 @@ WIFI_METHOD_TYPES = {
     "development_config",
     "custom",
 }
+SOFTAP_SSID_PREFIX = "TiRTC-"
+SOFTAP_AUTH_MODE = "open"
+SOFTAP_IPV4_ADDRESS = "192.168.6.1"
 BINDING_METHOD_TYPES = {
     "verification_code",
     "factory_bound",
@@ -444,6 +447,9 @@ def validate_onboarding(
                 errors.append(
                     f"{prefix}.type must be one of " + ", ".join(sorted(WIFI_METHOD_TYPES))
                 )
+            if method_type == "softap":
+                for field in ("ssid_prefix", "auth_mode", "ipv4_address"):
+                    nullable_string(method.get(field), f"{prefix}.{field}", errors)
             nullable_bool(method.get("available"), f"{prefix}.available", errors)
             validate_verification(
                 method.get("verification"), f"{prefix}.verification", errors
@@ -926,6 +932,26 @@ def wifi_requirement(onboarding: dict[str, Any]) -> Requirement:
         return "NEEDS_CONFIRMATION", "selected Wi-Fi method availability is unknown", 0
     if available is False:
         return "BLOCKED", "selected Wi-Fi method is unavailable", 0
+    if method.get("type") == "softap":
+        softap_fields = (
+            ("ssid_prefix", SOFTAP_SSID_PREFIX, "SSID prefix"),
+            ("auth_mode", SOFTAP_AUTH_MODE, "authentication mode"),
+            ("ipv4_address", SOFTAP_IPV4_ADDRESS, "IPv4 address"),
+        )
+        for field, expected, label in softap_fields:
+            value = method.get(field)
+            if value is None:
+                return (
+                    "NEEDS_CONFIRMATION",
+                    f"SoftAP {label} is unknown; expected {expected!r}",
+                    0,
+                )
+            if value != expected:
+                return (
+                    "BLOCKED",
+                    f"SoftAP {label} must be {expected!r}, got {value!r}",
+                    0,
+                )
     verification = method.get("verification")
     level = VERIFICATION_LEVELS.get(verification, 0)
     if level < VERIFICATION_LEVELS["corroborated"]:

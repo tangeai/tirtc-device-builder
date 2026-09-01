@@ -30,7 +30,7 @@ Turn every discovered invariant that can regress into a focused test or post-lin
 
 Wi-Fi provisioning and ThingConnect binding are separate state machines.
 
-Select one evidenced Wi-Fi credential method from SoftAP, BLE, SmartConfig, secure factory/NVS provisioning, development configuration, or a documented custom path. SoftAP is not mandatory. A board without AP provisioning can reach `READY_TO_PORT` through another available method when credentials remain outside source control and a reprovisioning path is defined.
+Select one evidenced Wi-Fi credential method from SoftAP, BLE, SmartConfig, secure factory/NVS provisioning, development configuration, or a documented custom path. SoftAP is not mandatory. A board without AP provisioning can reach `READY_TO_PORT` through another available method when credentials remain outside source control and a reprovisioning path is defined. When SoftAP is selected, implement and record the fixed [SoftAP product contract](hardware-ir.md#softap-product-contract).
 
 Development configuration may inject credentials through an untracked sdkconfig, environment, or provisioning artifact. Treat committed plaintext credentials as `BLOCKED`. Never copy SSIDs/passwords into Hardware IR, reports, examples, or source.
 

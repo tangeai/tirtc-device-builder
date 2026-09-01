@@ -2,6 +2,14 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.1
+
+- Pin ESP32 Device Kit 1.1.2 with an open `TiRTC-` SoftAP and provisioning at
+  `http://192.168.6.1`.
+- Reject Device Kit packaging when implementation or documentation retains the
+  legacy SSID, password, or `192.168.4.1` provisioning contract.
+- Make the Hardware IR SoftAP defaults and validation match the device runtime.
+
 ## 0.9.0
 
 - Add native Skill-directory installation for Codex, Claude Code, OpenCode,

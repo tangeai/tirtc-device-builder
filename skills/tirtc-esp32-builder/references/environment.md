@@ -16,7 +16,7 @@ The automatic branch never runs `sudo` or modifies a persistent shell profile. W
 When `<setup-root>/env.sh` exists, use it only as an activation prefix for the current command:
 
 ```bash
-bash -lc '. "<setup-root>/env.sh" && python3 "<skill-dir>/scripts/doctor.py" --expected-idf 5.5 --expected-kit 1.1.1 --target esp32s3 --require-workspace'
+bash -lc '. "<setup-root>/env.sh" && python3 "<skill-dir>/scripts/doctor.py" --expected-idf 5.5 --expected-kit 1.1.2 --target esp32s3 --require-workspace'
 ```
 
 The helper contains paths, not device or network credentials. Read `<setup-root>/config.json` when exact managed paths are needed; the environment helper does not authorize unrelated downloads, shell-profile changes, flashing, or credential writes.
@@ -26,7 +26,7 @@ Run the doctor before generation, build, flash, or monitor:
 ```bash
 python3 <skill-dir>/scripts/doctor.py \
   --expected-idf 5.5 \
-  --expected-kit 1.1.1 \
+  --expected-kit 1.1.2 \
   --target esp32s3 \
   --require-workspace
 ```

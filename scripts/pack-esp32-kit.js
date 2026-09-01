@@ -289,6 +289,47 @@ function assertRequiredFiles(root) {
   }
 }
 
+function assertContains(content, fragment, label) {
+  if (!content.includes(fragment)) {
+    throw new Error(`SoftAP contract is missing ${label}: ${fragment}`);
+  }
+}
+
+function assertOmits(content, fragment, label) {
+  if (content.includes(fragment)) {
+    throw new Error(`SoftAP contract still contains ${label}: ${fragment}`);
+  }
+}
+
+function assertSoftApContract(root) {
+  const sourcePath = join(
+    root,
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+  );
+  const readmePath = join(root, "device-sim/templates/esp32-h5-ai/README.md");
+  if (!existsSync(sourcePath) || !existsSync(readmePath)) {
+    throw new Error("SoftAP contract sources are missing from the Device Kit");
+  }
+
+  const source = readFileSync(sourcePath, "utf8");
+  assertContains(source, '"TiRTC-%02X%02X"', "SSID prefix");
+  assertContains(source, "ap.ap.authmode = WIFI_AUTH_OPEN", "open authentication");
+  assertContains(source, "#define WIFI_SETUP_IP_A 192", "IPv4 first octet");
+  assertContains(source, "#define WIFI_SETUP_IP_B 168", "IPv4 second octet");
+  assertContains(source, "#define WIFI_SETUP_IP_C 6", "IPv4 third octet");
+  assertContains(source, "#define WIFI_SETUP_IP_D 1", "IPv4 fourth octet");
+  assertContains(source, '"http://192.168.6.1"', "provisioning URL");
+  assertOmits(source, "WIFI_SETUP_PASSWORD", "a SoftAP password");
+  assertOmits(source, "TiRTC-Setup-", "the legacy SSID prefix");
+  assertOmits(source, "192.168.4.1", "the legacy provisioning address");
+
+  const readme = readFileSync(readmePath, "utf8");
+  assertContains(readme, "TiRTC-XXXX", "documented SSID prefix");
+  assertContains(readme, "无需密码", "documented open authentication");
+  assertContains(readme, "http://192.168.6.1", "documented provisioning URL");
+  assertOmits(readme, "192.168.4.1", "the legacy documented address");
+}
+
 function createArchive(staging, kitName, temporary) {
   const tarPath = join(temporary, `${kitName}.tar`);
   const environment = { ...process.env, LC_ALL: "C" };
@@ -341,6 +382,7 @@ function build(options) {
     copyLicense(thingConnectRoot, join(kitRoot, "LICENSE"));
     writeFileSync(join(kitRoot, "NOTICE"), KIT_NOTICE, "utf8");
     assertRequiredFiles(kitRoot);
+    assertSoftApContract(kitRoot);
 
     const files = Object.fromEntries(
       listFiles(kitRoot).map((path) => [path, hashFile(join(kitRoot, path))]),

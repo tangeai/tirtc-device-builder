@@ -72,6 +72,9 @@ def ready_onboarding(ir: dict) -> None:
                 {
                     "id": "softap-main",
                     "type": "softap",
+                    "ssid_prefix": "TiRTC-",
+                    "auth_mode": "open",
+                    "ipv4_address": "192.168.6.1",
                     "available": True,
                     "verification": "corroborated",
                     "source_refs": ["board-materials"],
@@ -377,6 +380,35 @@ class HardwareIrV2Test(unittest.TestCase):
         self.assertEqual("READY_TO_PORT", assessment["project_gate"]["status"])
         self.assertEqual(
             "factory_nvs", assessment["selected_wifi_method"]["type"]
+        )
+
+    def test_softap_contract_is_required(self) -> None:
+        cases = {
+            "ssid_prefix": "Other-",
+            "auth_mode": "wpa2_psk",
+            "ipv4_address": "192.168.4.1",
+        }
+        for field, invalid_value in cases.items():
+            with self.subTest(field=field):
+                blocked = ready_v2()
+                method = blocked["onboarding"]["wifi_credentials"]["methods"][0]
+                method[field] = invalid_value
+                assessment = MODULE.assess_ir(blocked)
+                self.assertEqual("BLOCKED", assessment["project_gate"]["status"])
+                self.assertIn(
+                    "SoftAP", " ".join(assessment["project_gate"]["reasons"])
+                )
+
+    def test_missing_softap_contract_needs_confirmation(self) -> None:
+        incomplete = ready_v2()
+        method = incomplete["onboarding"]["wifi_credentials"]["methods"][0]
+        del method["ipv4_address"]
+        assessment = MODULE.assess_ir(incomplete)
+        self.assertEqual(
+            "NEEDS_CONFIRMATION", assessment["project_gate"]["status"]
+        )
+        self.assertIn(
+            "192.168.6.1", " ".join(assessment["project_gate"]["reasons"])
         )
 
     def test_credentials_committed_to_source_block_project(self) -> None:

@@ -61,6 +61,26 @@ assessment also requires the project audio semantic gate to prove enabled AEC.
 
 The selected Wi-Fi method must be available and corroborated, credentials must remain outside tracked source, and reprovisioning must be defined. A board without SoftAP is valid when another selected method meets those conditions.
 
+### SoftAP product contract
+
+When the selected method is SoftAP:
+
+- generate the SSID as `TiRTC-<device suffix>` so its exact, case-sensitive
+  prefix is `TiRTC-`; use a stable non-secret suffix and keep the complete SSID
+  within the ESP32 32-byte limit;
+- configure an open network (`WIFI_AUTH_OPEN`) with an empty AP password so a
+  user can connect directly;
+- assign the AP netif, gateway and provisioning server `192.168.6.1/24`, serve
+  the setup page at `http://192.168.6.1`, and lease clients from that subnet.
+  With ESP-IDF, stop DHCP before changing the AP netif IP information and
+  restart it afterward.
+
+Record these values on the selected SoftAP method as `ssid_prefix: "TiRTC-"`,
+`auth_mode: "open"`, and `ipv4_address: "192.168.6.1"`. The Hardware IR gate
+returns `NEEDS_CONFIRMATION` when one is missing and `BLOCKED` when one differs.
+Keep the provisioning endpoints available only while onboarding is active, and
+disable the AP or restart into STA mode after credentials are accepted.
+
 The selected video profile controls assessment. An unselected H.264 fallback cannot make an MJPEG target pass, and missing H.264 cannot block an evidenced MJPEG target.
 
 ## Artifact-bound HIL

@@ -1,9 +1,9 @@
 export const ESP32_KIT = Object.freeze({
-  archiveName: "tirtc-esp32s3-kit-1.1.1.tar.gz",
-  archiveRoot: "tirtc-esp32s3-kit-1.1.1",
-  releaseTag: "kit-esp32s3-v1.1.1",
-  sha256: "d9818b1caf73b039d46b7f973ad675ac750d259940db4ef22b35a76896a0cdf3",
-  sourceCommit: "35acd405ffb0ed0917fc0671033b844739fe93dd",
-  url: "https://github.com/tangeai/tirtc-device-builder/releases/download/kit-esp32s3-v1.1.1/tirtc-esp32s3-kit-1.1.1.tar.gz",
-  version: "1.1.1",
+  archiveName: "tirtc-esp32s3-kit-1.1.2.tar.gz",
+  archiveRoot: "tirtc-esp32s3-kit-1.1.2",
+  releaseTag: "kit-esp32s3-v1.1.2",
+  sha256: "9c6d36e28b2584013dc9b7d171c460f93f6e4962457c454ff1b477d069aad498",
+  sourceCommit: "9aaf47eb3e120ac146b72140e5357b36f4b131f5",
+  url: "https://github.com/tangeai/tirtc-device-builder/releases/download/kit-esp32s3-v1.1.2/tirtc-esp32s3-kit-1.1.2.tar.gz",
+  version: "1.1.2",
 });

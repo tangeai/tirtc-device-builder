@@ -33,6 +33,7 @@ function createSource(root) {
     "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
     "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
     "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
+    "device-sim/templates/esp32-h5-ai/README.md",
     "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
@@ -48,6 +49,23 @@ function createSource(root) {
   for (const file of files) {
     writeFixture(thingConnect, file);
   }
+  writeFixture(
+    thingConnect,
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+    `#define WIFI_SETUP_URL "http://192.168.6.1"
+#define WIFI_SETUP_IP_A 192
+#define WIFI_SETUP_IP_B 168
+#define WIFI_SETUP_IP_C 6
+#define WIFI_SETUP_IP_D 1
+const char *ssid_format = "TiRTC-%02X%02X";
+void configure(void) { ap.ap.authmode = WIFI_AUTH_OPEN; }
+`,
+  );
+  writeFixture(
+    thingConnect,
+    "device-sim/templates/esp32-h5-ai/README.md",
+    "设备启动 TiRTC-XXXX 开放 SoftAP，无需密码；打开 http://192.168.6.1 配网。\n",
+  );
   writeFixture(root, "LICENSE", "fixture license\n");
   return thingConnect;
 }
@@ -184,6 +202,40 @@ test("pack:esp32-kit rejects incomplete sources", () => {
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /required Kit source is missing/);
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("pack:esp32-kit rejects the legacy SoftAP contract", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-test-"));
+  try {
+    const source = createSource(join(temporary, "source"));
+    writeFixture(
+      source,
+      "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+      `#define WIFI_SETUP_URL "http://192.168.4.1"
+#define WIFI_SETUP_PASSWORD "tirtc1234"
+const char *ssid_format = "TiRTC-Setup-%02X%02X";
+`,
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        "--source",
+        source,
+        "--kit-version",
+        "1.0.0",
+        "--source-commit",
+        COMMIT,
+        "--output",
+        join(temporary, "dist"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /SoftAP contract/);
   } finally {
     rmSync(temporary, { force: true, recursive: true });
   }
