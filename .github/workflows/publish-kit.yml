@@ -55,6 +55,13 @@ jobs:
           cd dist
           sha256sum -c "${archive_name}.sha256"
 
+      - name: Verify reproduced checksum matches pinned metadata
+        run: |
+          archive_name="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.archiveName)")"
+          expected_sha256="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.sha256)")"
+          actual_sha256="$(sha256sum "dist/${archive_name}" | cut -d ' ' -f 1)"
+          test "${actual_sha256}" = "${expected_sha256}"
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

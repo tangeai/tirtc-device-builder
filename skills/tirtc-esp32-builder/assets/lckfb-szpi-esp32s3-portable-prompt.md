@@ -8,7 +8,7 @@
 
 ```bash
 export TIRTC_AGENT_CLIENT=codex
-npx --yes tirtc-device-builder@0.9.2 setup esp32 --install \
+npx --yes tirtc-device-builder@0.9.3 setup esp32 --install \
   --client "$TIRTC_AGENT_CLIENT" --force-skill
 ```
 
@@ -17,11 +17,11 @@ npx --yes tirtc-device-builder@0.9.2 setup esp32 --install \
 本轮第一步先只读运行：
 
 ```bash
-npx --yes tirtc-device-builder@0.9.2 --version
-npx --yes tirtc-device-builder@0.9.2 setup esp32 --client "$TIRTC_AGENT_CLIENT"
+npx --yes tirtc-device-builder@0.9.3 --version
+npx --yes tirtc-device-builder@0.9.3 setup esp32 --client "$TIRTC_AGENT_CLIENT"
 ```
 
-必须根据命令的实际输出和本机文件确认：npm 包为 0.9.2、已安装 Skill 的 `VERSION` 为 0.9.2、所选 Device Kit 的 `manifest.json` 中 `kit_version` 为 1.1.3，并且 Doctor 对 `--expected-kit 1.1.3` 输出 `OVERALL: PASS`。Plugin manifest 不属于这种 npm 安装方式的运行时前置条件，不得把不可访问的 Plugin 版本当作阻塞项。如果版本不一致、Skill 是在当前会话启动后才安装，或环境检查未通过，停止并报告前置条件不成立；不要在当前会话中替换 Skill 后继续生成工程。
+必须根据命令的实际输出和本机文件确认：npm 包为 0.9.3、已安装 Skill 的 `VERSION` 为 0.9.3、所选 Device Kit 的 `manifest.json` 中 `kit_version` 为 1.1.4，并且 Doctor 对 `--expected-kit 1.1.4` 输出 `OVERALL: PASS`。Plugin manifest 不属于这种 npm 安装方式的运行时前置条件，不得把不可访问的 Plugin 版本当作阻塞项。如果版本不一致、Skill 是在当前会话启动后才安装，或环境检查未通过，停止并报告前置条件不成立；不要在当前会话中替换 Skill 后继续生成工程。
 
 工作区与 clean-room 边界：
 - 将启动 Agent 客户端时的当前目录定义为 `WORKSPACE_ROOT`。
@@ -60,7 +60,7 @@ npx --yes tirtc-device-builder@0.9.2 setup esp32 --client "$TIRTC_AGENT_CLIENT"
 - AI 对讲必须实现全双工和 AEC；构建阶段必须证明同时采集播放、真实播放参考与 `echo_cancellation.enabled=true`，实机结果仍只能在 L2-L7 验证后声明。
 
 接入要求：
-- SoftAP 配网：热点名使用 `TiRTC-` 前缀、开放认证无需密码，AP 网关和配网页面为 `192.168.6.1` / `http://192.168.6.1`；目标 Wi-Fi 凭证保存 NVS。
+- SoftAP 配网：热点名使用 `TiRTC-` 前缀、开放认证无需密码，AP 网关和配网页面为 `192.168.6.1` / `http://192.168.6.1`；启用通配 DNS 和 HTTP 重定向进行 captive portal 自动发现，不把 DHCP Option 114 指向本地 HTML 页面；Hardware IR 记录 `captive_portal: true`；目标 Wi-Fi 凭证保存 NVS。
 - 验证码绑定，并复用已有绑定。
 - 分别实现 `wifi-clear` 和 `tirtc-clear`。
 - 平台发现本轮先使用 HTTP；HTTPS 留待独立验收。

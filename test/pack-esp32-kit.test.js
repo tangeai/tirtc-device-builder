@@ -13,7 +13,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { installEsp32KitArchive } from "../bin/install-esp32-kit.js";
+import { normalizeUstarBuffer } from "../scripts/lib/normalize-ustar.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = join(ROOT, "scripts", "pack-esp32-kit.js");
@@ -61,7 +63,6 @@ function createSource(root) {
 const char *ssid_format = "TiRTC-%02X%02X";
 void configure(void) { ap.ap.authmode = WIFI_AUTH_OPEN; }
 void captive(void) {
-  esp_netif_dhcps_option(ap, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, 0, 0);
   wifi_captive_dns_start(0);
   httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, redirect);
 }
@@ -116,6 +117,12 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
       .update(readFileSync(archive))
       .digest("hex");
     assert.match(readFileSync(checksumPath, "utf8"), new RegExp(`^${actual}  `));
+
+    const canonicalTar = gunzipSync(readFileSync(archive));
+    const tarVariant = Buffer.from(canonicalTar);
+    tarVariant.write("0000000\0", 329, 8, "ascii");
+    tarVariant.write("0000000\0", 337, 8, "ascii");
+    assert.deepEqual(normalizeUstarBuffer(tarVariant), canonicalTar);
 
     const secondOutput = join(temporary, "dist-second");
     const second = spawnSync(
@@ -286,4 +293,51 @@ test("pack:esp32-kit rejects a missing captive portal implementation", () => {
   } finally {
     rmSync(temporary, { force: true, recursive: true });
   }
+});
+
+test("pack:esp32-kit rejects DHCP option 114 pointing at the HTML portal", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-test-"));
+  try {
+    const source = createSource(join(temporary, "source"));
+    const sourcePath = join(
+      source,
+      "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+    );
+    writeFileSync(
+      sourcePath,
+      `${readFileSync(sourcePath, "utf8")}\nvoid invalid_capport(void) { ESP_NETIF_CAPTIVEPORTAL_URI; }\n`,
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        "--source",
+        source,
+        "--kit-version",
+        "1.0.0",
+        "--source-commit",
+        COMMIT,
+        "--output",
+        join(temporary, "dist"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /invalid DHCP option 114 HTML endpoint/);
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("publish workflow checks the archive against pinned metadata", () => {
+  const workflow = readFileSync(
+    join(ROOT, ".github/workflows/publish-kit.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /Verify reproduced checksum matches pinned metadata/);
+  assert.match(workflow, /ESP32_KIT\.sha256/);
+  assert.match(
+    workflow,
+    /test "\$\{actual_sha256\}" = "\$\{expected_sha256\}"/,
+  );
 });

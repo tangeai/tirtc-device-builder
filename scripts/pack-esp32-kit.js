@@ -18,6 +18,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeUstarArchive } from "./lib/normalize-ustar.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_REPOSITORY =
@@ -335,9 +336,13 @@ function assertSoftApContract(root) {
   assertContains(source, "#define WIFI_SETUP_IP_C 6", "IPv4 third octet");
   assertContains(source, "#define WIFI_SETUP_IP_D 1", "IPv4 fourth octet");
   assertContains(source, '"http://192.168.6.1"', "provisioning URL");
-  assertContains(source, "ESP_NETIF_CAPTIVEPORTAL_URI", "DHCP option 114");
   assertContains(source, "wifi_captive_dns_start", "wildcard DNS startup");
   assertContains(source, "httpd_register_err_handler", "HTTP fallback redirect");
+  assertOmits(
+    source,
+    "ESP_NETIF_CAPTIVEPORTAL_URI",
+    "an invalid DHCP option 114 HTML endpoint",
+  );
   assertOmits(source, "WIFI_SETUP_PASSWORD", "a SoftAP password");
   assertOmits(source, "TiRTC-Setup-", "the legacy SSID prefix");
   assertOmits(source, "192.168.4.1", "the legacy provisioning address");
@@ -378,6 +383,7 @@ function createArchive(staging, kitName, temporary) {
     ],
     { environment },
   );
+  normalizeUstarArchive(tarPath);
   run("gzip", ["-n", "-f", tarPath], { environment });
   return `${tarPath}.gz`;
 }

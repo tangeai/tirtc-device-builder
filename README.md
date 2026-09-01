@@ -12,7 +12,7 @@ H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立�
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
-- ESP32 Device Kit：[kit-esp32s3-v1.1.3](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.3)
+- ESP32 Device Kit：[kit-esp32s3-v1.1.4](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.4)
 
 文档导航：
 
@@ -283,7 +283,7 @@ board-materials/
 | ESP-IDF | 5.5.x |
 | 自动安装版本 | ESP-IDF v5.5.4 |
 | TiRTC SDK | `espressif-esp32s3/2.3.0` |
-| ESP32 Device Kit | 1.1.3 |
+| ESP32 Device Kit | 1.1.4 |
 | Node.js | 18 或更高版本 |
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
@@ -392,7 +392,7 @@ Cline 当前还需要在 `Settings → Features → Enable Skills` 中启用实�
 |---|---|
 | Agent Skill | 上表中所选目录下的 `tirtc-esp32-builder` |
 | 托管根目录 | `~/.tirtc-device-builder` |
-| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.3` |
+| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.4` |
 | ESP-IDF | `~/.tirtc-device-builder/esp-idf-v5.5.4` |
 | Espressif 工具 | `~/.tirtc-device-builder/espressif` |
 | 安装记录 | `~/.tirtc-device-builder/config.json` |
@@ -437,7 +437,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.3.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.4.tar.gz
 ```
 
 安装器仍会核对固定的 SHA-256、目录结构、清单和每个资源文件，不接受未经验证的同名压缩包。
@@ -652,7 +652,7 @@ bootloader、分区表和应用镜像；无需手工维护多条 `esptool.py` �
 
 ### Wi-Fi 凭证和设备绑定
 
-SoftAP 是可选方案，不是接入前提。Hardware IR 要根据 BSP 的实际能力和产品要求，选择 SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。若选择 SoftAP，热点名必须以 `TiRTC-` 开头、使用开放认证（无需密码），AP 网关和配网页面地址固定为 `192.168.6.1`（`http://192.168.6.1`），并通过 DHCP Option 114、通配 DNS 和 HTTP 回退启用 captive portal 自动发现。系统没有自动弹窗时仍可手动打开该 HTTP 地址；HTTPS 不能透明重定向。这些值要写入 Hardware IR 并通过门禁；目标 WLAN 的 SSID 和密码仍不得写死在源码中。
+SoftAP 是可选方案，不是接入前提。Hardware IR 要根据 BSP 的实际能力和产品要求，选择 SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。若选择 SoftAP，热点名必须以 `TiRTC-` 开头、使用开放认证（无需密码），AP 网关和配网页面地址固定为 `192.168.6.1`（`http://192.168.6.1`），并通过通配 DNS 和 HTTP 回退启用 captive portal 自动发现。DHCP Option 114 只用于 RFC 8908 HTTPS/JSON API，不能指向本地 HTML 页面。系统没有自动弹窗时仍可手动打开该 HTTP 地址；HTTPS 不能透明重定向。这些值要写入 Hardware IR 并通过门禁；目标 WLAN 的 SSID 和密码仍不得写死在源码中。
 
 无论选择哪种方法，都要有当前 PCB/BSP 的支持证据，凭证不能进入 Git、源码或报告，并且要保留清除或重配入口。没有 SoftAP、但支持工厂 NVS 注入的设备同样可以接入。只要工程提交了明文密码，Hardware IR v2 门禁就会判为 `BLOCKED`。
 
@@ -820,7 +820,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.3.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.4.tar.gz
 ```
 
 安装器会校验 SHA-256 和内部文件清单。如果校验不一致，请重新获取官方 Release 附件，不要跳过校验。
@@ -932,25 +932,25 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 ```bash
 npm run pack:esp32-kit -- \
   --source /absolute/path/tirtc-server-example/thing-connect \
-  --kit-version 1.1.3
+  --kit-version 1.1.4
 ```
 
 输出位于 `dist/`：
 
 ```text
-tirtc-esp32s3-kit-1.1.3.tar.gz
-tirtc-esp32s3-kit-1.1.3.tar.gz.sha256
+tirtc-esp32s3-kit-1.1.4.tar.gz
+tirtc-esp32s3-kit-1.1.4.tar.gz.sha256
 ```
 
 校验后推送独立的 `kit-esp32s3-v<version>` 标签。`publish-kit.yml` 会从 metadata 固定的上游 commit 重建压缩包、核对 SHA-256，并使用 GitHub Actions token 创建 Release：
 
 ```bash
 cd dist
-sha256sum -c tirtc-esp32s3-kit-1.1.3.tar.gz.sha256
+sha256sum -c tirtc-esp32s3-kit-1.1.4.tar.gz.sha256
 cd ..
 
-git tag -a kit-esp32s3-v1.1.3 -m "TiRTC ESP32-S3 Device Kit 1.1.3"
-git push origin kit-esp32s3-v1.1.3
+git tag -a kit-esp32s3-v1.1.4 -m "TiRTC ESP32-S3 Device Kit 1.1.4"
+git push origin kit-esp32s3-v1.1.4
 ```
 
 metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地可复现打包结果一致；工作流不会从浮动的 `main` 取发布内容。
@@ -961,8 +961,8 @@ metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地
 
 ```bash
 npm test
-git tag -a v0.9.2 -m "v0.9.2"
-git push origin v0.9.2
+git tag -a v0.9.3 -m "v0.9.3"
+git push origin v0.9.3
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

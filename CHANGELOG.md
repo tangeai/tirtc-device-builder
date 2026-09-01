@@ -2,6 +2,17 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.3
+
+- Pin ESP32 Device Kit 1.1.4 and use wildcard DNS plus HTTP probe redirects for
+  the local captive portal without misadvertising the HTML page as a DHCP
+  option 114 CAPPORT API.
+- Canonicalize ustar headers across GNU tar versions and require the release
+  workflow to match the rebuilt archive against the checksum pinned in the
+  release tag.
+- Keep every SoftAP prompt aligned with the `captive_portal: true` Hardware IR
+  contract, and include the reviewed knowledge-only ESP32-S3 board identities.
+
 ## 0.9.2
 
 - Pin ESP32 Device Kit 1.1.3 with captive portal discovery through DHCP option
