@@ -1,4 +1,7 @@
 {
   "schema_version": 1,
-  "boards": []
+  "boards": [
+    {"package_id":"lckfb_szpi_esp32s3_v1_0_1","status":"knowledge_only","identity":{"vendor":"深圳嘉立创科技集团股份有限公司（立创开发板）","model":"立创·实战派 ESP32-S3 开发板","aliases":["LCKFB SZPI ESP32-S3"],"hardware_revision":"V1.0.1","target":"esp32s3","module":"ESP32-S3 module","flash_mb":16,"psram_mb":8,"components":[{"kind":"camera","model":"GC2145"},{"kind":"aec_reference","model":"ES7210 MIC3 hardware reference"}],"probes":[]},"compatibility":{"idf":"5.5.4","tirtc_sdk":"2.3.0"},"artifacts":{},"lessons":[]},
+    {"package_id":"alientek_atk_dnesp32s3_v1","status":"knowledge_only","identity":{"vendor":"正点原子 (ALIENTEK)","model":"ATK-DNESP32S3","aliases":[],"hardware_revision":"V1.0","target":"esp32s3","module":"ATK-MWS3S","flash_mb":16,"psram_mb":8,"components":[{"kind":"camera","model":"OV5640 PID 0x5640"},{"kind":"audio_codec","model":"ES8388"}],"probes":[]},"compatibility":{"idf":"5.5.4","tirtc_sdk":"2.3.0"},"artifacts":{},"lessons":[]}
+  ]
 }
