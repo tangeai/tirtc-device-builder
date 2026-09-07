@@ -43,6 +43,12 @@ A probable match supplies hypotheses; a component match supplies only component
 lessons. Any identity conflict creates a new variant and keeps concrete GPIO,
 clock, DMA and task values unresolved.
 
+Read a match's `knowledge_refs` before scanning reference repositories. These
+are source maps and evidence, not permission to install a candidate adapter.
+For an existing project's media, memory or scheduling bug, read
+[runtime-resource-review.md](references/runtime-resource-review.md); preserve
+the user's business baseline separately from the hardware reference.
+
 ## 3. Prove the business flows before board porting
 
 When device-call or WeChat VoIP is requested, first build and run the pinned

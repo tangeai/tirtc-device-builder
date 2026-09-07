@@ -2,6 +2,16 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.4
+
+- Add a knowledge-only Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5 package with
+  pinned source maps, media/resource lessons and explicit hardware/HIL limits.
+- Expose validated knowledge references for model candidates without granting
+  adapter reuse; allow unknown PCB revisions only in knowledge-only packages.
+- Add focused media/resource diagnosis guidance covering directional stream
+  contracts, WithCaps task cleanup, reserved codec ownership and UI cadence.
+- Test candidate discovery, unknown revisions and reference path boundaries.
+
 ## 0.9.3
 
 - Pin ESP32 Device Kit 1.1.4 and use wildcard DNS plus HTTP probe redirects for

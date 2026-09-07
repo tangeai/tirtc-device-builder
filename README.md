@@ -961,8 +961,8 @@ metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地
 
 ```bash
 npm test
-git tag -a v0.9.3 -m "v0.9.3"
-git push origin v0.9.3
+git tag -a v0.9.4 -m "v0.9.4"
+git push origin v0.9.4
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

@@ -95,6 +95,50 @@ def identity(
 
 
 class BoardRegistryTests(unittest.TestCase):
+    def test_packaged_waveshare_is_discoverable_but_not_reusable(self) -> None:
+        path = Path(__file__).resolve().parent.parent / "knowledge/board-registry.json"
+        registry = json.loads(path.read_text())
+        self.assertEqual([], validate_registry(registry, path))
+        query = identity(model="ESP32-P4-WIFI6-Touch-LCD-3.5", revision=None, camera_pid=None)
+        query["declared"]["vendor"] = "Waveshare"
+        query["observed"] = {"target": "esp32p4", "flash_mb": 16, "psram_mb": 32}
+        result = match_registry(registry, query)
+        self.assertEqual("probable", result["result"])
+        self.assertFalse(result["safe_registered_reuse"])
+        match = result["matches"][0]
+        self.assertTrue(match["knowledge_refs"])
+        self.assertEqual({}, match["artifacts"])
+        self.assertEqual([], match["applicable_lessons"])
+        query["declared"]["hardware_revision"] = "V1.0"
+        self.assertEqual("probable", match_registry(registry, query)["result"])
+        query["observed"]["psram_mb"] = 8
+        self.assertFalse(match_registry(registry, query)["safe_registered_reuse"])
+
+    def test_unknown_revision_is_only_valid_for_knowledge(self) -> None:
+        item = board()
+        item["identity"]["hardware_revision"] = None
+        path = Path("/tmp/registry.json")
+        self.assertEqual([], validate_registry({"schema_version": 1, "boards": [item]}, path))
+        item["status"] = "adapter_verified"
+        errors = validate_registry({"schema_version": 1, "boards": [item]}, path)
+        self.assertTrue(any("hardware_revision" in error for error in errors))
+
+    def test_knowledge_reference_cannot_escape_or_be_missing(self) -> None:
+        item = board()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            for ref in ("../outside.md", "/tmp/outside.md", "missing.md"):
+                item["knowledge_refs"] = [ref]
+                errors = validate_registry({"schema_version": 1, "boards": [item]}, path)
+                self.assertTrue(any("knowledge_refs" in error for error in errors))
+
+    def test_component_match_does_not_inherit_board_source_map(self) -> None:
+        item = board()
+        item["knowledge_refs"] = ["board-only.md"]
+        result = match_registry({"schema_version": 1, "boards": [item]}, identity(model="Other"))
+        self.assertEqual("component", result["result"])
+        self.assertEqual([], result["matches"][0]["knowledge_refs"])
+
     def test_empty_packaged_registry_is_valid(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "board-registry.json"

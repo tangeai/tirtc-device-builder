@@ -51,6 +51,13 @@ Registry package status controls reuse:
 
 An older HIL result is provenance, not proof for a newly built artifact.
 
+Knowledge-only packages may record an unknown PCB revision as `null`; verified
+packages still require an explicit revision. `match` returns registry-relative
+`knowledge_refs` for exact/model candidates, including knowledge-only packages.
+Read that source map first and inspect only relevant source deltas. A probable
+match provides investigation leads, not validated pins or an installable adapter.
+The Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5 package follows this boundary.
+
 ## Learning loop
 
 After the final assessment, create a project-local candidate:

@@ -95,12 +95,16 @@ def validate_probe(item: Any, path: str, errors: list[str]) -> None:
         errors.append(f"{path}.required_for_exact must be true or false")
 
 
-def validate_identity(identity: Any, path: str, errors: list[str]) -> None:
+def validate_identity(identity: Any, path: str, errors: list[str], *, allow_unknown_revision: bool = False) -> None:
     if not isinstance(identity, dict):
         errors.append(f"{path} must be an object")
         return
-    for field in ("vendor", "model", "hardware_revision", "target"):
+    for field in ("vendor", "model", "target"):
         nonempty(identity.get(field), f"{path}.{field}", errors)
+    if allow_unknown_revision:
+        nullable_nonempty(identity.get("hardware_revision"), f"{path}.hardware_revision", errors)
+    else:
+        nonempty(identity.get("hardware_revision"), f"{path}.hardware_revision", errors)
     aliases = string_array(identity.get("aliases", []), f"{path}.aliases", errors)
     names = [identity.get("model"), *aliases]
     normalized_names = [normalized(value) for value in names if normalized(value)]
@@ -244,7 +248,15 @@ def validate_registry(data: dict[str, Any], registry_path: Path) -> list[str]:
             errors.append(
                 f"{prefix}.status must be one of {', '.join(sorted(PACKAGE_STATUSES))}"
             )
-        validate_identity(board.get("identity"), f"{prefix}.identity", errors)
+        validate_identity(board.get("identity"), f"{prefix}.identity", errors,
+                          allow_unknown_revision=status == "knowledge_only")
+        for ref_index, value in enumerate(string_array(
+            board.get("knowledge_refs", []), f"{prefix}.knowledge_refs", errors
+        )):
+            resolved = safe_registry_path(registry_path, value,
+                f"{prefix}.knowledge_refs[{ref_index}]", errors)
+            if resolved is not None and not resolved.is_file():
+                errors.append(f"{prefix}.knowledge_refs[{ref_index}] does not exist")
         compatibility = board.get("compatibility")
         if not isinstance(compatibility, dict):
             errors.append(f"{prefix}.compatibility must be an object")
@@ -453,6 +465,10 @@ def match_board(board: dict[str, Any], query: dict[str, Any]) -> dict[str, Any] 
             {"kind": kind, "model": model} for kind, model in shared_components
         ],
         "applicable_lessons": applicable_lessons,
+        # A model candidate can read its evidence without acquiring GPIO/adapter
+        # authority. Component-only matches must not inherit board-specific docs.
+        "knowledge_refs": board.get("knowledge_refs", [])
+            if classification in {"exact", "probable"} else [],
         "artifacts": board.get("artifacts", {}) if reuse == "registered_board" else {},
     }
 
