@@ -2,6 +2,15 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.5
+
+- Add focused video-orientation and WeChat UI-profile guidance distinguishing
+  encoded pixels, display size, rotation conventions and endpoint verification.
+- Package the bounded XiaoTai serial capture/export helper with offline tests
+  for ANSI queries, evidence integrity and retained/empty capture recovery.
+- Pin Waveshare product knowledge to a95f368 and document the watchpoint-proven
+  LVGL callback-count overwrite; preserve pending HIL and non-default UI angles.
+
 ## 0.9.4
 
 - Add a knowledge-only Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5 package with

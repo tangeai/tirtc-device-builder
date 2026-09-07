@@ -48,6 +48,9 @@ are source maps and evidence, not permission to install a candidate adapter.
 For an existing project's media, memory or scheduling bug, read
 [runtime-resource-review.md](references/runtime-resource-review.md); preserve
 the user's business baseline separately from the hardware reference.
+For video orientation, unexpected cropping, or WeChat display-profile changes,
+read [video-orientation.md](references/video-orientation.md) before changing
+pixel transforms or UI angles.
 
 ## 3. Prove the business flows before board porting
 

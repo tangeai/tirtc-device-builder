@@ -68,6 +68,10 @@ authorized contact list, route WeChat MQTT events, and use `POST
 selects an authorized contact; it is not a direct SDK API. Mini-program
 authorization and plugin behavior are separate platform acceptance evidence.
 
+For video profile fields and orientation, use
+[video-orientation.md](video-orientation.md). Screen dimensions, encoded-frame
+aspect ratio and mini-program display transforms describe different boundaries.
+
 ## Simulator before hardware
 
 For the four-feature portfolio, use the pinned Linux C reference implementation

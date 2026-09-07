@@ -9,7 +9,7 @@ authorize pin reuse. No credentials, raw call logs or user media are retained.
 
 | Baseline | Pinned source | Locate next |
 | --- | --- | --- |
-| Product business | xiaotai, baseline `8d67f0fe1b7385485e9d3de57065be53d10639ed` plus uncommitted P4 port | `lckfb-szpi-esp32s3-tirtc/components/starter_runtime/src/starter_runtime.c`, shared `starter_product`, `starter_tirtc` |
+| Product business | xiaotai `a95f368a037eb3ebe88d8564e1cb2f85e369f525` | `lckfb-szpi-esp32s3-tirtc/components/starter_runtime/src/starter_runtime.c`, shared `starter_product`, `starter_tirtc` |
 | Hardware/media | tirtc-device-example `cad4cbe58c3ff451906322930ceede19e6bf6a07`, app 1.5.3 | `complete-applications/esp32-p4/device-monitor/main/` |
 | Vendor | waveshareteam/ESP32-P4-WIFI6-Touch-LCD-3.5 `870588e62daaf723f3c52f0060d8dc053665ed30` | `examples/esp-idf/06_I2SCodec`, `docs/revisions.md`, schematic |
 | Cross-check | xiaozhi-esp32 `1ce658bcb9ce9aac69d3f87af9894a715b7175f6` | `main/boards/waveshare/esp32-p4-wifi6-touch-lcd-3.5/` |
@@ -59,7 +59,7 @@ is in `waveshare-esp32p4-xiaotai/PORT_STATUS.md` and `BUILD_IDENTITY.md`.
 | UI slow / video not smooth | Product UI tick100ms limits presentation near10fps; renderer input24x256KiB plus output20x480x320x2 dominate pools. Retained pools are intentional, not proven optimal for this product. | `call_video_renderer_config.h`, `p4_video_ui_tick`; measure before tuning |
 
 Product-specific media: device CALL H264 both directions; WeChat VOIP H264 up /
-MJPEG down, profile video enabled with 640x480, 8k mono A-law. Preserve explicit
+MJPEG down, profile video enabled with actual screen 480x320, 8k mono A-law. Preserve explicit
 voice calls. Camera privacy disables local capture/send while keeping remote
 decode/audio; microphone is independent. Profile declaration is not proof of
 actual packets or display. P4 H264 encode is hardware; downstream H264 here is
@@ -78,7 +78,69 @@ These identify historical local artifacts, not bundled binaries or a reproducibl
 release. User reports video visible after the stream-filter correction, without
 a complete artifact-bound capture. Startup logs prove one successful media
 start, not long-run stability. Earlier HMAC signing -> invalid LVGL event crash
-is unresolved; no claim it was fixed by task cleanup. AEC/double-talk, weak
+was subsequently traced to an LVGL overwrite, as detailed below; task cleanup
+was a separate fix. AEC/double-talk, weak
 network, repeated calls, PMIC controls and full product parity remain pending.
 Promote only after exact identity, portable adapter/IR/contracts and per-flow
 artifact-bound acceptance are retained.
+
+## Later findings at the committed product baseline
+
+### LVGL callback counter overwrites an unrelated allocator hook
+
+The diagnostic `diag.9` hardware watchpoint caught `lv_obj_add_event_cb` writing
+the mbedTLS calloc function pointer while `render_page` registered the screen
+event again. `lv_obj_clean(screen)` removed children, not screen callbacks.
+The selected LVGL descriptor count was six bits: registration 64 wrapped it,
+zero-sized realloc returned the allocator's sentinel, and descriptor index -1
+wrote 12 bytes before that sentinel. An ensuing HMAC allocation jumped into
+`on_screen_event(e=1)`. The apparent crypto/LVGL call stack was a consequence,
+not an allocator ABI diagnosis or proof of stack exhaustion.
+
+Correction: register once when the persistent screen is initialized, not on
+every page rebuild; remove temporary watchpoints after capturing the writer.
+`tools/test_screen_event_lifetime.py` in the S3 project runs 512 actual setup
+paths against the relevant LVGL counter logic. Source/build regression passed;
+post-fix sustained HIL is not established by that test. Watchpoint addresses
+belonged to that ELF and must never become hardcoded protection logic.
+
+### Orientation, aspect ratio and profile experiments
+
+Read [video-orientation.md](../../references/video-orientation.md) for the
+general procedure and protocol fields. The capture.13 pre-SDK PNG showed the
+upright test card clockwise90; thus the device's encoded pixels were already
+sideways, not merely H5 CSS. The original H264 was not retained at inspection,
+so 1280x960 is corroborated by PNG/capture metadata, not a fresh SPS inspection.
+
+The upright.14 / voipdir.15 implementation captures native1280x960 and uses
+PPA CCW90 before H264 encode, producing960x1280@15 / target2Mbps without crop
+or spatial scale. It adds about1,843,200 bytes of rotation-output PSRAM and one
+PPA transaction. The source geometry and submission tests cover exchanged axes,
+zero crop offsets, 1:1 scale and rotation-aware resource matching. CALL's
+decoder-limited profile remains separate; these values are not maximum ratings.
+
+The user reported H5 orientation correct and P4's MJPEG CW90 display correct
+with voipdir.15, but mini-program rendering still wrong. These are user-reported
+per-direction observations, not a complete artifact-bound acceptance bundle.
+voipui.16 added UI fields with rotation0 / aspect0.75 / mirrorsfalse / contain.
+The subsequent request selected **additional UI rotation270** in voipui.17;
+that latest setting compiled but has **no confirming post-change HIL**. Do not
+promote270 into the board registry's default or claim it fixes every endpoint.
+
+- Latest compiled BIN SHA256: `8de6f919acd120fe283db17ffd653d347a5850df715e1f3879e7910b3b3df29c`
+- Latest compiled ELF SHA256: `2aecb8fb9e81347ef9aed76371c5f0404364b687f393df8fb4ae2099edfddc1c`
+- Source: `waveshare-esp32p4-xiaotai/main/media/{camera_pipeline,video_yuv420_scaler}.c`,
+  `main/services/call_video_renderer.c`; shared `request_voip_profile`.
+- Tests: P4 `tools/test_full_frame_uplink.py`, `test_uplink_rotation.py`,
+  `test_voip_profile.py`. Local SDK PPA enums are CCW, UI angles CW.
+
+### Reusable capture tool boundary
+
+The packaged `scripts/capture_uplink.py` is derived from the committed P4
+`tools/capture_uplink.py`. Its device counterpart is
+`components/p4_hardware/p4_video_capture.c` plus the pre-SDK hook in `p4_video.c`.
+Device firmware is not shipped by this knowledge-only package. Read product
+`VIDEO_CAPTURE.md` and confirm compatible commands before running the helper.
+The helper's actual dump parsing, fragmented ANSI query handling, stopped/empty
+recovery and disconnect classification have packaged host regressions. They do
+not establish unattended operation on an untested USB/terminal combination.

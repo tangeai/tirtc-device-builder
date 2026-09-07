@@ -29,6 +29,15 @@ specific, not generic magic constants.
 
 ## Resource lifecycle
 
+- A callback reached from an unrelated allocator/crypto call can be the victim
+  of an earlier overwrite. Validate the exact ELF, inspect the indirect-call
+  target and use a narrowly scoped watchpoint to catch the writer. In LVGL,
+  persistent screen callbacks belong to screen creation, not every child-page
+  rebuild: cleaning children does not remove callbacks on their parent. Check
+  the actual version's descriptor counter width. See the Waveshare knowledge
+  package for the captured six-bit overflow case; numeric addresses are not
+  portable fixes.
+
 - Inventory task creation and deletion pairs. ESP-IDF `xTaskCreate*WithCaps`
   requires `vTaskDeleteWithCaps`; ordinary deletion retains its statically
   registered stack/TCB. Confirm the installed IDF implementation. Self-deletion
