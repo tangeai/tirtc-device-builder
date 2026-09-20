@@ -58,7 +58,7 @@ function createDeviceKit(root, version) {
       "device-sim",
       "sdk",
       "espressif-esp32s3",
-      "2.3.0",
+      "2.5.0",
       "include",
       "tirtc",
       "tiRTC.h",
@@ -67,7 +67,7 @@ function createDeviceKit(root, version) {
       "device-sim",
       "sdk",
       "espressif-esp32s3",
-      "2.3.0",
+      "2.5.0",
       "lib",
       "libTiRTC.a",
     ),
@@ -75,7 +75,7 @@ function createDeviceKit(root, version) {
       "device-sim",
       "sdk",
       "espressif-esp32s3",
-      "2.3.0",
+      "2.5.0",
       "manifest",
       "build-contract.env",
     ),
@@ -87,7 +87,7 @@ function createDeviceKit(root, version) {
   }
   writeFileSync(
     join(root, "manifest.json"),
-    JSON.stringify({ kit_version: version }) + "\n",
+    JSON.stringify({ kit_version: version, tirtc_sdk_version: "2.5.0" }) + "\n",
     "utf8",
   );
 }
@@ -217,13 +217,13 @@ try {
 
   const managedRoot = join(temporary, "managed");
   const oldKit = join(managedRoot, "kits", "esp32s3", "1.0.0");
-  const expectedKit = join(managedRoot, "kits", "esp32s3", "1.1.4");
+  const expectedKit = join(managedRoot, "kits", "esp32s3", "1.1.5");
   createDeviceKit(oldKit, "1.0.0");
   writeFileSync(
     join(managedRoot, "config.json"),
     JSON.stringify({
       device_kit_root: oldKit,
-      device_kit_version: "1.1.4",
+      device_kit_version: "1.1.5",
     }),
     "utf8",
   );

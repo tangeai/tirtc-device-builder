@@ -50,6 +50,17 @@ jobs:
             exit "${view_status}"
           fi
 
+      - name: Verify pinned Device Kit release is downloadable
+        if: steps.registry.outputs.exists != 'true'
+        run: |
+          kit_url="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.url)")"
+          expected_sha256="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.sha256)")"
+          kit_archive="$(mktemp)"
+          trap 'rm -f "${kit_archive}"' EXIT
+          curl --fail --location --silent --show-error "${kit_url}" --output "${kit_archive}"
+          actual_sha256="$(sha256sum "${kit_archive}" | cut -d ' ' -f 1)"
+          test "${actual_sha256}" = "${expected_sha256}"
+
       - name: Publish with npm trusted publishing
         if: steps.registry.outputs.exists != 'true'
         run: npm publish

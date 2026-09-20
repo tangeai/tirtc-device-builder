@@ -74,7 +74,7 @@ printf '%s\n' "$TIRTC_THING_CONNECT_ROOT"
 python3 <skill-dir>/scripts/doctor.py \
   --expected-idf 5.5 \
   --target esp32s3 \
-  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.1.4 \
+  --thing-connect-root ~/.tirtc-device-builder/kits/esp32s3/1.1.5 \
   --require-workspace
 ```
 
@@ -119,4 +119,4 @@ python3 <skill-dir>/scripts/firmware_identity.py build/<app>.bin \
 
 ## 当前边界
 
-ThingConnect 仓库提供 ESP32-S3 H5/AI 模板和生成器，但默认媒体适配器不包含特定开发板的摄像头、麦克风、选定视频路径、Wi-Fi 凭证方法和扬声器驱动。模板生成和编译成功只证明工程与协议骨架可用，不代表 Web 已经出图或 AI 音频已经通过实机验收。
+Device Kit 提供 ESP32-S3 H5/AI 模板和生成器，但默认媒体适配器不包含特定开发板的摄像头、麦克风、选定视频路径和扬声器驱动。模板生成和编译成功只证明工程与协议骨架可用，不代表 Web 已经出图或 AI 音频已经通过实机验收。

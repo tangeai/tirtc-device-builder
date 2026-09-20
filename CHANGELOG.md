@@ -2,6 +2,15 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.6
+
+- Pin ESP32-S3 Device Kit 1.1.5 with TiRTC C SDK 2.5.0 and verify the
+  GitHub release archive checksum before npm publication.
+- Build the Kit from the builder-owned ESP32 source and validate the SDK,
+  installer, project generator, and standalone reference firmware.
+- Keep board-specific media adapters and hardware evidence separate from the
+  reusable Skill; hardware verification remains board-specific.
+
 ## 0.9.5
 
 - Add focused video-orientation and WeChat UI-profile guidance distinguishing

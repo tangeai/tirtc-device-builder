@@ -12,7 +12,7 @@ H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立�
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
-- ESP32 Device Kit：[kit-esp32s3-v1.1.4](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.4)
+- ESP32 Device Kit：[kit-esp32s3-v1.1.5](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.5)
 
 文档导航：
 
@@ -283,14 +283,14 @@ board-materials/
 | ESP-IDF | 5.5.x |
 | 自动安装版本 | ESP-IDF v5.5.4 |
 | 本仓库源码与本地打包使用的 TiRTC SDK | `espressif-esp32s3/2.5.0` |
-| 当前公开 ESP32 Device Kit | 1.1.4（内含 TiRTC SDK 2.3.0） |
+| ESP32 Device Kit | 1.1.5（内含 TiRTC SDK 2.5.0） |
 | Node.js | 18 或更高版本 |
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
 
 当前托管自动生成器只提供 ESP32-S3 模板。ESP32-P4 可由 Skill 在已有、证据完整的 P4 BSP/工程上移植，但必须使用 `espressif-esp32p4` SDK、匹配的构建合同和明确的 ESP-Hosted 或以太网方案。Flash 或 PSRAM 容量变化时，需要重新评估 `sdkconfig.defaults`、分区表、DMA 和媒体缓存预算。
 
-从本仓库 `kit-src/` 直接生成或打包时使用 TiRTC 2.5.0；`setup esp32` 安装固定的公开 Kit 版本，其 SDK 版本以该 Kit 的 `manifest.json` 为准。
+从本仓库 `kit-src/` 直接生成或打包时使用 TiRTC 2.5.0；`setup esp32` 安装固定的 Kit 版本，其 SDK 版本以该 Kit 的 `manifest.json` 为准。
 
 ### 本机软件
 
@@ -394,7 +394,7 @@ Cline 当前还需要在 `Settings → Features → Enable Skills` 中启用实�
 |---|---|
 | Agent Skill | 上表中所选目录下的 `tirtc-esp32-builder` |
 | 托管根目录 | `~/.tirtc-device-builder` |
-| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.4` |
+| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.5` |
 | ESP-IDF | `~/.tirtc-device-builder/esp-idf-v5.5.4` |
 | Espressif 工具 | `~/.tirtc-device-builder/espressif` |
 | 安装记录 | `~/.tirtc-device-builder/config.json` |
@@ -439,7 +439,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.4.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.5.tar.gz
 ```
 
 安装器仍会核对固定的 SHA-256、目录结构、清单和每个资源文件，不接受未经验证的同名压缩包。
@@ -822,7 +822,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.4.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.5.tar.gz
 ```
 
 安装器会校验 SHA-256 和内部文件清单。如果校验不一致，请重新获取官方 Release 附件，不要跳过校验。
@@ -962,8 +962,8 @@ metadata 中的版本、标签、本仓库源码 commit 和期望 SHA-256 必须
 
 ```bash
 npm test
-git tag -a v0.9.5 -m "v0.9.5"
-git push origin v0.9.5
+git tag -a v0.9.6 -m "v0.9.6"
+git push origin v0.9.6
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

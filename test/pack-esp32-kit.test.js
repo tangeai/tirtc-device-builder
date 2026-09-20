@@ -380,3 +380,15 @@ test("publish workflow checks the archive against pinned metadata", () => {
     /test "\$\{actual_sha256\}" = "\$\{expected_sha256\}"/,
   );
 });
+
+test("npm publication requires the pinned Kit release archive", () => {
+  const workflow = readFileSync(
+    join(ROOT, ".github/workflows/publish.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /Verify pinned Device Kit release is downloadable/);
+  assert.match(workflow, /ESP32_KIT\.url/);
+  assert.match(workflow, /ESP32_KIT\.sha256/);
+  assert.match(workflow, /curl --fail --location/);
+  assert.match(workflow, /test "\$\{actual_sha256\}" = "\$\{expected_sha256\}"/);
+});

@@ -16,7 +16,7 @@ The automatic branch never runs `sudo` or modifies a persistent shell profile. W
 When `<setup-root>/env.sh` exists, use it only as an activation prefix for the current command:
 
 ```bash
-bash -lc '. "<setup-root>/env.sh" && python3 "<skill-dir>/scripts/doctor.py" --expected-idf 5.5 --expected-kit 1.1.4 --target esp32s3 --require-workspace'
+bash -lc '. "<setup-root>/env.sh" && python3 "<skill-dir>/scripts/doctor.py" --expected-idf 5.5 --expected-kit 1.1.5 --target esp32s3 --require-workspace'
 ```
 
 The helper contains paths, not device or network credentials. Read `<setup-root>/config.json` when exact managed paths are needed; the environment helper does not authorize unrelated downloads, shell-profile changes, flashing, or credential writes.
@@ -26,7 +26,7 @@ Run the doctor before generation, build, flash, or monitor:
 ```bash
 python3 <skill-dir>/scripts/doctor.py \
   --expected-idf 5.5 \
-  --expected-kit 1.1.4 \
+  --expected-kit 1.1.5 \
   --target esp32s3 \
   --require-workspace
 ```
@@ -47,9 +47,8 @@ For an explicitly selected legacy workspace, omit `--expected-kit`; otherwise re
 4. an ancestor whose `kit-src/` or `thing-connect/` child contains that generator.
 
 The default managed root is `<setup-root>/kits/esp32s3/<kit-version>`. The `tirtc-device-builder/kit-src` directory is the ESP32 development source; the doctor also accepts an installed Device Kit root. Older `thing-connect/` layouts remain accepted as legacy inputs.
-The source generator uses SDK 2.5.0; the currently pinned published Kit 1.1.4
-contains SDK 2.3.0. Resolve the SDK from the selected Kit manifest or generated
-project, not from a global version assumption.
+Resolve the SDK from the selected Kit manifest or generated project. Kit 1.1.5
+and this repository's source generator use the ESP32-S3 SDK 2.5.0.
 
 The managed Kit currently contains the ESP32-S3 H5/AI starter. When the requested
 portfolio includes device-to-device calling or WeChat VoIP and the selected Kit
