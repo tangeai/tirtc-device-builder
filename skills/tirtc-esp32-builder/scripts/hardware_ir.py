@@ -61,7 +61,7 @@ WIFI_METHOD_TYPES = {
     "development_config",
     "custom",
 }
-SOFTAP_SSID_PREFIX = "TiRTC-"
+SOFTAP_SSID_PREFIX = "XiaoTai-"
 SOFTAP_AUTH_MODE = "open"
 SOFTAP_IPV4_ADDRESS = "192.168.6.1"
 SOFTAP_CAPTIVE_PORTAL = True

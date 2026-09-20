@@ -88,7 +88,7 @@ number.alaw_8khz
 设备没有 Wi-Fi 配置时会启动：
 
 ```text
-SSID: TiRTC-XXXX
+SSID: XiaoTai-XXXX
 认证: 开放热点，无需密码
 网页: http://192.168.6.1
 ```

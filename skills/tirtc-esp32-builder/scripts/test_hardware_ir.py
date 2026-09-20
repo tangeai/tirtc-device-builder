@@ -72,7 +72,7 @@ def ready_onboarding(ir: dict) -> None:
                 {
                     "id": "softap-main",
                     "type": "softap",
-                    "ssid_prefix": "TiRTC-",
+                    "ssid_prefix": "XiaoTai-",
                     "auth_mode": "open",
                     "ipv4_address": "192.168.6.1",
                     "captive_portal": True,
@@ -385,7 +385,7 @@ class HardwareIrV2Test(unittest.TestCase):
 
     def test_softap_contract_is_required(self) -> None:
         cases = {
-            "ssid_prefix": "Other-",
+            "ssid_prefix": "TiRTC-",
             "auth_mode": "wpa2_psk",
             "ipv4_address": "192.168.4.1",
             "captive_portal": False,

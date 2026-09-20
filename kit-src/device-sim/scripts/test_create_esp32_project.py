@@ -97,7 +97,7 @@ class CreateEsp32ProjectTest(unittest.TestCase):
             wifi_source = (
                 output / "components/wifi_manager/src/wifi_manager.c"
             ).read_text(encoding="utf-8")
-            self.assertIn('"TiRTC-%02X%02X"', wifi_source)
+            self.assertIn('"XiaoTai-%02X%02X"', wifi_source)
             self.assertIn("ap.ap.authmode = WIFI_AUTH_OPEN", wifi_source)
             self.assertIn(
                 "esp_netif_set_ip4_addr(&ip_info.ip, WIFI_SETUP_IP_A,",
@@ -108,7 +108,7 @@ class CreateEsp32ProjectTest(unittest.TestCase):
             self.assertIn("wifi_captive_dns_start", wifi_source)
             self.assertNotIn("ESP_NETIF_CAPTIVEPORTAL_URI", wifi_source)
             self.assertNotIn("WIFI_SETUP_PASSWORD", wifi_source)
-            self.assertNotIn("TiRTC-Setup-", wifi_source)
+            self.assertNotIn('"TiRTC-%02X%02X"', wifi_source)
             self.assertNotIn("192.168.4.1", wifi_source)
 
             dns_source = (

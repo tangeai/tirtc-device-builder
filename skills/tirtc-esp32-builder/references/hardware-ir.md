@@ -65,8 +65,8 @@ The selected Wi-Fi method must be available and corroborated, credentials must r
 
 When the selected method is SoftAP:
 
-- generate the SSID as `TiRTC-<device suffix>` so its exact, case-sensitive
-  prefix is `TiRTC-`; use a stable non-secret suffix and keep the complete SSID
+- generate the SSID as `XiaoTai-<device suffix>` so its exact, case-sensitive
+  prefix is `XiaoTai-`; use a stable non-secret suffix and keep the complete SSID
   within the ESP32 32-byte limit;
 - configure an open network (`WIFI_AUTH_OPEN`) with an empty AP password so a
   user can connect directly;
@@ -81,7 +81,7 @@ When the selected method is SoftAP:
   client auto-popup is not guaranteed and HTTPS cannot be transparently
   redirected.
 
-Record these values on the selected SoftAP method as `ssid_prefix: "TiRTC-"`,
+Record these values on the selected SoftAP method as `ssid_prefix: "XiaoTai-"`,
 `auth_mode: "open"`, `ipv4_address: "192.168.6.1"`, and
 `captive_portal: true`. The Hardware IR gate returns `NEEDS_CONFIRMATION` when
 one is missing and `BLOCKED` when one differs.

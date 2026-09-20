@@ -60,7 +60,7 @@ npx --yes tirtc-device-builder@0.9.6 setup esp32 --client "$TIRTC_AGENT_CLIENT"
 - AI 对讲必须实现全双工和 AEC；构建阶段必须证明同时采集播放、真实播放参考与 `echo_cancellation.enabled=true`，实机结果仍只能在 L2-L7 验证后声明。
 
 接入要求：
-- SoftAP 配网：热点名使用 `TiRTC-` 前缀、开放认证无需密码，AP 网关和配网页面为 `192.168.6.1` / `http://192.168.6.1`；启用通配 DNS 和 HTTP 重定向进行 captive portal 自动发现，不把 DHCP Option 114 指向本地 HTML 页面；Hardware IR 记录 `captive_portal: true`；目标 Wi-Fi 凭证保存 NVS。
+- SoftAP 配网：热点名使用 `XiaoTai-` 前缀、开放认证无需密码，AP 网关和配网页面为 `192.168.6.1` / `http://192.168.6.1`；启用通配 DNS 和 HTTP 重定向进行 captive portal 自动发现，不把 DHCP Option 114 指向本地 HTML 页面；Hardware IR 记录 `captive_portal: true`；目标 Wi-Fi 凭证保存 NVS。
 - 验证码绑定，并复用已有绑定。
 - 分别实现 `wifi-clear` 和 `tirtc-clear`。
 - 平台发现本轮先使用 HTTP；HTTPS 留待独立验收。

@@ -654,7 +654,7 @@ bootloader、分区表和应用镜像；无需手工维护多条 `esptool.py` �
 
 ### Wi-Fi 凭证和设备绑定
 
-SoftAP 是可选方案，不是接入前提。Hardware IR 要根据 BSP 的实际能力和产品要求，选择 SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。若选择 SoftAP，热点名必须以 `TiRTC-` 开头、使用开放认证（无需密码），AP 网关和配网页面地址固定为 `192.168.6.1`（`http://192.168.6.1`），并通过通配 DNS 和 HTTP 回退启用 captive portal 自动发现。DHCP Option 114 只用于 RFC 8908 HTTPS/JSON API，不能指向本地 HTML 页面。系统没有自动弹窗时仍可手动打开该 HTTP 地址；HTTPS 不能透明重定向。这些值要写入 Hardware IR 并通过门禁；目标 WLAN 的 SSID 和密码仍不得写死在源码中。
+SoftAP 是可选方案，不是接入前提。Hardware IR 要根据 BSP 的实际能力和产品要求，选择 SoftAP、BLE、SmartConfig、安全工厂/NVS 注入、不纳入版本控制的开发配置，或有文档的自定义方案。若选择 SoftAP，热点名必须以 `XiaoTai-` 开头、使用开放认证（无需密码），AP 网关和配网页面地址固定为 `192.168.6.1`（`http://192.168.6.1`），并通过通配 DNS 和 HTTP 回退启用 captive portal 自动发现。DHCP Option 114 只用于 RFC 8908 HTTPS/JSON API，不能指向本地 HTML 页面。系统没有自动弹窗时仍可手动打开该 HTTP 地址；HTTPS 不能透明重定向。这些值要写入 Hardware IR 并通过门禁；目标 WLAN 的 SSID 和密码仍不得写死在源码中。
 
 无论选择哪种方法，都要有当前 PCB/BSP 的支持证据，凭证不能进入 Git、源码或报告，并且要保留清除或重配入口。没有 SoftAP、但支持工厂 NVS 注入的设备同样可以接入。只要工程提交了明文密码，Hardware IR v2 门禁就会判为 `BLOCKED`。
 

@@ -61,7 +61,7 @@ function createSource(root) {
 #define WIFI_SETUP_IP_B 168
 #define WIFI_SETUP_IP_C 6
 #define WIFI_SETUP_IP_D 1
-const char *ssid_format = "TiRTC-%02X%02X";
+const char *ssid_format = "XiaoTai-%02X%02X";
 void configure(void) { ap.ap.authmode = WIFI_AUTH_OPEN; }
 void captive(void) {
   wifi_captive_dns_start(0);
@@ -82,7 +82,7 @@ void captive(void) {
   writeFixture(
     thingConnect,
     "device-sim/templates/esp32-h5-ai/README.md",
-    "设备启动 TiRTC-XXXX 开放 SoftAP，无需密码；通过 captive portal 自动打开 http://192.168.6.1 配网。\n",
+    "设备启动 XiaoTai-XXXX 开放 SoftAP，无需密码；通过 captive portal 自动打开 http://192.168.6.1 配网。\n",
   );
   writeFixture(root, "LICENSE", "fixture license\n");
   return thingConnect;
@@ -284,7 +284,7 @@ test("pack:esp32-kit rejects the legacy SoftAP contract", () => {
       "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
       `#define WIFI_SETUP_URL "http://192.168.4.1"
 #define WIFI_SETUP_PASSWORD "tirtc1234"
-const char *ssid_format = "TiRTC-Setup-%02X%02X";
+const char *ssid_format = "TiRTC-%02X%02X";
 `,
     );
     const result = spawnSync(
@@ -304,6 +304,40 @@ const char *ssid_format = "TiRTC-Setup-%02X%02X";
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /SoftAP contract/);
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("pack:esp32-kit rejects the old SSID prefix", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-test-"));
+  try {
+    const source = createSource(join(temporary, "source"));
+    writeFixture(
+      source,
+      "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+      `#define WIFI_SETUP_URL "http://192.168.6.1"
+#define WIFI_SETUP_PASSWORD ""
+const char *ssid_format = "TiRTC-%02X%02X";
+`,
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        "--source",
+        source,
+        "--kit-version",
+        "1.0.0",
+        "--source-commit",
+        COMMIT,
+        "--output",
+        join(temporary, "dist"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /SSID prefix/);
   } finally {
     rmSync(temporary, { force: true, recursive: true });
   }

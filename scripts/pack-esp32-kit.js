@@ -327,7 +327,7 @@ function assertSoftApContract(root) {
   }
 
   const source = readFileSync(sourcePath, "utf8");
-  assertContains(source, '"TiRTC-%02X%02X"', "SSID prefix");
+  assertContains(source, '"XiaoTai-%02X%02X"', "SSID prefix");
   assertContains(source, "ap.ap.authmode = WIFI_AUTH_OPEN", "open authentication");
   assertContains(source, "#define WIFI_SETUP_IP_A 192", "IPv4 first octet");
   assertContains(source, "#define WIFI_SETUP_IP_B 168", "IPv4 second octet");
@@ -342,7 +342,8 @@ function assertSoftApContract(root) {
     "an invalid DHCP option 114 HTML endpoint",
   );
   assertOmits(source, "WIFI_SETUP_PASSWORD", "a SoftAP password");
-  assertOmits(source, "TiRTC-Setup-", "the legacy SSID prefix");
+  assertOmits(source, '"TiRTC-%02X%02X"', "the old SSID prefix");
+  assertOmits(source, "XiaoTai-Setup-", "the legacy setup SSID prefix");
   assertOmits(source, "192.168.4.1", "the legacy provisioning address");
 
   const dns = readFileSync(dnsPath, "utf8");
@@ -354,7 +355,7 @@ function assertSoftApContract(root) {
   assertContains(cmake, "lwip", "DNS socket dependency");
 
   const readme = readFileSync(readmePath, "utf8");
-  assertContains(readme, "TiRTC-XXXX", "documented SSID prefix");
+  assertContains(readme, "XiaoTai-XXXX", "documented SSID prefix");
   assertContains(readme, "无需密码", "documented open authentication");
   assertContains(readme, "http://192.168.6.1", "documented provisioning URL");
   assertContains(readme, "captive portal", "documented automatic portal discovery");

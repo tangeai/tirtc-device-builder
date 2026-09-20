@@ -46,10 +46,10 @@ static httpd_handle_t s_http_server;
 static const char s_setup_page[] =
     "<!doctype html><html lang=zh-CN><meta charset=utf-8>"
     "<meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<title>TiRTC Wi-Fi 配置</title><style>body{font-family:sans-serif;max-width:420px;"
+    "<title>小钛 Wi-Fi 配置</title><style>body{font-family:sans-serif;max-width:420px;"
     "margin:40px auto;padding:0 18px}input,button{box-sizing:border-box;width:100%;"
     "padding:12px;margin:7px 0;font-size:16px}#msg{white-space:pre-wrap}</style>"
-    "<h2>TiRTC 设备配网</h2><p>填写设备需要连接的 Wi-Fi。</p>"
+    "<h2>小钛设备配网</h2><p>填写设备需要连接的 Wi-Fi。</p>"
     "<input id=s placeholder='Wi-Fi 名称' maxlength=32>"
     "<input id=p type=password placeholder='Wi-Fi 密码（开放网络可留空）' maxlength=64>"
     "<button onclick=save()>保存并重启</button><p id=msg></p>"
@@ -299,8 +299,8 @@ static esp_err_t configure_provisioning_netif(esp_netif_t *ap_netif)
     if (err != ESP_OK) {
         return err;
     }
-    bool restart_dhcp = dhcp_status == ESP_NETIF_DHCP_STARTED;
-    if (restart_dhcp) {
+    /* A newly created AP is INIT, but set_ip_info requires STOPPED. */
+    if (dhcp_status != ESP_NETIF_DHCP_STOPPED) {
         err = esp_netif_dhcps_stop(ap_netif);
         if (err != ESP_OK) {
             return err;
@@ -320,7 +320,7 @@ static esp_err_t configure_provisioning_netif(esp_netif_t *ap_netif)
      * HTTP page. Legacy captive-portal probes are handled by wildcard DNS and
      * the HTTP redirect instead.
      */
-    if (err != ESP_OK || !restart_dhcp) {
+    if (err != ESP_OK) {
         return err;
     }
     return esp_netif_dhcps_start(ap_netif);
@@ -335,7 +335,7 @@ static void start_provisioning(void)
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     (void)snprintf(s_provisioning_ssid,
                    sizeof(s_provisioning_ssid),
-                   "TiRTC-%02X%02X",
+                   "XiaoTai-%02X%02X",
                    mac[4],
                    mac[5]);
 

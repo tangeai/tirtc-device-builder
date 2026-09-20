@@ -22,7 +22,7 @@ idf.py -p <SERIAL_PORT> flash monitor
 
 ## 首次启动
 
-1. 设备没有 Wi-Fi 配置时启动 `TiRTC-XXXX` 开放 SoftAP，无需密码。设备通过通配 DNS 和 HTTP 重定向响应 Android、iOS、Windows 等客户端的 captive portal 探测，连接后通常会自动显示配网页面；没有弹窗时打开 `http://192.168.6.1`。HTTPS 页面不能被透明重定向。
+1. 设备没有 Wi-Fi 配置时启动 `XiaoTai-XXXX` 开放 SoftAP，无需密码。设备通过通配 DNS 和 HTTP 重定向响应 Android、iOS、Windows 等客户端的 captive portal 探测，连接后通常会自动显示配网页面；没有弹窗时打开 `http://192.168.6.1`。HTTPS 页面不能被透明重定向。
 2. 设备联网后在串口打印绑定验证码和体验平台地址。
 3. 在 H5 完成设备绑定。凭证保存到 NVS，设备随后完成服务发现、MQTT 登录和 TiRTC 启动。
 4. 串口输入 `status` 查看平台、MQTT、TiRTC、会话和媒体计数。
