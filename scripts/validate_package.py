@@ -234,7 +234,13 @@ def validate_repository_files(errors: list[str]) -> None:
         if not path.is_file() or ".git" in path.parts:
             continue
         relative = path.relative_to(ROOT)
-        if path.suffix.lower() in FORBIDDEN_SUFFIXES:
+        # The source Kit contains one redistributable target-specific SDK archive;
+        # package.json's files whitelist keeps kit-src out of the npm tarball.
+        bundled_sdks = {
+            Path("kit-src/device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a"),
+            Path("kit-src/device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a"),
+        }
+        if path.suffix.lower() in FORBIDDEN_SUFFIXES and relative not in bundled_sdks:
             error(errors, f"forbidden binary or credential file: {relative}")
         if path.suffix.lower() in {
             ".js",

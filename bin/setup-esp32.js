@@ -29,12 +29,6 @@ const GENERATOR_PATH = join(
   "scripts",
   "create_esp32_project.py",
 );
-const SDK_PATH = join(
-  "device-sim",
-  "sdk",
-  "espressif-esp32s3",
-  "2.3.0",
-);
 const REQUIRED_SDK_FILES = [
   join("include", "tirtc", "tiRTC.h"),
   join("lib", "libTiRTC.a"),
@@ -233,6 +227,7 @@ export function inspectDeviceKit(root) {
   const manifestPath = root ? join(root, DEVICE_KIT_MANIFEST) : null;
   let manifestPresent = false;
   let version = null;
+  let sdkVersion = null;
   let manifestError = null;
   if (manifestPath && existsSync(manifestPath)) {
     manifestPresent = true;
@@ -245,6 +240,9 @@ export function inspectDeviceKit(root) {
         manifest.kit_version.trim()
       ) {
         version = manifest.kit_version.trim();
+        if (typeof manifest.tirtc_sdk_version === "string") {
+          sdkVersion = manifest.tirtc_sdk_version;
+        }
       } else {
         manifestError = "manifest.json does not declare kit_version";
       }
@@ -258,11 +256,13 @@ export function inspectDeviceKit(root) {
   const generatorReady = Boolean(
     root && existsSync(join(root, GENERATOR_PATH)),
   );
-  const sdk = root ? join(root, SDK_PATH) : null;
-  const sdkReady = Boolean(
-    sdk &&
-      REQUIRED_SDK_FILES.every((relative) => existsSync(join(sdk, relative))),
-  );
+  const sdkVersions = sdkVersion
+    ? [sdkVersion]
+    : [...new Set(["2.5.0", ESP32_KIT.sdkVersion])];
+  const sdkReady = Boolean(root && sdkVersions.some((candidate) => {
+    const sdk = join(root, "device-sim", "sdk", "espressif-esp32s3", candidate);
+    return REQUIRED_SDK_FILES.every((relative) => existsSync(join(sdk, relative)));
+  }));
   const structureReady = generatorReady && sdkReady;
   const versionCompatible =
     !manifestPresent ||

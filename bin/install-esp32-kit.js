@@ -24,9 +24,6 @@ const REQUIRED_FILES = [
   "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
   "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
   "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
-  "device-sim/sdk/espressif-esp32s3/2.3.0/include/tirtc/tiRTC.h",
-  "device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a",
-  "device-sim/sdk/espressif-esp32s3/2.3.0/manifest/build-contract.env",
 ];
 
 function hashFile(path) {
@@ -98,8 +95,20 @@ function validateExtractedKit(root, metadata) {
       `Device Kit version mismatch: expected ${metadata.version}, got ${manifest.kit_version}`,
     );
   }
-  if (manifest.target !== "esp32s3" || manifest.tirtc_sdk_version !== "2.3.0") {
+  if (manifest.target !== "esp32s3" ||
+      !/^(?:2\.3\.0|2\.5\.0)$/.test(manifest.tirtc_sdk_version) ||
+      (metadata.sdkVersion && manifest.tirtc_sdk_version !== metadata.sdkVersion)) {
     throw new Error("Device Kit target or TiRTC SDK version is incompatible");
+  }
+  const sdkRoot = `device-sim/sdk/espressif-esp32s3/${manifest.tirtc_sdk_version}`;
+  const sdkFiles = [
+    `${sdkRoot}/include/tirtc/tiRTC.h`,
+    `${sdkRoot}/lib/libTiRTC.a`,
+    `${sdkRoot}/manifest/build-contract.env`,
+  ];
+  const missingSdk = sdkFiles.filter((path) => !existsSync(join(root, path)));
+  if (missingSdk.length > 0) {
+    throw new Error(`Device Kit SDK is incomplete: ${missingSdk.join(", ")}`);
   }
   if (!manifest.files || typeof manifest.files !== "object") {
     throw new Error("Device Kit manifest has no file checksums");

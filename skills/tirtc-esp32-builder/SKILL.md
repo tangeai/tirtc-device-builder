@@ -20,11 +20,12 @@ past build as proof for a new artifact.
    talkback, AI intercom, device-to-device calling, and WeChat VoIP. Do not
    silently remove a requested feature because the current starter lacks it.
 3. Resolve a versioned source of truth. The managed ESP32-S3 Device Kit is the
-   default for its packaged capabilities. Device-call/WeChat simulation or
-   protocol porting requires a pinned full `tirtc-server-example` checkout when
-   those sources are absent from the selected Kit. Clone or download it only
-   when the user authorizes that external write. Read applicable repository
-   instructions and the exact business documents routed by `workflow.md`.
+   default for its packaged capabilities; this repository's `kit-src/` owns the
+   ESP32 generator, SDK and standalone reference implementation. For
+   device-call/WeChat protocol simulation use a pinned `tirtc-server-example`
+   checkout when the Kit lacks the Linux C simulator and protocol documents.
+   Clone or download it only when the user authorizes that external write.
+   Read the exact business documents routed by `workflow.md`.
 4. Run Doctor for the exact target and SDK package. Managed generation currently
    automates ESP32-S3. ESP32-P4 is valid only with an evidenced P4 BSP/network
    path and the matching `espressif_esp32p4` SDK/build contract; never link the

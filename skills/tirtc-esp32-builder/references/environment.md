@@ -44,15 +44,19 @@ For an explicitly selected legacy workspace, omit `--expected-kit`; otherwise re
 1. an explicit `--thing-connect-root <path>`;
 2. `TIRTC_THING_CONNECT_ROOT`;
 3. an ancestor of the project or current directory containing `device-sim/scripts/create_esp32_project.py`;
-4. an ancestor whose `thing-connect/` child contains that generator.
+4. an ancestor whose `kit-src/` or `thing-connect/` child contains that generator.
 
-The default managed root is `<setup-root>/kits/esp32s3/<kit-version>`. The public ThingConnect workspace remains an optional legacy/development input; the doctor accepts either a Device Kit root, a repository root, or its `thing-connect/` child.
+The default managed root is `<setup-root>/kits/esp32s3/<kit-version>`. The `tirtc-device-builder/kit-src` directory is the ESP32 development source; the doctor also accepts an installed Device Kit root. Older `thing-connect/` layouts remain accepted as legacy inputs.
+The source generator uses SDK 2.5.0; the currently pinned published Kit 1.1.4
+contains SDK 2.3.0. Resolve the SDK from the selected Kit manifest or generated
+project, not from a global version assumption.
 
 The managed Kit currently contains the ESP32-S3 H5/AI starter. When the requested
 portfolio includes device-to-device calling or WeChat VoIP and the selected Kit
 does not contain `device-sim-c`, `device-call.md`, `device-voip.md`, and the API
-reference, use a full `tirtc-server-example` checkout pinned to a recorded commit
-for the simulator and porting source. Cloning is an external write and requires
+reference, use this repository's `kit-src/device-sim/device-sim-esp32` for the
+ESP32 implementation and a pinned `tirtc-server-example` commit for server
+protocols and non-ESP32 simulators. Cloning is an external write and requires
 user authorization. Do not track a moving default branch as build evidence.
 
 ESP32-P4 uses a separate `espressif_esp32p4` SDK archive and RISC-V toolchain.

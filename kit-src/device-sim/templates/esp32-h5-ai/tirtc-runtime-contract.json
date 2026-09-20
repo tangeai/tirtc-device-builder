@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "platform_contract": "platform-media-contract.json",
+  "files": {
+    "platform_client": "components/platform_client/src/platform_client.c",
+    "app_main": "main/app_main.c",
+    "starter_tirtc": "components/starter_tirtc/src/starter_tirtc.c",
+    "starter_runtime": "components/starter_runtime/src/starter_runtime.c"
+  }
+}

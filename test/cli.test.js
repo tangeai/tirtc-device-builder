@@ -16,6 +16,8 @@ import {
   listAgentClients,
   requireAgentClient,
 } from "../bin/agent-clients.js";
+import { inspectDeviceKit } from "../bin/setup-esp32.js";
+import { ESP32_KIT } from "../bin/esp32-kit-metadata.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(ROOT, "bin", "tirtc-device-builder.js");
@@ -28,14 +30,14 @@ function run(args, environment = {}) {
   });
 }
 
-function createDeviceKit(root, version) {
+function createDeviceKit(root, version, sdkVersion = "2.3.0") {
   const required = [
     join("device-sim", "scripts", "create_esp32_project.py"),
     join(
       "device-sim",
       "sdk",
       "espressif-esp32s3",
-      "2.3.0",
+      sdkVersion,
       "include",
       "tirtc",
       "tiRTC.h",
@@ -44,7 +46,7 @@ function createDeviceKit(root, version) {
       "device-sim",
       "sdk",
       "espressif-esp32s3",
-      "2.3.0",
+      sdkVersion,
       "lib",
       "libTiRTC.a",
     ),
@@ -52,7 +54,7 @@ function createDeviceKit(root, version) {
       "device-sim",
       "sdk",
       "espressif-esp32s3",
-      "2.3.0",
+      sdkVersion,
       "manifest",
       "build-contract.env",
     ),
@@ -64,7 +66,7 @@ function createDeviceKit(root, version) {
   }
   writeFileSync(
     join(root, "manifest.json"),
-    JSON.stringify({ kit_version: version }) + "\n",
+    JSON.stringify({ kit_version: version, tirtc_sdk_version: sdkVersion }) + "\n",
     "utf8",
   );
 }
@@ -77,6 +79,15 @@ async function withTemporaryDirectory(callback) {
     await rm(directory, { force: true, recursive: true });
   }
 }
+
+test("setup recognizes SDK 2.5.0 when the Kit manifest declares it", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    createDeviceKit(directory, ESP32_KIT.version, "2.5.0");
+    const kit = inspectDeviceKit(directory);
+    assert.equal(kit.structureReady, true);
+    assert.equal(kit.ready, true);
+  });
+});
 
 test("--version reports package version", () => {
   const result = run(["--version"]);

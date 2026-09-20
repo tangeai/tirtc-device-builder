@@ -20,7 +20,7 @@ used by a build.
 ## SDK lifecycle
 
 TiRTC is one process-wide runtime. The exact selected header governs API and
-option availability. For SDK 2.3.0 the important order is:
+option availability. For SDK 2.5.0 the important order is:
 
 1. Set `TIRTC_OPT_MAX_SEND_BUFFER` before `TiRtcInit()` when overriding it.
 2. Call `TiRtcInit()` once.
@@ -33,7 +33,12 @@ option availability. For SDK 2.3.0 the important order is:
 6. Stop sessions and connections through deferred lifecycle work before the one
    final `TiRtcStop()` / `TiRtcUninit()` sequence.
 
-The callback table and its context outlive the SDK runtime. Callback payloads
+The callback table and its context outlive the SDK runtime. SDK 2.5.0 adds
+`on_sleep_wakeup_info` at the end of `TIRTCCALLBACKS`; zero-initialize the full
+struct and keep it `NULL` when sleep wakeup is unused. If supplied, this callback
+can run synchronously inside `TiRtcStart()`. Set a custom
+`TIRTC_OPT_TGTRP_POLL_TIMEOUT` after `TiRtcInit()`, which resets it to 10 ms.
+Callback payloads
 are borrowed; copy required data into bounded application-owned storage before
 returning.
 
@@ -85,8 +90,8 @@ drop a requested feature or call it verified.
 
 ## ESP32 targets
 
-The current managed generator and Device Kit automate ESP32-S3. Official SDK
-2.3.0 also provides a distinct ESP32-P4 package. P4 needs ESP-IDF 5.5.4, matching
+The current managed generator and Device Kit automate ESP32-S3. ESP32-P4 requires
+a distinct target-specific SDK package. P4 needs ESP-IDF 5.5.4, matching
 RISC-V toolchain/build contract, PSRAM, and an evidenced network path such as
 ESP-Hosted with C6/C61 or Ethernet. P4 and S3 archives are not interchangeable.
 

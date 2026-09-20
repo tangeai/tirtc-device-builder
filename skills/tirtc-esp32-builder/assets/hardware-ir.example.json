@@ -29,8 +29,8 @@
     "verification": "extracted",
     "tirtc": {
       "platform": "espressif-esp32s3",
-      "version": "2.3.0",
-      "sdk_path": "device-sim/sdk/espressif-esp32s3/2.3.0",
+      "version": "2.5.0",
+      "sdk_path": "device-sim/sdk/espressif-esp32s3/2.5.0",
       "build_contract": "manifest/build-contract.env"
     },
     "source_refs": [

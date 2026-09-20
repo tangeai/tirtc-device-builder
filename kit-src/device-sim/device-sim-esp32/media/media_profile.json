@@ -1,0 +1,26 @@
+{
+  "audio": {
+    "file": "number.alaw_8khz",
+    "codec": "alaw",
+    "sample_rate_hz": 8000,
+    "channels": 1,
+    "packet_ms": 40,
+    "duration_ms": 21840,
+    "packet_count": 546
+  },
+  "video": {
+    "file": "",
+    "codec": "mjpeg",
+    "width": 0,
+    "height": 0,
+    "camera_rotation": 0,
+    "aspect_ratio": 1.3333333333,
+    "hor_mirror": false,
+    "vert_mirror": false,
+    "fps": 0,
+    "duration_ms": 0,
+    "frame_count": 0,
+    "uplink_enabled": false,
+    "downlink_enabled": false
+  }
+}

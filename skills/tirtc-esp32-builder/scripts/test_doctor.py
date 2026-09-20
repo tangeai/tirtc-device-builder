@@ -141,6 +141,31 @@ class DoctorTest(unittest.TestCase):
                 MODULE.normalize_thing_connect_root(repository),
             )
 
+    def test_workspace_accepts_builder_kit_src(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            kit_src = repository / "kit-src"
+            generator = kit_src / MODULE.GENERATOR_RELATIVE_PATH
+            generator.parent.mkdir(parents=True)
+            generator.write_text("# test generator\n", encoding="utf-8")
+            self.assertEqual(kit_src.resolve(), MODULE.normalize_thing_connect_root(repository))
+            sdk = self.create_sdk(kit_src / MODULE.SDK_RELATIVE_ROOT / "2.5.0")
+            actual, source = MODULE.resolve_sdk_dir(None, None, kit_src)
+            self.assertEqual(sdk, actual)
+            self.assertEqual("ESP32 source workspace", source)
+
+    def test_managed_kit_sdk_version_follows_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sdk = self.create_sdk(root / MODULE.SDK_RELATIVE_ROOT / "2.3.0")
+            (root / MODULE.DEVICE_KIT_MANIFEST).write_text(
+                '{"kit_version":"1.1.4","tirtc_sdk_version":"2.3.0"}',
+                encoding="utf-8",
+            )
+            actual, source = MODULE.resolve_sdk_dir(None, None, root)
+            self.assertEqual(sdk, actual)
+            self.assertEqual("Device Kit", source)
+
     def test_workspace_uses_environment_path(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)
@@ -178,7 +203,7 @@ class DoctorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = self.create_workspace(root)
-            self.create_sdk(workspace / MODULE.DEFAULT_SDK_RELATIVE_PATH)
+            self.create_sdk(workspace / MODULE.SDK_RELATIVE_ROOT / "2.5.0")
             self.write_kit_manifest(workspace, "1.0.0")
             idf_py = root / "idf.py"
             idf_py.write_text("# test\n", encoding="utf-8")
@@ -203,7 +228,7 @@ class DoctorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = self.create_workspace(root)
-            self.create_sdk(workspace / MODULE.DEFAULT_SDK_RELATIVE_PATH)
+            self.create_sdk(workspace / MODULE.SDK_RELATIVE_ROOT / "2.5.0")
             self.write_kit_manifest(workspace, "1.1.1")
             idf_py = root / "idf.py"
             idf_py.write_text("# test\n", encoding="utf-8")

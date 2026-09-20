@@ -22,10 +22,11 @@ import { normalizeUstarArchive } from "./lib/normalize-ustar.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_REPOSITORY =
-  "https://github.com/tangeai/tirtc-server-example";
+  "https://github.com/tangeai/tirtc-device-builder";
+const DEFAULT_SOURCE = join(ROOT, "kit-src");
 const TARGET = "esp32s3";
 const IDF_VERSION = "5.5.x";
-const SDK_VERSION = "2.3.0";
+const SDK_VERSION = "2.5.0";
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
 
@@ -68,19 +69,19 @@ const REQUIRED_FILES = [
 const KIT_NOTICE = `TiRTC ESP32-S3 Device Kit
 Copyright 2026 探鸽智能 (TangeAI)
 
-This kit contains the TiRTC ESP32-S3 SDK 2.3.0, including libTiRTC.a,
+This kit contains the TiRTC ESP32-S3 SDK 2.5.0, including libTiRTC.a,
 redistributed by TangeAI for TiRTC device development. It also contains a
-focused selection of MIT-licensed ThingConnect example sources and protocol
-documentation. ESP-IDF, board BSPs, credentials, and captured media are not
+focused selection of MIT-licensed ESP32 example sources and versioned
+ThingConnect protocol documentation. ESP-IDF, board BSPs, credentials, and captured media are not
 included and remain subject to their own licenses and terms.
 `;
 
 function printHelp() {
   console.log(`Usage:
-  npm run pack:esp32-kit -- --source <thing-connect-or-repository> --kit-version <version>
+  npm run pack:esp32-kit -- --kit-version <version> [--source <kit-source-root>]
 
 Options:
-  --source <path>         ThingConnect repository root or thing-connect directory
+  --source <path>         ESP32 Kit source root (default: ./kit-src)
   --kit-version <semver>  Device Kit version, for example 1.0.0
   --output <path>         Output directory (default: ./dist)
   --source-commit <sha>   Override the detected 40-character source commit
@@ -103,7 +104,7 @@ function parseOptions(args) {
     help: false,
     kitVersion: null,
     output: join(ROOT, "dist"),
-    source: null,
+    source: DEFAULT_SOURCE,
     sourceCommit: null,
   };
   for (let index = 0; index < args.length; index += 1) {
@@ -136,9 +137,6 @@ function parseOptions(args) {
   if (options.help) {
     return options;
   }
-  if (!options.source) {
-    throw new Error("--source is required");
-  }
   if (!options.kitVersion || !VERSION_PATTERN.test(options.kitVersion)) {
     throw new Error("--kit-version must be a semantic version such as 1.0.0");
   }
@@ -166,14 +164,14 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 
-function normalizeThingConnectRoot(source) {
-  for (const candidate of [source, join(source, "thing-connect")]) {
+function normalizeKitSourceRoot(source) {
+  for (const candidate of [source, join(source, "kit-src"), join(source, "thing-connect")]) {
     if (existsSync(join(candidate, "device-sim", "scripts", "create_esp32_project.py"))) {
       return candidate;
     }
   }
   throw new Error(
-    `--source does not contain thing-connect/device-sim resources: ${source}`,
+    `--source does not contain ESP32 Kit resources: ${source}`,
   );
 }
 
@@ -389,7 +387,7 @@ function createArchive(staging, kitName, temporary) {
 }
 
 function build(options) {
-  const thingConnectRoot = normalizeThingConnectRoot(options.source);
+  const thingConnectRoot = normalizeKitSourceRoot(options.source);
   assertSelectedSourceIsClean(thingConnectRoot, options.sourceCommit);
   const commit = sourceCommit(thingConnectRoot, options.sourceCommit);
   const kitName = `tirtc-esp32s3-kit-${options.kitVersion}`;

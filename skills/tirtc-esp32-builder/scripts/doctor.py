@@ -24,9 +24,7 @@ CONTRACT_KEYS = {
 }
 THING_CONNECT_ENV = "TIRTC_THING_CONNECT_ROOT"
 GENERATOR_RELATIVE_PATH = Path("device-sim/scripts/create_esp32_project.py")
-DEFAULT_SDK_RELATIVE_PATH = Path(
-    "device-sim/sdk/espressif-esp32s3/2.3.0"
-)
+SDK_RELATIVE_ROOT = Path("device-sim/sdk/espressif-esp32s3")
 DEVICE_KIT_MANIFEST = "manifest.json"
 
 
@@ -161,7 +159,7 @@ def discover_serial_ports() -> list[str]:
 def normalize_thing_connect_root(candidate: Path) -> Path | None:
     """Accept either the ThingConnect directory or its parent repository."""
     resolved = candidate.expanduser().resolve()
-    for root in (resolved, resolved / "thing-connect"):
+    for root in (resolved, resolved / "kit-src", resolved / "thing-connect"):
         if (root / GENERATOR_RELATIVE_PATH).is_file():
             return root
     return None
@@ -248,7 +246,20 @@ def resolve_sdk_dir(
         if bundled.is_dir():
             return bundled, "generated project"
     if thing_connect_root is not None:
-        return thing_connect_root / DEFAULT_SDK_RELATIVE_PATH, "Device Kit or legacy workspace"
+        manifest_path = thing_connect_root / DEVICE_KIT_MANIFEST
+        if manifest_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                version = manifest.get("tirtc_sdk_version")
+                if isinstance(version, str) and re.fullmatch(r"\d+\.\d+\.\d+", version):
+                    return thing_connect_root / SDK_RELATIVE_ROOT / version, "Device Kit"
+            except (OSError, json.JSONDecodeError):
+                pass
+        for version in ("2.5.0", "2.3.0"):
+            candidate = thing_connect_root / SDK_RELATIVE_ROOT / version
+            if candidate.is_dir():
+                return candidate, "ESP32 source workspace"
+        return thing_connect_root / SDK_RELATIVE_ROOT / "2.5.0", "ESP32 source workspace"
     return None, "not found"
 
 

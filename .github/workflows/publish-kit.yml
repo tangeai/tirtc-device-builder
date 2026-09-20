@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -28,11 +30,11 @@ jobs:
           expected_tag="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.releaseTag)")"
           test "${GITHUB_REF_NAME}" = "${expected_tag}"
 
-      - name: Fetch pinned ThingConnect source
+      - name: Verify pinned Kit source
         run: |
           source_commit="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.sourceCommit)")"
-          git clone --no-checkout https://github.com/tangeai/tirtc-server-example.git upstream
-          git -C upstream checkout --detach "${source_commit}"
+          git cat-file -e "${source_commit}^{commit}"
+          git diff --exit-code "${source_commit}" -- kit-src
 
       - run: npm ci --ignore-scripts
 
@@ -40,12 +42,15 @@ jobs:
         run: |
           kit_version="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.version)")"
           archive_name="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.archiveName)")"
+          source_commit="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.sourceCommit)")"
           npm run pack:esp32-kit -- \
-            --source upstream/thing-connect \
+            --source kit-src \
+            --source-commit "${source_commit}" \
             --kit-version "${kit_version}" \
             --output dist-first
           npm run pack:esp32-kit -- \
-            --source upstream/thing-connect \
+            --source kit-src \
+            --source-commit "${source_commit}" \
             --kit-version "${kit_version}" \
             --output dist-second
           cmp "dist-first/${archive_name}" "dist-second/${archive_name}"
@@ -68,10 +73,11 @@ jobs:
         run: |
           archive_name="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.archiveName)")"
           kit_version="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.version)")"
+          sdk_version="$(node --input-type=module -e "import { ESP32_KIT } from './bin/esp32-kit-metadata.js'; process.stdout.write(ESP32_KIT.sdkVersion)")"
           gh release create "${GITHUB_REF_NAME}" \
             "dist/${archive_name}" \
             "dist/${archive_name}.sha256" \
             --verify-tag \
             --latest=false \
             --title "TiRTC ESP32-S3 Device Kit ${kit_version}" \
-            --notes "ESP-IDF 5.5.x; TiRTC SDK 2.3.0; pinned generated H5/AI starter and runtime/media contracts."
+            --notes "ESP-IDF 5.5.x; TiRTC SDK ${sdk_version}; pinned generated H5/AI starter and runtime/media contracts."

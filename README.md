@@ -8,7 +8,7 @@ TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入�
 |---|---|---|
 | `tirtc-esp32-builder` | ESP32-S3 / ESP32-P4、ESP-IDF 5.5.x | 板型识别、Hardware IR、工程生成/移植、H5/AI/设备互呼/微信 VoIP、AEC 门禁、编译烧录和分层验收 |
 
-H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。设备互呼或微信 VoIP 的模拟/移植若超出当前 Kit 内容，则需要在用户授权后使用固定 commit 的 `tirtc-server-example` 完整仓库。ESP32-P4 必须使用匹配的 P4 SDK、BSP 与网络方案，不能复用 S3 预编译库。
+H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。ESP32 示例源码由本仓库的 `kit-src/` 维护；设备互呼或微信 VoIP 的移植可参考其中的独立示例。ESP32-P4 必须使用匹配的 P4 SDK、BSP 与网络方案，不能复用 S3 预编译库。
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
@@ -282,13 +282,15 @@ board-materials/
 | 参考模组 | ESP32-S3-WROOM-1-N16R8，或资源和配置经过确认的兼容板 |
 | ESP-IDF | 5.5.x |
 | 自动安装版本 | ESP-IDF v5.5.4 |
-| TiRTC SDK | `espressif-esp32s3/2.3.0` |
-| ESP32 Device Kit | 1.1.4 |
+| 本仓库源码与本地打包使用的 TiRTC SDK | `espressif-esp32s3/2.5.0` |
+| 当前公开 ESP32 Device Kit | 1.1.4（内含 TiRTC SDK 2.3.0） |
 | Node.js | 18 或更高版本 |
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
 
 当前托管自动生成器只提供 ESP32-S3 模板。ESP32-P4 可由 Skill 在已有、证据完整的 P4 BSP/工程上移植，但必须使用 `espressif-esp32p4` SDK、匹配的构建合同和明确的 ESP-Hosted 或以太网方案。Flash 或 PSRAM 容量变化时，需要重新评估 `sdkconfig.defaults`、分区表、DMA 和媒体缓存预算。
+
+从本仓库 `kit-src/` 直接生成或打包时使用 TiRTC 2.5.0；`setup esp32` 安装固定的公开 Kit 版本，其 SDK 版本以该 Kit 的 `manifest.json` 为准。
 
 ### 本机软件
 
@@ -880,7 +882,7 @@ npx --yes tirtc-device-builder@latest setup esp32
 
 不需要。普通开发所需的生成器、模板、协议文档、TiRTC 头文件和 `libTiRTC.a` 都在版本化的 ESP32 Device Kit 中。一键安装会下载公开 Release，并把路径写进 `env.sh`。
 
-`--thing-connect-root` 主要用于维护模板、协议或 Device Kit 的开发者复用完整源码工作区。
+维护者可用 `--thing-connect-root` 指向本仓库的 `kit-src/`；普通使用者使用安装好的 Device Kit 路径。
 
 ### 为什么推荐 `npx`，不是安装一个 npm 包就结束？
 
@@ -931,29 +933,28 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 
 ```bash
 npm run pack:esp32-kit -- \
-  --source /absolute/path/tirtc-server-example/thing-connect \
-  --kit-version 1.1.4
+  --kit-version 1.1.5
 ```
 
 输出位于 `dist/`：
 
 ```text
-tirtc-esp32s3-kit-1.1.4.tar.gz
-tirtc-esp32s3-kit-1.1.4.tar.gz.sha256
+tirtc-esp32s3-kit-1.1.5.tar.gz
+tirtc-esp32s3-kit-1.1.5.tar.gz.sha256
 ```
 
-校验后推送独立的 `kit-esp32s3-v<version>` 标签。`publish-kit.yml` 会从 metadata 固定的上游 commit 重建压缩包、核对 SHA-256，并使用 GitHub Actions token 创建 Release：
+校验后推送独立的 `kit-esp32s3-v<version>` 标签。`publish-kit.yml` 会从 metadata 固定的本仓库源码 commit 重建压缩包、核对 SHA-256，并使用 GitHub Actions token 创建 Release：
 
 ```bash
 cd dist
-sha256sum -c tirtc-esp32s3-kit-1.1.4.tar.gz.sha256
+sha256sum -c tirtc-esp32s3-kit-1.1.5.tar.gz.sha256
 cd ..
 
-git tag -a kit-esp32s3-v1.1.4 -m "TiRTC ESP32-S3 Device Kit 1.1.4"
-git push origin kit-esp32s3-v1.1.4
+git tag -a kit-esp32s3-v1.1.5 -m "TiRTC ESP32-S3 Device Kit 1.1.5"
+git push origin kit-esp32s3-v1.1.5
 ```
 
-metadata 中的版本、标签、上游 commit 和期望 SHA-256 必须与本地可复现打包结果一致；工作流不会从浮动的 `main` 取发布内容。
+metadata 中的版本、标签、本仓库源码 commit 和期望 SHA-256 必须与本地可复现打包结果一致；工作流不会从浮动的 `main` 取发布内容。
 
 ### 发布 npm
 

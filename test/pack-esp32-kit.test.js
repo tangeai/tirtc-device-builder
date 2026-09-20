@@ -40,9 +40,9 @@ function createSource(root) {
     "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
-    "device-sim/sdk/espressif-esp32s3/2.3.0/include/tirtc/tiRTC.h",
-    "device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a",
-    "device-sim/sdk/espressif-esp32s3/2.3.0/manifest/build-contract.env",
+    "device-sim/sdk/espressif-esp32s3/2.5.0/include/tirtc/tiRTC.h",
+    "device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a",
+    "device-sim/sdk/espressif-esp32s3/2.5.0/manifest/build-contract.env",
     "device-integration.md",
     "device-h5-live.md",
     "device-ai.md",
@@ -155,8 +155,9 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
     const kit = join(extracted, "tirtc-esp32s3-kit-1.0.0");
     const manifest = JSON.parse(readFileSync(join(kit, "manifest.json"), "utf8"));
     assert.equal(manifest.kit_version, "1.0.0");
-    assert.equal(manifest.tirtc_sdk_version, "2.3.0");
+    assert.equal(manifest.tirtc_sdk_version, "2.5.0");
     assert.equal(manifest.source_commit, COMMIT);
+    assert.equal(manifest.source_repository, "https://github.com/tangeai/tirtc-device-builder");
     assert.equal(
       existsSync(
         join(kit, "device-sim/templates/esp32-h5-ai/platform-media-contract.json"),
@@ -173,7 +174,7 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
       existsSync(
         join(
           kit,
-          "device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a",
+          "device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a",
         ),
       ),
       true,
@@ -193,10 +194,48 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
       existsSync(
         join(
           installed,
-          "device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a",
+          "device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a",
         ),
       ),
       true,
+    );
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("pack:esp32-kit includes the repository-owned ESP32-S3 SDK 2.5.0", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-source-test-"));
+  try {
+    const output = join(temporary, "dist");
+    const result = spawnSync(process.execPath, [
+      SCRIPT,
+      "--kit-version", "1.1.5",
+      "--source-commit", COMMIT,
+      "--output", output,
+    ], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+
+    const archive = join(output, "tirtc-esp32s3-kit-1.1.5.tar.gz");
+    const extracted = join(temporary, "extracted");
+    mkdirSync(extracted);
+    const unpack = spawnSync("tar", ["-xzf", archive, "-C", extracted], {
+      encoding: "utf8",
+    });
+    assert.equal(unpack.status, 0, unpack.stderr);
+    const kit = join(extracted, "tirtc-esp32s3-kit-1.1.5");
+    const sdkPath = "device-sim/sdk/espressif-esp32s3/2.5.0";
+    const manifest = JSON.parse(readFileSync(join(kit, "manifest.json"), "utf8"));
+    assert.equal(manifest.tirtc_sdk_version, "2.5.0");
+    assert.equal(existsSync(join(kit, sdkPath, "lib/libTiRTC.a")), true);
+    assert.equal(existsSync(join(kit, "device-sim/sdk/espressif-esp32s3/2.3.0")), false);
+    assert.deepEqual(
+      readFileSync(join(kit, sdkPath, "lib/libTiRTC.a")),
+      readFileSync(join(ROOT, "kit-src", sdkPath, "lib/libTiRTC.a")),
+    );
+    assert.match(
+      readFileSync(join(kit, sdkPath, "include/tirtc/tiRTC.h"), "utf8"),
+      /#define TIRTC_VERSION_MINOR\s+5\b/,
     );
   } finally {
     rmSync(temporary, { force: true, recursive: true });
