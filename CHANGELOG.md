@@ -2,6 +2,13 @@
 
 This project follows Semantic Versioning.
 
+## 0.9.7
+
+- Pin ESP32-S3 Device Kit 1.1.7 with the `XiaoTai-` SoftAP name and the
+  provisioning DHCP state fix; keep TiRTC C SDK 2.5.0.
+- Align generated-project instructions, Hardware IR validation, and Kit
+  packaging checks with the SoftAP name, and cover DHCP initial states.
+
 ## 0.9.6
 
 - Pin ESP32-S3 Device Kit 1.1.6 with TiRTC C SDK 2.5.0 and verify the

@@ -12,7 +12,7 @@ H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立�
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
-- ESP32 Device Kit：[kit-esp32s3-v1.1.6](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.6)
+- ESP32 Device Kit：[kit-esp32s3-v1.1.7](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.7)
 
 文档导航：
 
@@ -283,7 +283,7 @@ board-materials/
 | ESP-IDF | 5.5.x |
 | 自动安装版本 | ESP-IDF v5.5.4 |
 | 本仓库源码与本地打包使用的 TiRTC SDK | `espressif-esp32s3/2.5.0` |
-| ESP32 Device Kit | 1.1.6（内含 TiRTC SDK 2.5.0） |
+| ESP32 Device Kit | 1.1.7（内含 TiRTC SDK 2.5.0） |
 | Node.js | 18 或更高版本 |
 | 支持自动安装的系统 | Linux、WSL、macOS |
 | 原生 Windows | 使用 Espressif 官方安装器准备 ESP-IDF，再重新运行检查 |
@@ -394,7 +394,7 @@ Cline 当前还需要在 `Settings → Features → Enable Skills` 中启用实�
 |---|---|
 | Agent Skill | 上表中所选目录下的 `tirtc-esp32-builder` |
 | 托管根目录 | `~/.tirtc-device-builder` |
-| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.6` |
+| Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.7` |
 | ESP-IDF | `~/.tirtc-device-builder/esp-idf-v5.5.4` |
 | Espressif 工具 | `~/.tirtc-device-builder/espressif` |
 | 安装记录 | `~/.tirtc-device-builder/config.json` |
@@ -439,7 +439,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.6.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.7.tar.gz
 ```
 
 安装器仍会核对固定的 SHA-256、目录结构、清单和每个资源文件，不接受未经验证的同名压缩包。
@@ -822,7 +822,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install \
-  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.6.tar.gz
+  --kit-archive /absolute/path/tirtc-esp32s3-kit-1.1.7.tar.gz
 ```
 
 安装器会校验 SHA-256 和内部文件清单。如果校验不一致，请重新获取官方 Release 附件，不要跳过校验。
@@ -933,25 +933,25 @@ python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 
 ```bash
 npm run pack:esp32-kit -- \
-  --kit-version 1.1.6
+  --kit-version 1.1.7
 ```
 
 输出位于 `dist/`：
 
 ```text
-tirtc-esp32s3-kit-1.1.6.tar.gz
-tirtc-esp32s3-kit-1.1.6.tar.gz.sha256
+tirtc-esp32s3-kit-1.1.7.tar.gz
+tirtc-esp32s3-kit-1.1.7.tar.gz.sha256
 ```
 
 校验后推送独立的 `kit-esp32s3-v<version>` 标签。`publish-kit.yml` 会从 metadata 固定的本仓库源码 commit 重建压缩包、核对 SHA-256，并使用 GitHub Actions token 创建 Release：
 
 ```bash
 cd dist
-sha256sum -c tirtc-esp32s3-kit-1.1.6.tar.gz.sha256
+sha256sum -c tirtc-esp32s3-kit-1.1.7.tar.gz.sha256
 cd ..
 
-git tag -a kit-esp32s3-v1.1.6 -m "TiRTC ESP32-S3 Device Kit 1.1.6"
-git push origin kit-esp32s3-v1.1.6
+git tag -a kit-esp32s3-v1.1.7 -m "TiRTC ESP32-S3 Device Kit 1.1.7"
+git push origin kit-esp32s3-v1.1.7
 ```
 
 metadata 中的版本、标签、本仓库源码 commit 和期望 SHA-256 必须与本地可复现打包结果一致；工作流不会从浮动的 `main` 取发布内容。
@@ -962,8 +962,8 @@ metadata 中的版本、标签、本仓库源码 commit 和期望 SHA-256 必须
 
 ```bash
 npm test
-git tag -a v0.9.6 -m "v0.9.6"
-git push origin v0.9.6
+git tag -a v0.9.7 -m "v0.9.7"
+git push origin v0.9.7
 ```
 
 不要重复发布已经存在的 npm 版本。版本变化同步更新 `package.json`、`.codex-plugin/plugin.json` 和发布说明。

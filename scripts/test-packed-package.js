@@ -217,13 +217,13 @@ try {
 
   const managedRoot = join(temporary, "managed");
   const oldKit = join(managedRoot, "kits", "esp32s3", "1.0.0");
-  const expectedKit = join(managedRoot, "kits", "esp32s3", "1.1.6");
+  const expectedKit = join(managedRoot, "kits", "esp32s3", "1.1.7");
   createDeviceKit(oldKit, "1.0.0");
   writeFileSync(
     join(managedRoot, "config.json"),
     JSON.stringify({
       device_kit_root: oldKit,
-      device_kit_version: "1.1.6",
+      device_kit_version: "1.1.7",
     }),
     "utf8",
   );
