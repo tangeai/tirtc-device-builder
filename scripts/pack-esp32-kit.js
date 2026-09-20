@@ -372,6 +372,7 @@ function createArchive(staging, kitName, temporary) {
       "--owner=0",
       "--group=0",
       "--numeric-owner",
+      "--mode=go-w",
       "--format=ustar",
       "-cf",
       tarPath,

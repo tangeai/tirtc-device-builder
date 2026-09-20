@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -125,6 +126,11 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
     assert.deepEqual(normalizeUstarBuffer(tarVariant), canonicalTar);
 
     const secondOutput = join(temporary, "dist-second");
+    chmodSync(
+      join(source, "device-sim", "scripts", "create_esp32_project.py"),
+      0o664,
+    );
+    chmodSync(join(source, "device-sim", "scripts"), 0o775);
     const second = spawnSync(
       process.execPath,
       [
@@ -210,20 +216,20 @@ test("pack:esp32-kit includes the repository-owned ESP32-S3 SDK 2.5.0", () => {
     const output = join(temporary, "dist");
     const result = spawnSync(process.execPath, [
       SCRIPT,
-      "--kit-version", "1.1.5",
+      "--kit-version", "1.1.6",
       "--source-commit", COMMIT,
       "--output", output,
     ], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
 
-    const archive = join(output, "tirtc-esp32s3-kit-1.1.5.tar.gz");
+    const archive = join(output, "tirtc-esp32s3-kit-1.1.6.tar.gz");
     const extracted = join(temporary, "extracted");
     mkdirSync(extracted);
     const unpack = spawnSync("tar", ["-xzf", archive, "-C", extracted], {
       encoding: "utf8",
     });
     assert.equal(unpack.status, 0, unpack.stderr);
-    const kit = join(extracted, "tirtc-esp32s3-kit-1.1.5");
+    const kit = join(extracted, "tirtc-esp32s3-kit-1.1.6");
     const sdkPath = "device-sim/sdk/espressif-esp32s3/2.5.0";
     const manifest = JSON.parse(readFileSync(join(kit, "manifest.json"), "utf8"));
     assert.equal(manifest.tirtc_sdk_version, "2.5.0");
