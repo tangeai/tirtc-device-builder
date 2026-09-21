@@ -136,6 +136,50 @@ class CreateEsp32ProjectTest(unittest.TestCase):
             self.assertIn("小钛", setup_page)
             self.assertIn("/api/networks", setup_page)
 
+    def test_generates_self_contained_p4_reference_project(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "p4_device"
+            MODULE.create_project(output, "p4_device", None, target="esp32p4")
+
+            self.assertTrue((output / "CMakeLists.txt").is_file())
+            self.assertTrue((output / "main" / "xiaotai_main.c").is_file())
+            self.assertTrue((output / "dependencies.lock").is_file())
+            self.assertTrue((output / "partitions.csv").is_file())
+            self.assertTrue((output / "third_party/tirtc/lib/libTiRTC.a").is_file())
+            self.assertFalse((output / "build").exists())
+            self.assertFalse((output / "managed_components").exists())
+
+            cmake = (output / "CMakeLists.txt").read_text(encoding="utf-8")
+            self.assertIn("project(p4_device)", cmake)
+            self.assertNotIn("project(xiaotai_esp32p4)", cmake)
+            self.assertIn("EXTRA_COMPONENT_DIRS", cmake)
+
+            sdkconfig = (output / "sdkconfig.defaults").read_text(encoding="utf-8")
+            self.assertIn('CONFIG_IDF_TARGET="esp32p4"', sdkconfig)
+            self.assertIn("CONFIG_LWIP_MAX_SOCKETS=10", sdkconfig)
+
+            for component in ("wifi_manager", "platform_client", "runtime_config"):
+                self.assertTrue((output / "components" / component).is_dir())
+            wifi_source = (
+                output / "components/wifi_manager/src/wifi_manager.c"
+            ).read_text(encoding="utf-8")
+            self.assertIn('"XiaoTai-%02X%02X"', wifi_source)
+            # 全量 P4 参考保留完整服务面，不做 focus 裁剪。
+            platform_header = (
+                output / "components/platform_client/include/platform_client.h"
+            ).read_text(encoding="utf-8")
+            self.assertIn("PLATFORM_SERVICE_VOIP", platform_header)
+            self.assertIn("platform_client_set_online_handler", platform_header)
+
+    def test_rejects_unknown_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(ValueError):
+                MODULE.create_project(
+                    Path(temp_dir) / "bad", "bad", None, target="esp32c3"
+                )
+        with self.assertRaises(ValueError):
+            MODULE.repository_paths(target="esp32c6")
+
     def test_does_not_overwrite_existing_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             output = Path(temp_dir) / "existing"
