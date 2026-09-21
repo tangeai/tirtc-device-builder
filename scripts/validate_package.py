@@ -234,11 +234,13 @@ def validate_repository_files(errors: list[str]) -> None:
         if not path.is_file() or ".git" in path.parts:
             continue
         relative = path.relative_to(ROOT)
-        # The source Kit contains one redistributable target-specific SDK archive;
-        # package.json's files whitelist keeps kit-src out of the npm tarball.
+        # The source Kit contains the redistributable target-specific SDK
+        # archives; package.json's files whitelist keeps kit-src out of the npm
+        # tarball. ESP32-S3 and ESP32-P4 archives must never be mixed.
         bundled_sdks = {
             Path("kit-src/device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a"),
             Path("kit-src/device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a"),
+            Path("kit-src/device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a"),
         }
         if path.suffix.lower() in FORBIDDEN_SUFFIXES and relative not in bundled_sdks:
             error(errors, f"forbidden binary or credential file: {relative}")

@@ -17,6 +17,7 @@ htmlcov/
 *.a
 !kit-src/device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a
 !kit-src/device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a
+!kit-src/device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a
 *.la
 *.lo
 *.dll
