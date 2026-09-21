@@ -56,6 +56,10 @@ const REQUIRED_FILES = [
   "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
   "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.c",
   "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
+  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.c",
+  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.h",
+  "device-sim/device-sim-esp32/components/wifi_manager/web/setup.html",
+  "device-sim/device-sim-esp32/components/wifi_manager/Kconfig",
   `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/include/tirtc/tiRTC.h`,
   `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/lib/libTiRTC.a`,
   `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/manifest/build-contract.env`,
@@ -345,6 +349,11 @@ function assertSoftApContract(root) {
   assertOmits(source, '"TiRTC-%02X%02X"', "the old SSID prefix");
   assertOmits(source, "XiaoTai-Setup-", "the legacy setup SSID prefix");
   assertOmits(source, "192.168.4.1", "the legacy provisioning address");
+  assertContains(source, '"/api/networks"', "portal network list endpoint");
+  assertContains(source, '"/api/scan"', "portal scan endpoint");
+  assertContains(source, "portal_socket_allowed", "portal socket filtering");
+  assertContains(source, "wifi_manager_disconnect", "manual network change API");
+  assertContains(source, "WIFI_PROVISION_AFTER_FAILURES", "post-failure portal policy");
 
   const dns = readFileSync(dnsPath, "utf8");
   assertContains(dns, "DNS_FLAG_RESPONSE", "DNS response handling");
@@ -352,7 +361,17 @@ function assertSoftApContract(root) {
 
   const cmake = readFileSync(cmakePath, "utf8");
   assertContains(cmake, '"src/wifi_captive_dns.c"', "DNS component source");
+  assertContains(cmake, '"src/wifi_history.c"', "history component source");
+  assertContains(cmake, 'EMBED_TXTFILES "web/setup.html"', "embedded setup page");
   assertContains(cmake, "lwip", "DNS socket dependency");
+
+  const htmlPath = join(
+    root,
+    "device-sim/device-sim-esp32/components/wifi_manager/web/setup.html",
+  );
+  const html = readFileSync(htmlPath, "utf8");
+  assertContains(html, "小钛", "setup page branding");
+  assertContains(html, "/api/networks", "setup page network list");
 
   const readme = readFileSync(readmePath, "utf8");
   assertContains(readme, "XiaoTai-XXXX", "documented SSID prefix");

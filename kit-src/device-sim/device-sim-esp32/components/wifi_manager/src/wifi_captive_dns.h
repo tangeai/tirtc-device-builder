@@ -1,11 +1,14 @@
 #ifndef WIFI_CAPTIVE_DNS_H
 #define WIFI_CAPTIVE_DNS_H
 
-#include <stdint.h>
-
 #include "esp_err.h"
+#include "esp_netif.h"
 
-/** Start the provisioning-only wildcard DNS responder on UDP port 53. */
-esp_err_t wifi_captive_dns_start(uint32_t captive_portal_ip);
+/** Start one wildcard IPv4 DNS responder for the SoftAP; repeated calls are safe. */
+esp_err_t wifi_captive_dns_start(esp_netif_t *ap_netif);
+/* Start/stop are serialized by the Wi-Fi lifecycle owner. The worker closes
+ * its socket before acknowledging stop; the owner then frees its PSRAM task.
+ * A stop timeout retains ownership for a later stop, never forcing deletion. */
+esp_err_t wifi_captive_dns_stop(void);
 
 #endif

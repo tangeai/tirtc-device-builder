@@ -111,9 +111,10 @@
 处理规则：
 
 1. 启动时优先读取 NVS 中最后一次成功配置。
-2. 没有配置或连接失败时进入串口/SoftAP 配置模式。
-3. 新配置连接成功后写入 NVS。
-4. 修改配置不需要改代码或重新编译固件。
+2. 没有配置时进入 SoftAP 配网页；已存网络连续 5 次失败后在继续重试（1/2/4/8/15/30 s 退避）的同时开启配网页，便于换网。
+3. 配网页提供附近 Wi-Fi 扫描列表（`/api/scan`、`/api/networks`）与已保存网络历史，支持免密复用（`use_saved`）和手动输入；只接受 SoftAP 本地连接，写入请求校验 `Origin`。
+4. 新配置连接成功后写入 NVS（版本化单键记录），成功联网写入网络历史；`wifi-change` 保留凭证重新打开配网页，`wifi-clear` 清除配置与历史。
+5. 修改配置不需要改代码或重新编译固件。
 
 Demo 可使用明文配置；正式产品应增加 NVS 加密或安全注入方案。
 
@@ -151,9 +152,11 @@ accept
 reject
 hangup
 wifi-set <ssid> <password>
-wifi-clear
+wifi-clear                                       # 清除 Wi-Fi 配置与历史
+wifi-change                                      # 保留凭证，断开并重新打开配网页
 tirtc-set <device_id> <device_key> [client_id]  # 仅预烧/联调
 tirtc-clear                                     # 清除后重新验证码绑定
+bind-retry                                      # 绑定失败/超时后无需重启的重试
 ```
 
 产品可增加三键、LCD、LED、提示音或本地网页。GPIO 只在板级配置中定义，业务代码只接收抽象动作。
@@ -226,7 +229,9 @@ ARM/MIPS 设备执行。
 ESP32-S3 业务信令沿用 `device-sim-c` 的服务发现、HMAC-SHA256 设备登录、业务 HTTP、永久 MQTT、
 ACK 和心跳协议；`platform_client` 负责这些平台通信，`tirtc_adapter` 只负责媒体连接、命令和帧。
 首次启动沿用 `device-sim-c` 的验证码绑定：设备上报 MAC，显示验证码，通过临时 MQTT 等待
-`auth_grant`，ACK 后将 `device_id/device_key` 保存到 NVS。后续启动直接读取凭证；解绑后自动重新绑定。
+`auth_grant`，ACK 后将 `device_id/device_key` 保存到 NVS。后续启动直接读取凭证；收到解绑
+通知或登录返回 6006 时保留本地身份，先核对服务端绑定状态，确认后用旧密钥签名重绑，
+重绑返回的身份与本地不一致时拒绝写入。
 
 ## 10. 验证范围与产品扩展
 

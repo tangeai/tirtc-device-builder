@@ -214,7 +214,7 @@ Report 成功后，设备从 HTTP 响应中取得 `temp_client_id`（格式为 `
 | type | topic | channel | payload | 触发时机 |
 |---|---|---|---|---|
 | `auth_grant` | `{temp_client_id}/cmd` | — | `{"device_id":"...","device_key":"..."}` 或空 payload | 绑定成功，处理见 [临时 MQTT 连接](#临时-mqtt-连接) |
-| `unbind` | `sn_{device_id}/cmd` | — | — | 用户解绑设备时，通知设备清除本地状态 |
+| `unbind` | `sn_{device_id}/cmd` | — | — | 用户解绑设备时，通知设备核对绑定状态并签名重绑（保留本地身份，不提前清除 NVS） |
 
 正式连接（topic: `device/sn_{device_id}/cmd`、`device/sn_{device_id}/notify`）的常见下行消息如下（`channel=wx`，来自 voip-server）：
 

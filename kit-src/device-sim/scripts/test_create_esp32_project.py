@@ -120,7 +120,21 @@ class CreateEsp32ProjectTest(unittest.TestCase):
             self.assertIn("wildcard DNS listening", dns_source)
             self.assertIn("DNS_FLAG_RESPONSE", dns_source)
             self.assertIn('"src/wifi_captive_dns.c"', wifi_cmake)
+            self.assertIn('"src/wifi_history.c"', wifi_cmake)
+            self.assertIn('EMBED_TXTFILES "web/setup.html"', wifi_cmake)
             self.assertIn("lwip", wifi_cmake)
+
+            self.assertIn('"/api/networks"', wifi_source)
+            self.assertIn('"/api/scan"', wifi_source)
+            self.assertIn("portal_socket_allowed", wifi_source)
+            self.assertIn("wifi_manager_disconnect", wifi_source)
+            self.assertIn("WIFI_PROVISION_AFTER_FAILURES", wifi_source)
+
+            setup_page = (
+                output / "components/wifi_manager/web/setup.html"
+            ).read_text(encoding="utf-8")
+            self.assertIn("小钛", setup_page)
+            self.assertIn("/api/networks", setup_page)
 
     def test_does_not_overwrite_existing_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

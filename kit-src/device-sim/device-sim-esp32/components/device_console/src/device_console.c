@@ -23,17 +23,30 @@ static int command_status(int argc, char **argv)
     (void)argc;
     (void)argv;
     printf("Wi-Fi: %s", wifi_manager_connected() ? "connected" : "disconnected");
+    if (wifi_manager_connection_failed()) {
+        printf(" (connection failed, retrying)");
+    }
     if (wifi_manager_provisioning()) {
-        printf(" (SoftAP %s)", wifi_manager_provisioning_ssid());
+        printf(" (SoftAP %s -> %s)", wifi_manager_provisioning_ssid(),
+               wifi_manager_provisioning_url());
+        const char *status = wifi_manager_provisioning_status();
+        if (status[0] != '\0') {
+            printf(" [%s]", status);
+        }
     }
     printf("\nTiRTC: state=%d connection=%s\n",
            (int)tirtc_adapter_state(),
            tirtc_adapter_has_connection() ? "active" : "none");
     printf("       audio subscription=%s; video=unsupported\n",
            tirtc_adapter_audio_subscribed() ? "active" : "inactive");
-    printf("Platform: api=%s mqtt=%s\n",
+    printf("Platform: api=%s mqtt=%s",
            platform_client_ready() ? "ready" : "offline",
            platform_client_mqtt_connected() ? "connected" : "disconnected");
+    if (platform_client_reconciling()) {
+        printf(" binding=reconciling(known_unbound=%d)",
+               (int)platform_client_known_unbound());
+    }
+    printf("\n");
     if (platform_client_provisioning()) {
         printf("Binding: waiting for H5, verification code=%s\n",
                platform_client_verification_code());
@@ -87,6 +100,30 @@ static int command_wifi_clear(int argc, char **argv)
     printf("Wi-Fi config cleared; restarting into SoftAP mode...\n");
     vTaskDelay(pdMS_TO_TICKS(300));
     esp_restart();
+    return 0;
+}
+
+static int command_wifi_change(int argc, char **argv)
+{
+    /* "换网"语义：保留已存凭证，断开 STA 并打开配网门户直到保存重启。 */
+    (void)argc;
+    (void)argv;
+    esp_err_t err = wifi_manager_disconnect();
+    if (err != ESP_OK) {
+        printf("disconnect rejected: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Wi-Fi disconnected; provisioning portal opened (credentials retained)\n");
+    return 0;
+}
+
+static int command_bind_retry(int argc, char **argv)
+{
+    /* 对应带屏设备的绑定页重试按钮；绑定失败或解绑后无需重启重试。 */
+    (void)argc;
+    (void)argv;
+    platform_client_retry_binding();
+    printf("binding retry requested\n");
     return 0;
 }
 
@@ -264,8 +301,10 @@ esp_err_t device_console_start(void)
     ESP_ERROR_CHECK(register_command("status", "Show Wi-Fi, TiRTC and media status", command_status));
     ESP_ERROR_CHECK(register_command("wifi-set", "wifi-set <ssid> <password>", command_wifi_set));
     ESP_ERROR_CHECK(register_command("wifi-clear", "Clear Wi-Fi config and enter SoftAP", command_wifi_clear));
+    ESP_ERROR_CHECK(register_command("wifi-change", "Disconnect and reopen provisioning; credentials retained", command_wifi_change));
     ESP_ERROR_CHECK(register_command("tirtc-set", "Diagnostic: pre-load device credentials", command_tirtc_set));
     ESP_ERROR_CHECK(register_command("tirtc-clear", "Clear credentials and restart verification binding", command_tirtc_clear));
+    ESP_ERROR_CHECK(register_command("bind-retry", "Retry device binding without reboot", command_bind_retry));
     ESP_ERROR_CHECK(register_command("ai-press", "Start AI PTT and keep talking", command_ai_press));
     ESP_ERROR_CHECK(register_command("ai-release", "Release AI PTT and end conversation", command_ai_release));
     ESP_ERROR_CHECK(register_command("voip-call", "Call the first authorized VoIP contact", command_voip_call));

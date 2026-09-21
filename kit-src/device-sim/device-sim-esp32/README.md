@@ -85,7 +85,7 @@ number.alaw_8khz
 
 ## 首次配置
 
-设备没有 Wi-Fi 配置时会启动：
+设备没有 Wi-Fi 配置、已存网络连续 5 次连接失败、或用户主动换网时，会启动：
 
 ```text
 SSID: XiaoTai-XXXX
@@ -96,21 +96,37 @@ SSID: XiaoTai-XXXX
 设备通过通配 DNS 和 HTTP 重定向响应 Android、iOS、Windows 等客户端的 captive
 portal 探测，连接热点后通常会自动显示配网页面；没有弹窗时手动打开上述 HTTP
 地址。HTTPS 页面不能被透明重定向。
-网页提交 SSID/密码后写入 NVS 并重启。也可使用串口：
+
+配网页面提供附近 Wi-Fi 的实时扫描列表、信号强度与认证方式标记，并合并设备
+已保存的网络历史（含「已保存」标记与免密复用）；也支持手动输入 SSID/密码。
+页面提交后写入 NVS 并重启。配网请求只接受来自 SoftAP 接口的本地连接，写入
+请求同时校验 `Origin`，设备在线后门户立即关闭。串口等价命令：
 
 ```text
 wifi-set "My WiFi" "12345678"
-wifi-clear
+wifi-clear   # 清除 Wi-Fi 配置与联网历史，重启后进入 SoftAP
+wifi-change  # 保留已存凭证，断开 STA 并重新打开配网页（换网）
 ```
+
+STA 取得 IP 后，如果 DHCP 未提供备选 DNS，设备会在 FALLBACK 槽位安装
+`CONFIG_WIFI_MANAGER_FALLBACK_DNS_IPV4`（默认 `223.5.5.5`，空串禁用），
+供首次 SNTP/HTTP 使用；主/备份 DNS 槽位始终由 DHCP 拥有。
 
 Wi-Fi 连通后，如果 NVS 中没有设备凭证，设备会自动：
 
 1. 上报 Wi-Fi STA MAC，获取验证码和临时 MQTT 凭证。
-2. 在串口打印验证码和 [TiRTC 体验平台](https://xiaotai.chat) 地址，等待用户登录后进入设备绑定并输入验证码。
+2. 在串口打印验证码和 [TiRTC 体验平台](https://xiaotai.chat) 地址，等待用户登录后进入设备绑定并输入验证码。临时 MQTT 订阅成功后才认为绑定会话可用。
 3. 接收临时 MQTT 的 `auth_grant`，发送 QoS1 ACK。
 4. 将下发的 `device_id/device_key` 写入 NVS，随后启动正式 MQTT 和 TiRTC。
 
-后续启动会直接读取 NVS，不再要求输入验证码。收到 `unbind` 或登录返回设备已解绑时，会重新进入绑定流程。
+后续启动会直接读取 NVS，不再要求输入验证码。绑定失败或超时不再要求重启：
+串口输入 `bind-retry` 即可重新进入验证码绑定。
+
+收到 `unbind` 或登录返回设备已解绑（6006）时，设备保留本地身份，先向服务端
+核对绑定状态；确认解绑后用旧密钥签名重绑（验证码流程），重绑返回的身份必须
+与本地一致，否则视为契约错误并拒绝写入。只有 `tirtc-clear` 才会真正清除本地
+绑定凭证。
+
 设备取得正式 MQTT token 后，会向 device-server 调用
 [`POST /v1/device/profile`](../../api-reference.md#post-v1deviceprofile)，在 `profiles.voip`
 中上报纯音频工作配置。Web 与微信小程序通过用户设备列表读取这份配置；联系人查询仍由
@@ -122,6 +138,7 @@ Wi-Fi 连通后，如果 NVS 中没有设备凭证，设备会自动：
 tirtc-set <device_id> <device_key>
 tirtc-set <device_id> <device_key> <client_id>
 tirtc-clear  # 清除绑定凭证，重启后重新显示验证码
+bind-retry   # 绑定失败/超时后无需重启的绑定重试
 ```
 
 平台服务默认通过 `http://ep-open.tangeopen.com/services` 发现。ESP32-S3 不设置

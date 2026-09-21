@@ -2,6 +2,33 @@
 
 This project follows Semantic Versioning.
 
+## 0.10.0 (planned; ships Device Kit 1.2.0)
+
+- Align the Kit's provisioning and device-binding implementation with the
+  reference XiaoTai product firmware:
+  - Wi-Fi provisioning: the embedded setup page gains a live scan list
+    (`POST /api/scan`, `GET /api/networks`), saved-network history with
+    `use_saved` password reuse, portal isolation to the SoftAP interface and
+    Origin checks on writes, exponential retry (1/2/4/8/15/30 s) with the
+    portal opened alongside retries after 5 consecutive failures, a manual
+    `wifi-change` entrance that retains credentials, and a station fallback
+    DNS slot (`CONFIG_WIFI_MANAGER_FALLBACK_DNS_IPV4`, default 223.5.5.5).
+  - Device binding: fresh-boot SNTP is required before any authentication;
+    the verification-code TTS endpoint (`GET /v1/device/tts`) is supported
+    behind a prompt callback (NULL by default; headless devices keep the
+    serial code); binding failures and rebinds can be retried without a
+    reboot (`bind-retry`); an `unbind` signal or a 6006 token response now
+    triggers identity reconciliation and a signed rebind that retains the
+    stored identity instead of clearing NVS and restarting.
+  - Shared components (`wifi_manager`, `platform_client`, `runtime_config`)
+    keep dual-target ESP32-S3/ESP32-P4 conditionals so future P4 ports can
+    reuse them unchanged.
+- Extend the Kit packing contract and generator tests to cover the new
+  portal endpoints, history component, embedded setup page, and portal
+  isolation; keep the `XiaoTai-` / open-auth / 192.168.6.1 SoftAP contract.
+- Device Kit release (1.2.0) and checksum pinning are deferred to the
+  release workflow; no sha256 is fabricated in this changelog.
+
 ## 0.9.7
 
 - Pin ESP32-S3 Device Kit 1.1.7 with the `XiaoTai-` SoftAP name and the

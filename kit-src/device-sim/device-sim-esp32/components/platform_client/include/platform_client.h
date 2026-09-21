@@ -12,6 +12,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "esp_err.h"
 
@@ -35,6 +36,19 @@ typedef struct {
     const char *discovery_url; /**< 服务发现入口，NULL 使用默认值。 */
 } platform_client_config_t;
 
+/**
+ * 播放服务端生成的 8 kHz、单声道、signed 16-bit little-endian PCM。
+ * pcm 仅在回调期间有效；回调运行在绑定工作任务中，可以阻塞到播放完成。
+ */
+typedef esp_err_t (*platform_verification_prompt_callback_t)(
+    const int16_t *pcm,
+    size_t sample_count,
+    void *user_data);
+
+/** Stop an obsolete prompt after binding ACK/error. Runs on the MQTT task:
+ * only signal cancellation here; no playback, NVS, UI calls or blocking I/O. */
+typedef void (*platform_verification_prompt_cancel_t)(void *user_data);
+
 /** 首次绑定或服务端解绑后重绑的输入。 */
 typedef struct {
     const char *mac_address;          /**< 设备指纹。 */
@@ -42,6 +56,9 @@ typedef struct {
     const char *existing_device_secret; /**< 必须与 existing_device_id 同时提供。 */
     const char *discovery_url;        /**< NULL 使用默认发现入口。 */
     unsigned timeout_seconds;         /**< 等待 auth_grant，0 使用默认值。 */
+    platform_verification_prompt_callback_t prompt_callback; /**< NULL 不播报。 */
+    void *prompt_user_data;           /**< 原样传给 prompt_callback。 */
+    platform_verification_prompt_cancel_t prompt_cancel_callback;
 } platform_provision_config_t;
 
 /** 绑定完成后由调用者持久化，结构内容不会由模块自动写入 NVS。 */
@@ -61,10 +78,46 @@ typedef void (*platform_signal_callback_t)(const char *json,
                                            void *user_data);
 
 /**
- * 完成服务发现、签名设备登录并启动 HTTP 请求任务和永久 MQTT。
+ * Start/reuse SNTP and wait for a valid synchronization in this boot before
+ * TiRTC initialization, provisioning or authentication. A plausible retained
+ * wall clock alone does not satisfy the first wait. Later calls reuse the
+ * confirmed clock; SNTP keeps refreshing it in the background.
+ * Call serially from the startup/platform HTTP owner after Wi-Fi has an IP,
+ * never from LVGL, media or SDK callbacks. One wait is bounded by the configured
+ * SNTP peer timeouts; errors leave dependent startup work to the caller.
+ * Does not create a product task, start MQTT or perform service discovery.
+ */
+esp_err_t platform_client_sync_clock(void);
+
+/**
+ * 完成服务发现、签名设备登录并启动永久 MQTT。
  * 函数执行网络 I/O，必须在 app_main 之外的工作任务调用；重复调用安全。
  */
 esp_err_t platform_client_start(const platform_client_config_t *config);
+
+/**
+ * 把当前调用任务转为永久 HTTP/心跳循环；平台上线后调用。
+ * 正常情况下不返回；返回 NOT_FOUND 时由同一工作任务处理身份重核/重绑。
+ */
+esp_err_t platform_client_run_request_loop(void);
+
+/* Runtime requests a transition without doing NVS, restart or network I/O.
+ * The HTTP owner stops the old MQTT, then either validates the old binding
+ * or performs signed provisioning. Pending requests retain their old epoch. */
+bool platform_client_request_rebind(bool known_unbound);
+/* Call after runtime media/connection teardown; wakes the existing HTTP owner. */
+void platform_client_rebind_quiesced(void);
+bool platform_client_known_unbound(void);
+bool platform_client_reconciling(void);
+esp_err_t platform_client_prepare_rebind(void);
+void platform_client_complete_rebind(void);
+uint32_t platform_client_epoch(void);
+/* Only read from a platform HTTP response callback. */
+uint32_t platform_client_response_epoch(void);
+/* Only read in the HTTP callback: final status, or 0 if no response arrived. */
+int platform_client_response_status(void);
+void platform_client_retry_binding(void);
+bool platform_client_take_binding_retry(void);
 
 /**
  * 上报设备指纹、显示验证码、使用临时 MQTT 等待 auth_grant 并发送 ACK。

@@ -24,13 +24,11 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_random.h"
-#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "platform_client.h"
-#include "runtime_config.h"
 #include "starter_media.h"
 #include "starter_tirtc.h"
 
@@ -645,9 +643,21 @@ static void end_ai_session(void)
     finish_session(0);
 }
 
+static void reconcile_platform_binding(bool known_unbound)
+{
+    if (!platform_client_request_rebind(known_unbound)) return;
+    finish_session(0);
+    atomic_store_explicit(&s_transport_recovery_required,
+                          false,
+                          memory_order_release);
+    platform_client_rebind_quiesced();
+    ESP_LOGW(TAG, "binding transition requested: unbound=%d; identity retained",
+             known_unbound);
+}
+
 static void handle_platform_signal(const runtime_event_t *event)
 {
-    /* unbind 清除本地凭证并重启，下一次启动重新进入验证码绑定。 */
+    /* unbind 触发身份核对与签名重绑，本地凭证保留到服务端确认。 */
     cJSON *root = event->text == NULL
                       ? NULL
                       : cJSON_ParseWithLength(event->text, event->length);
@@ -660,13 +670,8 @@ static void handle_platform_signal(const runtime_event_t *event)
     if (!unbound) {
         return;
     }
-    ESP_LOGW(TAG, "device was unbound; clearing local credentials and restarting");
-    finish_session(0);
-    if (runtime_config_clear_tirtc() != ESP_OK) {
-        ESP_LOGE(TAG, "cannot clear stored device credentials");
-    }
-    vTaskDelay(pdMS_TO_TICKS(300));
-    esp_restart();
+    ESP_LOGW(TAG, "device was unbound; reconciling binding with identity retained");
+    reconcile_platform_binding(true);
 }
 
 static void runtime_task(void *argument)
@@ -675,15 +680,14 @@ static void runtime_task(void *argument)
     publish_state(STARTER_RUNTIME_WAITING);
     for (;;) {
         /*
-         * 平台信令无法可靠入队时通过重启重新核对服务端绑定状态；若设备已
-         * unbind，组合根会进入签名重绑。传输事件丢失则收敛到 WAITING 并断连。
+         * 平台信令无法可靠入队时核对服务端绑定状态，而不是重启；只有确认
+         * 6006 才由 HTTP owner 进入签名重绑。传输事件丢失则收敛到 WAITING。
          */
         if (atomic_exchange_explicit(&s_platform_restart_required,
                                      false,
                                      memory_order_acq_rel)) {
-            ESP_LOGE(TAG, "restarting after platform signal queue overflow");
-            vTaskDelay(pdMS_TO_TICKS(100));
-            esp_restart();
+            ESP_LOGE(TAG, "reconciling binding after platform signal queue overflow");
+            reconcile_platform_binding(false);
         }
         if (atomic_exchange_explicit(&s_transport_recovery_required,
                                      false,

@@ -22,18 +22,21 @@ idf.py -p <SERIAL_PORT> flash monitor
 
 ## 首次启动
 
-1. 设备没有 Wi-Fi 配置时启动 `XiaoTai-XXXX` 开放 SoftAP，无需密码。设备通过通配 DNS 和 HTTP 重定向响应 Android、iOS、Windows 等客户端的 captive portal 探测，连接后通常会自动显示配网页面；没有弹窗时打开 `http://192.168.6.1`。HTTPS 页面不能被透明重定向。
-2. 设备联网后在串口打印绑定验证码和体验平台地址。
-3. 在 H5 完成设备绑定。凭证保存到 NVS，设备随后完成服务发现、MQTT 登录和 TiRTC 启动。
-4. 串口输入 `status` 查看平台、MQTT、TiRTC、会话和媒体计数。
+1. 设备没有 Wi-Fi 配置、已存网络连续失败或主动换网时，启动 `XiaoTai-XXXX` 开放 SoftAP，无需密码。设备通过通配 DNS 和 HTTP 重定向响应 Android、iOS、Windows 等客户端的 captive portal 探测，连接后通常会自动显示配网页面；没有弹窗时打开 `http://192.168.6.1`。HTTPS 页面不能被透明重定向。配网页面提供附近 Wi-Fi 的实时扫描列表与已保存网络复用（免密/手动输入均可），配网请求只接受 SoftAP 本地连接。
+2. 设备联网后在串口打印绑定验证码和体验平台地址；临时 MQTT 订阅成功后才认为绑定会话可用。
+3. 在 H5 完成设备绑定。凭证保存到 NVS，设备随后完成服务发现、MQTT 登录和 TiRTC 启动。绑定失败或超时无需重启，串口输入 `bind-retry` 重试。
+4. 服务端解绑（`unbind` 信号或登录返回 6006）时设备保留本地身份，先核对绑定状态，确认后走签名重绑；身份不一致视为契约错误，不会覆盖 NVS。
+5. 串口输入 `status` 查看平台、MQTT、TiRTC、会话和媒体计数。
 
 也可以使用以下联调命令预置或清理配置：
 
 ```text
 wifi-set <ssid> <password>
-wifi-clear
+wifi-clear     # 清除 Wi-Fi 配置与联网历史
+wifi-change    # 保留凭证，断开 STA 并重新打开配网页（换网）
 tirtc-set <device_id> <device_secret> [client_id]
-tirtc-clear
+tirtc-clear    # 清除绑定凭证
+bind-retry     # 绑定失败/超时后无需重启的绑定重试
 restart
 ```
 

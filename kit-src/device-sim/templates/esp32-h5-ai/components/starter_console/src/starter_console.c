@@ -32,12 +32,25 @@ static int command_status(int argc, char **argv)
     starter_runtime_status_t runtime = starter_runtime_status();
     starter_media_status_t media = starter_media_status();
     printf("Wi-Fi: %s", wifi_manager_connected() ? "connected" : "disconnected");
-    if (wifi_manager_provisioning()) {
-        printf(" (SoftAP %s)", wifi_manager_provisioning_ssid());
+    if (wifi_manager_connection_failed()) {
+        printf(" (connection failed, retrying)");
     }
-    printf("\nPlatform: api=%s mqtt=%s\n",
+    if (wifi_manager_provisioning()) {
+        printf(" (SoftAP %s -> %s)", wifi_manager_provisioning_ssid(),
+               wifi_manager_provisioning_url());
+        const char *status = wifi_manager_provisioning_status();
+        if (status[0] != '\0') {
+            printf(" [%s]", status);
+        }
+    }
+    printf("\nPlatform: api=%s mqtt=%s",
            platform_client_ready() ? "ready" : "offline",
            platform_client_mqtt_connected() ? "connected" : "disconnected");
+    if (platform_client_reconciling()) {
+        printf(" binding=reconciling(known_unbound=%d)",
+               (int)platform_client_known_unbound());
+    }
+    printf("\n");
     if (platform_client_provisioning()) {
         printf("Binding: verification code=%s\n",
                platform_client_verification_code());
@@ -134,6 +147,30 @@ static int command_wifi_clear(int argc, char **argv)
     return 0;
 }
 
+static int command_wifi_change(int argc, char **argv)
+{
+    /* "换网"语义：保留已存凭证，断开 STA 并打开配网门户直到保存重启。 */
+    (void)argc;
+    (void)argv;
+    esp_err_t err = wifi_manager_disconnect();
+    if (err != ESP_OK) {
+        printf("disconnect rejected: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    printf("Wi-Fi disconnected; provisioning portal opened (credentials retained)\n");
+    return 0;
+}
+
+static int command_bind_retry(int argc, char **argv)
+{
+    /* 对应带屏设备的绑定页重试按钮；绑定失败或解绑后无需重启重试。 */
+    (void)argc;
+    (void)argv;
+    platform_client_retry_binding();
+    printf("binding retry requested\n");
+    return 0;
+}
+
 static int command_tirtc_set(int argc, char **argv)
 {
     /* 仅用于受控联调；正常设备通过验证码绑定获得并保存凭证。 */
@@ -219,10 +256,14 @@ esp_err_t starter_console_start(void)
                         "starter_console", "register wifi-set");
     ESP_RETURN_ON_ERROR(register_command("wifi-clear", "Clear Wi-Fi and use SoftAP", command_wifi_clear),
                         "starter_console", "register wifi-clear");
+    ESP_RETURN_ON_ERROR(register_command("wifi-change", "Disconnect and reopen provisioning; credentials retained", command_wifi_change),
+                        "starter_console", "register wifi-change");
     ESP_RETURN_ON_ERROR(register_command("tirtc-set", "Pre-load device credentials", command_tirtc_set),
                         "starter_console", "register tirtc-set");
     ESP_RETURN_ON_ERROR(register_command("tirtc-clear", "Clear device credentials", command_tirtc_clear),
                         "starter_console", "register tirtc-clear");
+    ESP_RETURN_ON_ERROR(register_command("bind-retry", "Retry device binding without reboot", command_bind_retry),
+                        "starter_console", "register bind-retry");
     ESP_RETURN_ON_ERROR(register_command("restart", "Restart the device", command_restart),
                         "starter_console", "register restart");
 

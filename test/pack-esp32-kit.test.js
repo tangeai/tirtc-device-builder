@@ -41,6 +41,10 @@ function createSource(root) {
     "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.c",
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.h",
+    "device-sim/device-sim-esp32/components/wifi_manager/web/setup.html",
+    "device-sim/device-sim-esp32/components/wifi_manager/Kconfig",
     "device-sim/sdk/espressif-esp32s3/2.5.0/include/tirtc/tiRTC.h",
     "device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a",
     "device-sim/sdk/espressif-esp32s3/2.5.0/manifest/build-contract.env",
@@ -61,7 +65,12 @@ function createSource(root) {
 #define WIFI_SETUP_IP_B 168
 #define WIFI_SETUP_IP_C 6
 #define WIFI_SETUP_IP_D 1
+#define WIFI_PROVISION_AFTER_FAILURES 5U
 const char *ssid_format = "XiaoTai-%02X%02X";
+const char *networks_api = "/api/networks";
+const char *scan_api = "/api/scan";
+int portal_socket_allowed(void) { return 1; }
+void wifi_manager_disconnect(void) {}
 void configure(void) { ap.ap.authmode = WIFI_AUTH_OPEN; }
 void captive(void) {
   wifi_captive_dns_start(0);
@@ -77,7 +86,14 @@ void captive(void) {
   writeFixture(
     thingConnect,
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
-    'idf_component_register(SRCS "src/wifi_manager.c" "src/wifi_captive_dns.c" PRIV_REQUIRES lwip)\n',
+    'idf_component_register(SRCS "src/wifi_manager.c" "src/wifi_captive_dns.c" "src/wifi_history.c" '
+      + 'PRIV_REQUIRES lwip EMBED_TXTFILES "web/setup.html")\n',
+  );
+  writeFixture(
+    thingConnect,
+    "device-sim/device-sim-esp32/components/wifi_manager/web/setup.html",
+    "<!doctype html><title>小钛 · Wi-Fi 配网</title>"
+      + "<script>fetch('/api/networks')</script>\n",
   );
   writeFixture(
     thingConnect,

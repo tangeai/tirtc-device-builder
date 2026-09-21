@@ -1,0 +1,12 @@
+menu "Wi-Fi provisioning (wifi_manager)"
+
+config WIFI_MANAGER_FALLBACK_DNS_IPV4
+    string "Station fallback DNS server"
+    default "223.5.5.5"
+    help
+        Installed into the station's FALLBACK DNS slot after DHCP completes,
+        and only when that slot is empty. DHCP-provided main and backup DNS
+        servers are never replaced. Board projects may override this value in
+        their sdkconfig.defaults. Leave empty to disable the fallback.
+
+endmenu

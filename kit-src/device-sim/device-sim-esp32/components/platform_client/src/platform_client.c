@@ -1,9 +1,9 @@
 /*
  * ThingConnect 平台传输 adapter。
  *
- * 正常上线：服务发现 -> SNTP -> HMAC 设备登录 -> MQTT token -> 永久 MQTT。
+ * 正常上线：SNTP -> 服务发现 -> HMAC 设备登录 -> MQTT token -> 永久 MQTT。
  * 首次绑定：设备上报 -> 显示验证码 -> 临时 MQTT auth_grant -> QoS1 ACK。
- * 业务 HTTP：调用者复制请求到固定队列，由 request_task 串行执行和回调。
+ * 业务 HTTP：调用者复制请求到固定队列，由请求循环串行执行和回调。
  *
  * 正常在线阶段的 MQTT token 只保存在本模块内存中。首次绑定会把设备密钥
  * 放入 provision result 交给组合根持久化；两者都不会写入日志。
@@ -13,21 +13,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
+#include <stdatomic.h>
 
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
+#include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_netif_sntp.h"
 #include "esp_random.h"
+#include "esp_sntp.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "lwip/apps/sntp_opts.h"
+#include "lwip/dns.h"
 #include "mbedtls/base64.h"
 #include "mbedtls/md.h"
+#include "mbedtls/platform_util.h"
 #include "mqtt_client.h"
 
 #define PLATFORM_HTTP_BODY_MAX 8192
@@ -36,11 +45,16 @@
 #define PLATFORM_REQUEST_BODY_MAX 2048
 #define PLATFORM_SIGNAL_MAX 4096
 #define PLATFORM_DEFAULT_HTTP_TIMEOUT_MS 15000U
+#define PLATFORM_TTS_HTTP_TIMEOUT_MS 20000U
+/* 服务端最坏情况：中文前缀 + 6 个最长数字 + 6 段静音 = 157824 bytes。 */
+#define PLATFORM_TTS_PCM_MAX_BYTES (160U * 1024U)
+#define PLATFORM_TTS_DOWNLOAD_ATTEMPTS 2U
 #define PLATFORM_DEFAULT_DISCOVERY "http://ep-open.tangeopen.com/services"
 #define PLATFORM_DEFAULT_PROVISION_TIMEOUT_SECONDS 190U
 #define EXPERIENCE_PLATFORM_URL "https://xiaotai.chat"
 #define PROVISION_DONE_BIT BIT0
 #define PROVISION_ERROR_BIT BIT1
+#define PROVISION_READY_BIT BIT2
 
 /* 服务发现结果；生成的起步工程会裁剪未使用的服务字段。 */
 typedef struct {
@@ -57,11 +71,14 @@ typedef struct {
     size_t capacity;
     size_t length;
     bool overflow;
+    bool content_type_pcm;
 } http_output_t;
 
 /* 请求按值进入固定队列，避免调用者栈内字符串在异步执行前失效。 */
 typedef struct {
     platform_service_t service;
+    uint32_t epoch;
+    uint32_t queued_ms;
     char path[PLATFORM_REQUEST_PATH_MAX];
     bool post;
     char body[PLATFORM_REQUEST_BODY_MAX];
@@ -80,7 +97,10 @@ typedef struct {
     char message[PLATFORM_SIGNAL_MAX];
     size_t message_size;
     int message_id;
+    int subscribe_message_id;
     int ack_message_id;
+    platform_verification_prompt_cancel_t prompt_cancel_callback;
+    void *prompt_user_data;
 } provision_mqtt_t;
 
 static const char *TAG = "platform_client";
@@ -93,10 +113,20 @@ static char s_client_id[129];
 static char s_mac_address[24];
 static char s_mqtt_token[1024];
 static QueueHandle_t s_request_queue;
-static TaskHandle_t s_request_task;
 static esp_mqtt_client_handle_t s_mqtt;
-static volatile bool s_ready;
-static volatile bool s_mqtt_connected;
+/* External users serialize handle lifetime, not just pointer visibility.
+ * MQTT callbacks use event->client and never acquire this lock: stop joins them. */
+static StaticSemaphore_t s_mqtt_lifecycle_storage;
+static SemaphoreHandle_t s_mqtt_lifecycle;
+static atomic_bool s_ready;
+/* 0=online, 1=reconcile after lost signal, 2=confirmed unbind. */
+static atomic_uint s_rebind_request;
+static atomic_bool s_rebind_quiesced;
+static atomic_uint s_epoch;
+static uint32_t s_response_epoch;
+static int s_response_status;
+static atomic_bool s_binding_retry;
+static atomic_bool s_mqtt_connected;
 static volatile bool s_provisioning;
 static bool s_services_ready;
 static char s_verification_code[17];
@@ -169,6 +199,7 @@ static esp_err_t http_request(const char *url,
     if (bearer != NULL && bearer[0] != '\0') {
         int count = snprintf(authorization, sizeof(authorization), "Bearer %s", bearer);
         if (count <= 0 || (size_t)count >= sizeof(authorization)) {
+            mbedtls_platform_zeroize(authorization, sizeof(authorization));
             esp_http_client_cleanup(client);
             return ESP_ERR_INVALID_SIZE;
         }
@@ -183,8 +214,88 @@ static esp_err_t http_request(const char *url,
         *status = esp_http_client_get_status_code(client);
     }
     esp_http_client_cleanup(client);
+    mbedtls_platform_zeroize(authorization, sizeof(authorization));
     if (err == ESP_OK && output.overflow) {
         return ESP_ERR_INVALID_SIZE;
+    }
+    return err;
+}
+
+/* 原始 PCM 可以包含 NUL，不能复用以 NUL 结尾的 JSON 收集器。 */
+static esp_err_t http_binary_event(esp_http_client_event_t *event)
+{
+    http_output_t *output = event->user_data;
+    if (event->event_id == HTTP_EVENT_ON_HEADER && output != NULL &&
+        event->header_key != NULL && event->header_value != NULL &&
+        strcasecmp(event->header_key, "Content-Type") == 0) {
+        output->content_type_pcm =
+            strncasecmp(event->header_value, "audio/pcm", 9) == 0;
+        return ESP_OK;
+    }
+    if (event->event_id != HTTP_EVENT_ON_DATA || event->data == NULL ||
+        event->data_len <= 0) {
+        return ESP_OK;
+    }
+    if (output == NULL || output->overflow ||
+        output->length + (size_t)event->data_len > output->capacity) {
+        if (output != NULL) {
+            output->overflow = true;
+        }
+        return ESP_OK;
+    }
+    memcpy(output->data + output->length, event->data, (size_t)event->data_len);
+    output->length += (size_t)event->data_len;
+    return ESP_OK;
+}
+
+static esp_err_t http_binary_get(const char *url,
+                                 const char *bearer,
+                                 uint8_t *response,
+                                 size_t response_size,
+                                 size_t *response_length,
+                                 int *status)
+{
+    if (url == NULL || bearer == NULL || bearer[0] == '\0' || response == NULL ||
+        response_size == 0U || response_length == NULL || status == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *response_length = 0;
+    *status = 0;
+    http_output_t output = {
+        .data = (char *)response,
+        .capacity = response_size,
+    };
+    esp_http_client_config_t config = {
+        .url = url,
+        .event_handler = http_binary_event,
+        .user_data = &output,
+        .timeout_ms = PLATFORM_TTS_HTTP_TIMEOUT_MS,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .disable_auto_redirect = false,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    char authorization[1100] = {0};
+    int count = snprintf(authorization, sizeof(authorization), "Bearer %s", bearer);
+    if (count <= 0 || (size_t)count >= sizeof(authorization)) {
+        mbedtls_platform_zeroize(authorization, sizeof(authorization));
+        esp_http_client_cleanup(client);
+        return ESP_ERR_INVALID_SIZE;
+    }
+    esp_err_t err = esp_http_client_set_header(client, "Authorization", authorization);
+    if (err == ESP_OK) err = esp_http_client_perform(client);
+    *status = esp_http_client_get_status_code(client);
+    bool content_type_ok = *status != 200 || output.content_type_pcm;
+    mbedtls_platform_zeroize(authorization, sizeof(authorization));
+    esp_http_client_cleanup(client);
+    *response_length = output.length;
+    if (err == ESP_OK && output.overflow) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    if (err == ESP_OK && !content_type_ok) {
+        return ESP_ERR_INVALID_RESPONSE;
     }
     return err;
 }
@@ -351,7 +462,15 @@ static const char *service_base(platform_service_t service)
 
 static void process_request(const platform_request_t *request)
 {
-    /* 请求任务是业务 HTTP 的唯一执行者，callback 也在该任务中同步调用。 */
+    /* 请求循环是业务 HTTP 的唯一执行者，callback 也在该任务中同步调用。 */
+    s_response_epoch = request->epoch;
+    s_response_status = 0;
+    if (!platform_client_ready() || request->epoch != platform_client_epoch()) {
+        if (request->callback != NULL) {
+            request->callback(NULL, request->user_data);
+        }
+        return;
+    }
     const char *base = service_base(request->service);
     char url[512];
     int url_length = base == NULL ? -1 :
@@ -370,6 +489,7 @@ static void process_request(const platform_request_t *request)
                                        sizeof(response),
                                        request->timeout_ms,
                                        &status);
+    s_response_status = status;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "platform request %s failed: %s HTTP=%d",
                  request->path, esp_err_to_name(err), status);
@@ -383,13 +503,18 @@ static void process_request(const platform_request_t *request)
                  request->path, status);
     }
     if (request->callback != NULL) {
-        request->callback(response, request->user_data);
+        /* A request already in flight may finish after unbind. Do not deliver
+         * the previous owner's contacts or tokens into the new binding. */
+        request->callback(platform_client_ready() && request->epoch == platform_client_epoch()
+                              ? response : NULL, request->user_data);
     }
 }
 
 static void publish_heartbeat(unsigned sequence)
 {
-    if (!s_mqtt_connected || s_mqtt == NULL) {
+    if (s_mqtt_lifecycle == NULL || xSemaphoreTake(s_mqtt_lifecycle, 0) != pdTRUE) return;
+    if (!platform_client_ready() || !s_mqtt_connected || s_mqtt == NULL) {
+        xSemaphoreGive(s_mqtt_lifecycle);
         return;
     }
     char topic[128];
@@ -401,18 +526,22 @@ static void publish_heartbeat(unsigned sequence)
     if (length > 0 && (size_t)length < sizeof(body)) {
         (void)esp_mqtt_client_publish(s_mqtt, topic, body, length, 0, 0);
     }
+    xSemaphoreGive(s_mqtt_lifecycle);
 }
 
-static void request_task(void *argument)
+static void request_loop(void)
 {
     /* 同一任务同时负责串行业务 HTTP 和每 30 秒心跳，避免额外后台任务。 */
-    (void)argument;
     unsigned heartbeat_sequence = 0;
     int64_t next_heartbeat_ms = esp_timer_get_time() / 1000 + 30000;
     for (;;) {
+        if (atomic_load(&s_rebind_quiesced)) return;
         platform_request_t request;
         if (xQueueReceive(s_request_queue, &request, pdMS_TO_TICKS(1000)) == pdTRUE) {
-            process_request(&request);
+            /* 空 path 是重绑静默唤醒哨兵，不是业务请求。 */
+            if (request.path[0] != '\0') {
+                process_request(&request);
+            }
         }
         int64_t current_ms = esp_timer_get_time() / 1000;
         if (current_ms >= next_heartbeat_ms) {
@@ -503,6 +632,13 @@ static void mqtt_event(void *handler_args,
 
 static esp_err_t start_mqtt(void)
 {
+    /* First creation runs in the single startup task, before s_ready/worker. */
+    if (s_mqtt_lifecycle == NULL)
+        s_mqtt_lifecycle = xSemaphoreCreateMutexStatic(&s_mqtt_lifecycle_storage);
+    if (xSemaphoreTake(s_mqtt_lifecycle, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    /* Only the identity owner creates/destroys this transport. Media sessions
+     * never interrupt it; network reconnect stays with esp-mqtt. */
+    if (s_mqtt != NULL) { xSemaphoreGive(s_mqtt_lifecycle); return ESP_OK; }
     esp_mqtt_client_config_t config = {
         .broker.address.uri = s_services.mqtt,
         .broker.verification.crt_bundle_attach = esp_crt_bundle_attach,
@@ -515,6 +651,7 @@ static esp_err_t start_mqtt(void)
     };
     s_mqtt = esp_mqtt_client_init(&config);
     if (s_mqtt == NULL) {
+        xSemaphoreGive(s_mqtt_lifecycle);
         return ESP_ERR_NO_MEM;
     }
     esp_err_t err = esp_mqtt_client_register_event(s_mqtt,
@@ -528,30 +665,131 @@ static esp_err_t start_mqtt(void)
         (void)esp_mqtt_client_destroy(s_mqtt);
         s_mqtt = NULL;
     }
+    xSemaphoreGive(s_mqtt_lifecycle);
     return err;
 }
 
-static esp_err_t sync_clock(void)
+static esp_err_t stop_mqtt(void)
 {
-    /* HMAC 登录依赖可信 Unix 时间；已同步时不重复初始化 SNTP。 */
-    time_t current = time(NULL);
-    if (current > 1700000000) {
+    if (s_mqtt_lifecycle == NULL ||
+        xSemaphoreTake(s_mqtt_lifecycle, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    if (s_mqtt == NULL) {
+        s_mqtt_connected = false;
+        xSemaphoreGive(s_mqtt_lifecycle);
         return ESP_OK;
     }
-    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_err_t err = esp_netif_sntp_init(&config);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    esp_mqtt_client_handle_t mqtt = s_mqtt;
+    esp_err_t err = esp_mqtt_client_stop(mqtt);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "cannot stop MQTT client: %s",
+                 esp_err_to_name(err));
+        xSemaphoreGive(s_mqtt_lifecycle);
         return err;
     }
-    for (int attempt = 0; attempt < 5; ++attempt) {
-        err = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(2000));
-        if (err == ESP_OK || time(NULL) > 1700000000) {
-            ESP_LOGI(TAG, "network clock synchronized");
-            return ESP_OK;
-        }
+    s_mqtt_connected = false;
+    err = esp_mqtt_client_destroy(mqtt);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "cannot release stopped MQTT client: %s",
+                 esp_err_to_name(err));
+        xSemaphoreGive(s_mqtt_lifecycle);
+        return err;
     }
-    ESP_LOGE(TAG, "network clock synchronization timed out");
-    return ESP_ERR_TIMEOUT;
+    s_mqtt = NULL;
+    xSemaphoreGive(s_mqtt_lifecycle);
+    ESP_LOGI(TAG, "MQTT client released");
+    return ESP_OK;
+}
+
+/* Serialized by the startup owner, then its platform HTTP successor. */
+static bool s_clock_initialized;
+static bool s_clock_synchronized;
+
+#define PLATFORM_CLOCK_PEERS 2U
+typedef struct {
+    bool active;
+    ip_addr_t dns[DNS_MAX_SERVERS];
+    ip_addr_t peer[PLATFORM_CLOCK_PEERS];
+    uint8_t reach[PLATFORM_CLOCK_PEERS];
+} clock_snapshot_t;
+
+static esp_err_t clock_snapshot_read(void *context)
+{
+    /* Copy in the TCP/IP context; do not log, resolve DNS or send probes here. */
+    clock_snapshot_t *snapshot = context;
+    snapshot->active = esp_sntp_enabled();
+    for (unsigned i = 0; i < DNS_MAX_SERVERS; ++i)
+        snapshot->dns[i] = *dns_getserver(i);
+    for (unsigned i = 0; i < PLATFORM_CLOCK_PEERS; ++i) {
+        snapshot->peer[i] = *esp_sntp_getserver(i);
+        snapshot->reach[i] = esp_sntp_getreachability(i);
+    }
+    return ESP_OK;
+}
+
+static void clock_log_failure(void)
+{
+    clock_snapshot_t snapshot = {0};
+    esp_err_t err = esp_netif_tcpip_exec(clock_snapshot_read, &snapshot);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "network clock snapshot failed: %s", esp_err_to_name(err));
+        return;
+    }
+    ESP_LOGW(TAG, "network clock snapshot: active=%u", (unsigned)snapshot.active);
+    char address[IPADDR_STRLEN_MAX];
+    for (unsigned i = 0; i < DNS_MAX_SERVERS; ++i) {
+        ipaddr_ntoa_r(&snapshot.dns[i], address, sizeof(address));
+        ESP_LOGW(TAG, "network clock DNS: slot=%u addr=%s", i, address);
+    }
+    for (unsigned i = 0; i < PLATFORM_CLOCK_PEERS; ++i) {
+        ipaddr_ntoa_r(&snapshot.peer[i], address, sizeof(address));
+        /* An address is not proof of transmission; reach=0 is not a loss rate.
+         * The first unresolved peer also leaves later, untried peers at zero. */
+        ESP_LOGW(TAG, "network clock peer: slot=%u addr=%s reach=0x%02x",
+                 i, address, (unsigned)snapshot.reach[i]);
+    }
+}
+
+esp_err_t platform_client_sync_clock(void)
+{
+    /* Require a received SNTP result in this boot, not just a retained date.
+     * Reuse the service and confirmed time on binding/SDK retries. */
+    if (s_clock_synchronized && time(NULL) > 1700000000) return ESP_OK;
+    s_clock_synchronized = false;
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG_MULTIPLE(
+        PLATFORM_CLOCK_PEERS,
+        ESP_SNTP_SERVER_LIST("ntp.aliyun.com", "pool.ntp.org"));
+    esp_err_t err;
+    if (!s_clock_initialized) {
+        err = esp_netif_sntp_init(&config);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGE(TAG, "network clock init failed: %s", esp_err_to_name(err));
+            return err;
+        }
+        s_clock_initialized = true;
+    }
+    /* lwIP switches peers only after SNTP_RECV_TIMEOUT (15 s in IDF 5.5.x).
+     * Cover both peers plus one resolution/start window; a shorter deadline
+     * abandoned first binding before the fallback peer could answer.
+     * This blocks only the startup worker, not audio capture. */
+    uint32_t timeout_ms = (config.num_of_servers + 1U) * SNTP_RECV_TIMEOUT;
+#if SNTP_STARTUP_DELAY && defined(CONFIG_LWIP_SNTP_MAXIMUM_STARTUP_DELAY)
+    timeout_ms += CONFIG_LWIP_SNTP_MAXIMUM_STARTUP_DELAY;
+#endif
+    const int64_t started_us = esp_timer_get_time();
+    ESP_LOGI(TAG, "waiting for network clock: timeout_ms=%lu peers=%u",
+             (unsigned long)timeout_ms, (unsigned)config.num_of_servers);
+    err = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(timeout_ms));
+    const unsigned long elapsed_ms = (unsigned long)((esp_timer_get_time() - started_us) / 1000);
+    if (err == ESP_OK && time(NULL) > 1700000000) {
+        s_clock_synchronized = true;
+        ESP_LOGI(TAG, "network clock synchronized: elapsed_ms=%lu", elapsed_ms);
+        return ESP_OK;
+    }
+    if (err == ESP_OK) err = ESP_ERR_INVALID_RESPONSE;
+    ESP_LOGE(TAG, "network clock unavailable: elapsed_ms=%lu error=%s",
+             elapsed_ms, esp_err_to_name(err));
+    clock_log_failure();
+    return err;
 }
 
 typedef struct {
@@ -673,9 +911,100 @@ static esp_err_t report_for_provision(const platform_provision_config_t *config,
     return ESP_OK;
 }
 
+static bool verification_code_valid(const char *code)
+{
+    if (code == NULL || strlen(code) != 6U) {
+        return false;
+    }
+    for (size_t i = 0; i < 6U; ++i) {
+        if (code[i] < '0' || code[i] > '9') {
+            return false;
+        }
+    }
+    return true;
+}
+
+static esp_err_t play_verification_prompt(
+    const provision_report_t *report,
+    const platform_provision_config_t *config,
+    EventGroupHandle_t events)
+{
+    if (config->prompt_callback == NULL) {
+        return ESP_OK;
+    }
+    if (!verification_code_valid(report->code)) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    uint8_t *pcm = heap_caps_malloc(PLATFORM_TTS_PCM_MAX_BYTES,
+                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (pcm == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    char url[384] = {0};
+    int url_length = snprintf(url,
+                              sizeof(url),
+                              "%s/v1/device/tts?code=%s",
+                              s_services.device,
+                              report->code);
+    esp_err_t err = url_length <= 0 || (size_t)url_length >= sizeof(url)
+                        ? ESP_ERR_INVALID_SIZE
+                        : ESP_FAIL;
+    size_t pcm_bytes = 0;
+    for (unsigned attempt = 0;
+         url_length > 0 && (size_t)url_length < sizeof(url) &&
+         attempt < PLATFORM_TTS_DOWNLOAD_ATTEMPTS;
+         ++attempt) {
+        if (xEventGroupGetBits(events) & (PROVISION_DONE_BIT | PROVISION_ERROR_BIT)) {
+            err = ESP_OK;
+            break;
+        }
+        int status = 0;
+        pcm_bytes = 0;
+        err = http_binary_get(url,
+                              report->temp_token,
+                              pcm,
+                              PLATFORM_TTS_PCM_MAX_BYTES,
+                              &pcm_bytes,
+                              &status);
+        if (err == ESP_OK && status == 200 && pcm_bytes > 0U &&
+            (pcm_bytes % sizeof(int16_t)) == 0U) {
+            break;
+        }
+        if (err == ESP_OK) {
+            err = status == 200 ? ESP_ERR_INVALID_SIZE : ESP_FAIL;
+        }
+        ESP_LOGW(TAG,
+                 "verification prompt download attempt %u failed: %s HTTP=%d bytes=%u",
+                 attempt + 1U,
+                 esp_err_to_name(err),
+                 status,
+                 (unsigned)pcm_bytes);
+        if (attempt + 1U < PLATFORM_TTS_DOWNLOAD_ATTEMPTS) {
+            vTaskDelay(pdMS_TO_TICKS(300));
+        }
+    }
+    if (err == ESP_OK &&
+        !(xEventGroupGetBits(events) & (PROVISION_DONE_BIT | PROVISION_ERROR_BIT))) {
+        ESP_LOGI(TAG,
+                 "verification prompt downloaded bytes=%u format=pcm_s16le_8k_mono",
+                 (unsigned)pcm_bytes);
+        err = config->prompt_callback((const int16_t *)pcm,
+                                      pcm_bytes / sizeof(int16_t),
+                                      config->prompt_user_data);
+    }
+    mbedtls_platform_zeroize(pcm, PLATFORM_TTS_PCM_MAX_BYTES);
+    heap_caps_free(pcm);
+    mbedtls_platform_zeroize(url, sizeof(url));
+    return err;
+}
+
 static void provision_finish_with_error(provision_mqtt_t *context)
 {
     if (context != NULL && context->events != NULL) {
+        if (context->prompt_cancel_callback != NULL) {
+            context->prompt_cancel_callback(context->prompt_user_data);
+        }
         xEventGroupSetBits(context->events, PROVISION_ERROR_BIT);
     }
 }
@@ -730,6 +1059,7 @@ static void provision_handle_message(provision_mqtt_t *context,
         return;
     }
     char ack_topic[128];
+    ESP_LOGI(TAG, "binding grant received; delivering ACK");
     (void)snprintf(ack_topic,
                    sizeof(ack_topic),
                    "device/%s/ack",
@@ -761,12 +1091,18 @@ static void provision_mqtt_event(void *handler_args,
                        sizeof(topic),
                        "device/%s/cmd",
                        context->temp_client_id);
-        if (esp_mqtt_client_subscribe(context->mqtt, topic, 1) < 0) {
+        context->subscribe_message_id =
+            esp_mqtt_client_subscribe(context->mqtt, topic, 1);
+        if (context->subscribe_message_id < 0) {
             ESP_LOGE(TAG, "cannot subscribe temporary binding topic");
             provision_finish_with_error(context);
         } else {
-            ESP_LOGI(TAG, "temporary MQTT connected; waiting for H5 binding");
+            ESP_LOGI(TAG, "temporary MQTT connected; binding subscription pending");
         }
+    } else if (event_id == MQTT_EVENT_SUBSCRIBED &&
+               event->msg_id == context->subscribe_message_id) {
+        ESP_LOGI(TAG, "temporary MQTT subscribed; waiting for H5 binding");
+        xEventGroupSetBits(context->events, PROVISION_READY_BIT);
     } else if (event_id == MQTT_EVENT_DATA) {
         if (event->current_data_offset == 0) {
             context->message_size = 0;
@@ -796,6 +1132,12 @@ static void provision_mqtt_event(void *handler_args,
     } else if (event_id == MQTT_EVENT_PUBLISHED &&
                event->msg_id == context->ack_message_id) {
         ESP_LOGI(TAG, "binding ACK delivered");
+        /* Wake the synchronous prompt owner, not just its later event wait.
+         * Cancellation is bounded/lock-free; credential persistence stays in
+         * the startup task, after MQTT has stopped. */
+        if (context->prompt_cancel_callback != NULL) {
+            context->prompt_cancel_callback(context->prompt_user_data);
+        }
         xEventGroupSetBits(context->events, PROVISION_DONE_BIT);
     } else if (event_id == MQTT_EVENT_ERROR) {
         ESP_LOGW(TAG,
@@ -810,7 +1152,10 @@ static esp_err_t wait_for_auth_grant(const provision_report_t *report,
     /* 临时 MQTT 与正常设备 MQTT 完全分离，完成或超时后始终销毁。 */
     provision_mqtt_t context = {
         .message_id = -1,
+        .subscribe_message_id = -1,
         .ack_message_id = -1,
+        .prompt_cancel_callback = config->prompt_cancel_callback,
+        .prompt_user_data = config->prompt_user_data,
     };
     (void)snprintf(context.temp_client_id,
                    sizeof(context.temp_client_id),
@@ -862,22 +1207,52 @@ static esp_err_t wait_for_auth_grant(const provision_report_t *report,
     unsigned timeout_seconds = config->timeout_seconds == 0
                                    ? PLATFORM_DEFAULT_PROVISION_TIMEOUT_SECONDS
                                    : config->timeout_seconds;
+    TickType_t wait_started = xTaskGetTickCount();
+    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_seconds * 1000U);
     EventBits_t bits = xEventGroupWaitBits(context.events,
-                                           PROVISION_DONE_BIT | PROVISION_ERROR_BIT,
+                                           PROVISION_READY_BIT |
+                                               PROVISION_DONE_BIT |
+                                               PROVISION_ERROR_BIT,
                                            pdFALSE,
                                            pdFALSE,
-                                           pdMS_TO_TICKS(timeout_seconds * 1000U));
+                                           timeout_ticks);
+    if ((bits & PROVISION_READY_BIT) != 0 &&
+        (bits & (PROVISION_DONE_BIT | PROVISION_ERROR_BIT)) == 0) {
+        /* A Report response alone is not a usable binding session. Publish
+         * the code only after SUBACK, before the optional spoken prompt. */
+        (void)snprintf(s_verification_code, sizeof(s_verification_code), "%s", report->code);
+        ESP_LOGI(TAG, "binding code ready: mqtt_ms=%lu",
+                 (unsigned long)((xTaskGetTickCount() - wait_started) * portTICK_PERIOD_MS));
+        esp_err_t prompt_err = play_verification_prompt(report, config, context.events);
+        if (prompt_err != ESP_OK) {
+            /* 串口验证码仍然可用，语音失败不应破坏绑定凭证状态机。 */
+            ESP_LOGW(TAG,
+                     "verification prompt unavailable: %s",
+                     esp_err_to_name(prompt_err));
+        }
+        TickType_t elapsed = xTaskGetTickCount() - wait_started;
+        TickType_t remaining = elapsed < timeout_ticks
+                                   ? timeout_ticks - elapsed
+                                   : 0;
+        bits |= xEventGroupWaitBits(context.events,
+                                    PROVISION_DONE_BIT | PROVISION_ERROR_BIT,
+                                    pdFALSE,
+                                    pdFALSE,
+                                    remaining);
+    }
     (void)esp_mqtt_client_stop(context.mqtt);
     (void)esp_mqtt_client_destroy(context.mqtt);
     vEventGroupDelete(context.events);
     if ((bits & PROVISION_DONE_BIT) == 0) {
         if ((bits & PROVISION_ERROR_BIT) != 0) {
             ESP_LOGE(TAG, "verification binding failed");
+            mbedtls_platform_zeroize(&context, sizeof(context));
             return ESP_FAIL;
         }
         ESP_LOGE(TAG,
                  "verification binding timed out after %u seconds",
                  timeout_seconds);
+        mbedtls_platform_zeroize(&context, sizeof(context));
         return ESP_ERR_TIMEOUT;
     }
     (void)snprintf(result->device_id,
@@ -888,6 +1263,7 @@ static esp_err_t wait_for_auth_grant(const provision_report_t *report,
                    sizeof(result->device_secret),
                    "%s",
                    context.device_secret);
+    mbedtls_platform_zeroize(&context, sizeof(context));
     return ESP_OK;
 }
 
@@ -906,7 +1282,7 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
         return ESP_ERR_INVALID_ARG;
     }
     memset(result, 0, sizeof(*result));
-    esp_err_t err = sync_clock();
+    esp_err_t err = platform_client_sync_clock();
     if (err != ESP_OK) {
         return err;
     }
@@ -925,19 +1301,18 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
     if (err != ESP_OK) {
         return err;
     }
+    /* 无屏设备把验证码打印到串口；s_verification_code 在 SUBACK 后置位。 */
     ESP_LOGW(TAG, "============================================================");
     ESP_LOGW(TAG, "verification code: %s", report.code);
     ESP_LOGW(TAG, "registration/login: %s", EXPERIENCE_PLATFORM_URL);
     ESP_LOGW(TAG, "open device binding and enter this verification code");
     ESP_LOGW(TAG, "============================================================");
-    (void)snprintf(s_verification_code,
-                   sizeof(s_verification_code),
-                   "%s",
-                   report.code);
     s_provisioning = true;
     err = wait_for_auth_grant(&report, config, result);
     s_provisioning = false;
-    s_verification_code[0] = '\0';
+    mbedtls_platform_zeroize(s_verification_code,
+                             sizeof(s_verification_code));
+    mbedtls_platform_zeroize(&report, sizeof(report));
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "verification binding completed; credentials ready for NVS");
     }
@@ -946,7 +1321,8 @@ esp_err_t platform_client_provision(const platform_provision_config_t *config,
 
 esp_err_t platform_client_start(const platform_client_config_t *config)
 {
-    /* 正常在线入口只创建一次永久请求任务和 MQTT client。 */
+    /* 正常在线入口只完成发现、鉴权和 MQTT；HTTP 请求循环延迟到平台上线后
+     * 由组合根转入，避免与 TiRTC 启动的大栈峰值重叠。 */
     if (s_ready) {
         return ESP_OK;
     }
@@ -967,7 +1343,7 @@ esp_err_t platform_client_start(const platform_client_config_t *config)
     }
     (void)snprintf(s_mac_address, sizeof(s_mac_address), "%s", config->mac_address);
 
-    esp_err_t err = sync_clock();
+    esp_err_t err = platform_client_sync_clock();
     if (err != ESP_OK) {
         return err;
     }
@@ -985,37 +1361,93 @@ esp_err_t platform_client_start(const platform_client_config_t *config)
     if (err != ESP_OK) {
         return err;
     }
-    s_request_queue = xQueueCreate(PLATFORM_REQUEST_QUEUE_DEPTH,
-                                   sizeof(platform_request_t));
-    if (s_request_queue == NULL) {
-        return ESP_ERR_NO_MEM;
-    }
-    if (xTaskCreate(request_task, "platform_http", 24576, NULL, 5,
-                    &s_request_task) != pdPASS) {
-        vQueueDelete(s_request_queue);
-        s_request_queue = NULL;
-        return ESP_ERR_NO_MEM;
-    }
     err = start_mqtt();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "MQTT start failed: %s", esp_err_to_name(err));
-        if (s_request_task != NULL) {
-            vTaskDelete(s_request_task);
-            s_request_task = NULL;
-        }
-        if (s_request_queue != NULL) {
-            vQueueDelete(s_request_queue);
-            s_request_queue = NULL;
-        }
         return err;
     }
     s_ready = true;
     return ESP_OK;
 }
 
+esp_err_t platform_client_run_request_loop(void)
+{
+    if (atomic_load(&s_rebind_quiesced)) return ESP_ERR_NOT_FOUND;
+    if (!s_ready) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (s_request_queue == NULL) {
+        s_request_queue = xQueueCreate(PLATFORM_REQUEST_QUEUE_DEPTH,
+                                       sizeof(platform_request_t));
+        if (s_request_queue == NULL) {
+            return ESP_ERR_NO_MEM;
+        }
+    }
+    request_loop();
+    return ESP_ERR_NOT_FOUND;
+}
+
 bool platform_client_ready(void)
 {
-    return s_ready;
+    return s_ready && atomic_load(&s_rebind_request) == 0;
+}
+
+uint32_t platform_client_epoch(void) { return atomic_load(&s_epoch); }
+uint32_t platform_client_response_epoch(void) { return s_response_epoch; }
+int platform_client_response_status(void) { return s_response_status; }
+void platform_client_retry_binding(void) { atomic_store(&s_binding_retry, true); }
+bool platform_client_take_binding_retry(void) { return atomic_exchange(&s_binding_retry, false); }
+
+bool platform_client_request_rebind(bool known_unbound)
+{
+    unsigned expected = 0;
+    if (!atomic_compare_exchange_strong(&s_rebind_request, &expected, known_unbound ? 2U : 1U)) {
+        if (known_unbound) atomic_store(&s_rebind_request, 2U);
+        return false;
+    }
+    atomic_fetch_add(&s_epoch, 1U);
+    return true;
+}
+
+bool platform_client_known_unbound(void) { return atomic_load(&s_rebind_request) == 2U; }
+bool platform_client_reconciling(void) { return atomic_load(&s_rebind_request) != 0; }
+
+void platform_client_rebind_quiesced(void)
+{
+    atomic_store(&s_rebind_quiesced, true);
+    /* An empty-path sentinel wakes an idle loop without allocating another
+     * task/stack. A busy loop is already awake and checks quiesced first. */
+    const platform_request_t wake = {0};
+    if (s_request_queue != NULL) (void)xQueueSend(s_request_queue, &wake, 0);
+}
+
+esp_err_t platform_client_prepare_rebind(void)
+{
+    /* Called only by the HTTP owner, after its current request has returned.
+     * No NVS is erased: device identity survives an ownership change. */
+    if (!atomic_load(&s_rebind_quiesced)) return ESP_ERR_INVALID_STATE;
+    s_ready = false;
+    esp_err_t err = stop_mqtt();
+    if (err != ESP_OK) return err;
+    mbedtls_platform_zeroize(s_mqtt_token, sizeof(s_mqtt_token));
+    platform_request_t request;
+    while (s_request_queue != NULL &&
+           xQueueReceive(s_request_queue, &request, 0) == pdTRUE) {
+        s_response_epoch = request.epoch;
+        s_response_status = 0;
+        if (request.callback != NULL) request.callback(NULL, request.user_data);
+        memset(&request, 0, sizeof(request));
+    }
+    ESP_LOGI(TAG, "binding transition: old MQTT/HTTP credentials released epoch=%lu",
+             (unsigned long)platform_client_epoch());
+    return ESP_OK;
+}
+
+void platform_client_complete_rebind(void)
+{
+    if (!s_ready) return;
+    atomic_store(&s_rebind_quiesced, false);
+    atomic_store(&s_rebind_request, 0);
 }
 
 bool platform_client_mqtt_connected(void)
@@ -1059,6 +1491,7 @@ esp_err_t platform_client_request_timeout(platform_service_t service,
                                           platform_response_callback_t callback,
                                           void *user_data)
 {
+    uint32_t epoch = platform_client_epoch();
     if (!s_ready || s_request_queue == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -1071,6 +1504,8 @@ esp_err_t platform_client_request_timeout(platform_service_t service,
     /* path/body 复制进队列项；callback/user_data 的生命周期由调用者保证。 */
     platform_request_t request = {
         .service = service,
+        .epoch = epoch,
+        .queued_ms = (uint32_t)(esp_timer_get_time() / 1000),
         .post = json_body != NULL,
         .timeout_ms = timeout_ms,
         .callback = callback,

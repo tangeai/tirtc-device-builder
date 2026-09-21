@@ -31,6 +31,7 @@
 
 static const char *TAG = "starter_main";
 static runtime_tirtc_config_t s_tirtc_config;
+static char s_station_mac[18];
 
 /* 使用 STA MAC 生成稳定的设备指纹和默认 TiRTC client_id。 */
 static void station_identity(char mac_address[18], char client_id[65])
@@ -70,6 +71,21 @@ static esp_err_t provision_and_save(const char *mac_address, bool signed_rebind)
     if (err != ESP_OK) {
         return err;
     }
+    if (signed_rebind) {
+        /* A signed Report reactivates this identity, including empty auth_grant
+         * payloads. Keep TiRTC's identity stable and avoid all flash operations;
+         * a changed key/ID is a contract error, not a reason to overwrite NVS
+         * underneath a running SDK. */
+        bool same = strcmp(result.device_id, s_tirtc_config.device_id) == 0 &&
+                    strcmp(result.device_secret, s_tirtc_config.device_secret) == 0;
+        memset(&result, 0, sizeof(result));
+        if (!same) {
+            ESP_LOGE(TAG, "signed binding changed device identity; not applying");
+            return ESP_ERR_INVALID_RESPONSE;
+        }
+        ESP_LOGI(TAG, "signed binding restored; NVS identity retained");
+        return ESP_OK;
+    }
     (void)snprintf(s_tirtc_config.device_id,
                    sizeof(s_tirtc_config.device_id),
                    "%s",
@@ -85,18 +101,88 @@ static esp_err_t provision_and_save(const char *mac_address, bool signed_rebind)
     return err;
 }
 
+static esp_err_t rebind_platform(bool *binding_restored)
+{
+    esp_err_t err = platform_client_prepare_rebind();
+    if (err != ESP_OK) return err;
+    while (!wifi_manager_connected()) vTaskDelay(pdMS_TO_TICKS(100));
+    const platform_client_config_t platform = {
+        .device_id = s_tirtc_config.device_id,
+        .device_secret = s_tirtc_config.device_secret,
+        .client_id = s_tirtc_config.client_id,
+        .mac_address = s_station_mac,
+        .discovery_url = DISCOVERY_URL,
+    };
+    /* Missing a signal is not proof of unbind. Validate before asking the user
+     * to bind again; a confirmed unbind goes straight to signed Report. */
+    err = platform_client_known_unbound() && !*binding_restored
+              ? ESP_ERR_NOT_FOUND : platform_client_start(&platform);
+    if (err == ESP_ERR_NOT_FOUND) {
+        err = provision_and_save(s_station_mac, true);
+        if (err == ESP_OK) {
+            *binding_restored = true;
+            err = platform_client_start(&platform);
+        }
+    }
+    if (err == ESP_OK) {
+        platform_client_complete_rebind();
+        ESP_LOGI(TAG, "binding transition complete; identity retained");
+    }
+    return err;
+}
+
+static void wait_for_network_clock(void)
+{
+    for (;;) {
+        while (!wifi_manager_connected()) vTaskDelay(pdMS_TO_TICKS(100));
+        esp_err_t err = platform_client_sync_clock();
+        if (err == ESP_OK) return;
+        ESP_LOGW(TAG, "startup waiting for network clock: %s; retrying in %u ms",
+                 esp_err_to_name(err), START_RETRY_DELAY_MS);
+        vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
+    }
+}
+
+static void platform_request_task(void *argument)
+{
+    (void)argument;
+    bool binding_restored = false;
+    for (;;) {
+        esp_err_t err = platform_client_run_request_loop();
+        while (err == ESP_ERR_NOT_FOUND) {
+            /* Runtime signalled a rebind: re-validate the stored identity and
+             * signed-rebind on confirmed unbind, without clearing NVS. */
+            ESP_LOGW(TAG, "binding transition requested; validating identity");
+            err = rebind_platform(&binding_restored);
+            if (err == ESP_ERR_NOT_FOUND) {
+                ESP_LOGE(TAG, "rebind failed: %s; waiting for user retry",
+                         esp_err_to_name(err));
+                while (!platform_client_take_binding_retry()) vTaskDelay(pdMS_TO_TICKS(100));
+                while (!wifi_manager_connected()) vTaskDelay(pdMS_TO_TICKS(100));
+            }
+        }
+        if (err == ESP_OK) {
+            continue;
+        }
+        ESP_LOGE(TAG,
+                 "platform request loop unavailable: %s; retrying in %u ms",
+                 esp_err_to_name(err), START_RETRY_DELAY_MS);
+        vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
+    }
+}
+
 static void starter_start_task(void *argument)
 {
     (void)argument;
 
-    /* 服务发现、HTTP 和 MQTT 都依赖 STA 已拿到 IP。 */
-    while (!wifi_manager_connected()) {
-        vTaskDelay(pdMS_TO_TICKS(250));
-    }
+    /* Both stored credentials and first binding must cross the same clock
+     * boundary before any SDK initialization or authenticated network I/O. */
+    wait_for_network_clock();
 
     char mac_address[18];
     char default_client_id[65];
     station_identity(mac_address, default_client_id);
+    (void)snprintf(s_station_mac, sizeof(s_station_mac), "%s", mac_address);
 
     /* NVS 没有有效凭证时进入验证码绑定，成功后再继续正常启动。 */
     esp_err_t err = runtime_config_load_tirtc(&s_tirtc_config);
@@ -109,14 +195,17 @@ static void starter_start_task(void *argument)
                        "%s",
                        default_client_id);
         ESP_LOGW(TAG, "device is not bound; starting verification-code binding");
-        err = provision_and_save(mac_address, false);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG,
-                     "binding did not complete: %s; restart to retry",
-                     esp_err_to_name(err));
-            vTaskDelete(NULL);
-            return;
-        }
+        do {
+            err = provision_and_save(mac_address, false);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "binding failed: %s; waiting for user retry",
+                         esp_err_to_name(err));
+                while (!platform_client_take_binding_retry()) vTaskDelay(pdMS_TO_TICKS(100));
+                while (!wifi_manager_connected()) vTaskDelay(pdMS_TO_TICKS(100));
+            }
+        } while (err != ESP_OK);
+    } else {
+        ESP_LOGI(TAG, "stored device binding found; skipping verification-code binding");
     }
     if (s_tirtc_config.client_id[0] == '\0') {
         (void)snprintf(s_tirtc_config.client_id,
@@ -150,15 +239,21 @@ static void starter_start_task(void *argument)
     bool rebind_attempted = false;
     bool tirtc_submitted = false;
     for (;;) {
-        while (!wifi_manager_connected()) {
-            vTaskDelay(pdMS_TO_TICKS(250));
-        }
+        /* Normally a cache hit; also covers a retry after time became invalid. */
+        wait_for_network_clock();
+
         if (!platform_client_ready()) {
             esp_err_t platform_err = platform_client_start(&platform);
             if (platform_err == ESP_ERR_NOT_FOUND && !rebind_attempted) {
                 rebind_attempted = true;
                 ESP_LOGW(TAG, "stored device was unbound; starting signed rebind");
-                platform_err = provision_and_save(mac_address, true);
+                do {
+                    platform_err = provision_and_save(mac_address, true);
+                    if (platform_err != ESP_OK) {
+                        while (!platform_client_take_binding_retry()) vTaskDelay(pdMS_TO_TICKS(100));
+                        while (!wifi_manager_connected()) vTaskDelay(pdMS_TO_TICKS(100));
+                    }
+                } while (platform_err != ESP_OK);
                 if (platform_err == ESP_OK) {
                     platform_err = platform_client_start(&platform);
                 }
@@ -192,11 +287,16 @@ static void starter_start_task(void *argument)
                 ESP_LOGE(TAG, "TiRTC start failed rc=%d", rc);
             }
         }
-        if (platform_client_ready() && tirtc_submitted) {
+        if ((platform_client_ready() || platform_client_reconciling()) && tirtc_submitted) {
             break;
         }
         ESP_LOGW(TAG, "startup incomplete; retrying in %u ms", START_RETRY_DELAY_MS);
         vTaskDelay(pdMS_TO_TICKS(START_RETRY_DELAY_MS));
+    }
+    /* TiRTC/TLS startup is over; hand the identity lifecycle to a dedicated
+     * HTTP worker that owns rebind transitions and the 30 s heartbeat. */
+    if (xTaskCreate(platform_request_task, "platform_http", 24576, NULL, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "cannot create platform HTTP task");
     }
     vTaskDelete(NULL);
 }

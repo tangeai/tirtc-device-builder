@@ -8,7 +8,6 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_random.h"
-#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -597,6 +596,22 @@ static void remember_cancelled_voip(void)
     s_voip_cancelled_until_ms = now_ms() + VOIP_CANCEL_CACHE_MS;
 }
 
+static void reconcile_platform_binding(bool known_unbound)
+{
+    if (!platform_client_request_rebind(known_unbound)) return;
+    finish_session();
+    /* 重置依赖旧身份的在线状态；新身份重新提交 profile 与房间请求。 */
+    atomic_store_explicit(&s_voip_profile_submitted, false, memory_order_release);
+    atomic_store_explicit(&s_voip_profile_pending, false, memory_order_release);
+    atomic_store_explicit(&s_voip_profile_retry_at_ms, 0, memory_order_release);
+    atomic_store_explicit(&s_room_request_pending, false, memory_order_release);
+    s_room_missing_count = 0;
+    s_call_after_contacts = false;
+    platform_client_rebind_quiesced();
+    ESP_LOGW(TAG, "binding transition requested: unbound=%d; identity retained",
+             known_unbound);
+}
+
 static void handle_platform_signal(const session_event_t *event)
 {
     cJSON *root = cJSON_ParseWithLength(event->payload, event->length);
@@ -612,17 +627,9 @@ static void handle_platform_signal(const session_event_t *event)
     const char *type_name = cJSON_IsString(type) ? type->valuestring : "";
     const char *channel_name = cJSON_IsString(channel) ? channel->valuestring : "";
     if (strcmp(type_name, "unbind") == 0) {
-        ESP_LOGW(TAG,
-                 "device unbound; clearing NVS credentials and restarting verification binding");
-        finish_session();
+        /* 身份归属变化时保留物理身份用于签名重绑；不在此处清 NVS 或重启。 */
         cJSON_Delete(root);
-        esp_err_t err = runtime_config_clear_tirtc();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "cannot clear binding credentials: %s", esp_err_to_name(err));
-            return;
-        }
-        vTaskDelay(pdMS_TO_TICKS(500));
-        esp_restart();
+        reconcile_platform_binding(true);
         return;
     }
     if (!cJSON_IsObject(payload)) {
