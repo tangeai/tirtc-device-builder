@@ -235,14 +235,24 @@ def validate_repository_files(errors: list[str]) -> None:
             continue
         relative = path.relative_to(ROOT)
         # The source Kit contains the redistributable target-specific SDK
-        # archives; package.json's files whitelist keeps kit-src out of the npm
-        # tarball. ESP32-S3 and ESP32-P4 archives must never be mixed.
+        # archives and the P4 reference's vendored codec libraries;
+        # package.json's files whitelist keeps kit-src out of the npm tarball.
+        # ESP32-S3 and ESP32-P4 archives must never be mixed.
         bundled_sdks = {
             Path("kit-src/device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a"),
             Path("kit-src/device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a"),
             Path("kit-src/device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a"),
         }
-        if path.suffix.lower() in FORBIDDEN_SUFFIXES and relative not in bundled_sdks:
+        vendored_lib_roots = (
+            Path("kit-src/device-sim/device-sim-p4/components/espressif__esp_h264/sw/libs"),
+        )
+        if (
+            path.suffix.lower() in FORBIDDEN_SUFFIXES
+            and relative not in bundled_sdks
+            and not any(
+                root in relative.parents for root in vendored_lib_roots
+            )
+        ):
             error(errors, f"forbidden binary or credential file: {relative}")
         if path.suffix.lower() in {
             ".js",

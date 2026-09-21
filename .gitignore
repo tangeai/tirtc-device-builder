@@ -18,6 +18,8 @@ htmlcov/
 !kit-src/device-sim/sdk/espressif-esp32s3/2.3.0/lib/libTiRTC.a
 !kit-src/device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a
 !kit-src/device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a
+!kit-src/device-sim/device-sim-p4/components/espressif__esp_h264/sw/libs/
+!kit-src/device-sim/device-sim-p4/components/espressif__esp_h264/sw/libs/**
 *.la
 *.lo
 *.dll
@@ -44,6 +46,7 @@ Mkfile.old
 dkms.conf
 
 build/
+managed_components/
 sdkconfig
 sdkconfig.old
 *.elf
