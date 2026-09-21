@@ -1,6 +1,20 @@
 idf_component_register(
-    SRCS "src/platform_client.c"
+    SRCS "src/platform_client.c" "src/platform_http_trace.c"
     INCLUDE_DIRS "include"
     REQUIRES esp_http_client esp_netif mqtt mbedtls json
-    PRIV_REQUIRES esp-tls esp_timer
+    PRIV_REQUIRES esp-tls esp_timer tcp_transport lwip http_parser
+)
+
+if(CMAKE_BUILD_EARLY_EXPANSION)
+    return()
+endif()
+# Observe scoped platform HTTP only. IDF/SDK archives are not patched, and
+# calls outside that task/scope retain their original arguments and results.
+target_link_libraries(${COMPONENT_LIB} INTERFACE
+    "-Wl,--wrap=lwip_getaddrinfo"
+    "-Wl,--wrap=lwip_connect"
+    "-Wl,--wrap=lwip_select"
+    "-Wl,--wrap=esp_transport_connect"
+    "-Wl,--wrap=esp_transport_write"
+    "-Wl,--wrap=esp_transport_read"
 )

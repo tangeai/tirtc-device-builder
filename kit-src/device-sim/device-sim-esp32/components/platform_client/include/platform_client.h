@@ -162,6 +162,16 @@ esp_err_t platform_client_request_timeout(platform_service_t service,
 void platform_client_set_signal_handler(platform_signal_callback_t callback,
                                         void *user_data);
 
+/**
+ * 永久 MQTT 已连接且 HTTP 请求循环可用时通知一次。每次 MQTT 重连都会再次
+ * 通知，供上层重新上报依赖在线状态的媒体能力；回调必须立即返回。
+ */
+typedef void (*platform_online_callback_t)(void *user_data);
+
+/** 注册 MQTT 上线通知消费者；应在 platform_client_start() 前调用。 */
+void platform_client_set_online_handler(platform_online_callback_t callback,
+                                        void *user_data);
+
 #ifdef __cplusplus
 }
 #endif

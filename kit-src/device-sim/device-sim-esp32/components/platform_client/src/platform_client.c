@@ -9,6 +9,7 @@
  * 放入 provision result 交给组合根持久化；两者都不会写入日志。
  */
 #include "platform_client.h"
+#include "platform_http_trace.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +19,7 @@
 #include <stdatomic.h>
 
 #include "cJSON.h"
+#include "esp_attr.h"
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
@@ -32,6 +34,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "http_parser.h"
 #include "lwip/apps/sntp_opts.h"
 #include "lwip/dns.h"
 #include "mbedtls/base64.h"
@@ -45,6 +48,7 @@
 #define PLATFORM_REQUEST_BODY_MAX 2048
 #define PLATFORM_SIGNAL_MAX 4096
 #define PLATFORM_DEFAULT_HTTP_TIMEOUT_MS 15000U
+#define PLATFORM_HTTP_REUSE_IDLE_MS 3000U
 #define PLATFORM_TTS_HTTP_TIMEOUT_MS 20000U
 /* 服务端最坏情况：中文前缀 + 6 个最长数字 + 6 段静音 = 157824 bytes。 */
 #define PLATFORM_TTS_PCM_MAX_BYTES (160U * 1024U)
@@ -72,7 +76,17 @@ typedef struct {
     size_t length;
     bool overflow;
     bool content_type_pcm;
+    bool redirected;
 } http_output_t;
+
+/* One short-lived connection owned by the HTTP worker. Startup/provisioning
+ * close their one-shot requests before returning to an unbounded UI wait. */
+typedef struct {
+    esp_http_client_handle_t client;
+    uint32_t idle_since_ms;
+    char origin[256];
+} http_reuse_t;
+static EXT_RAM_BSS_ATTR http_reuse_t s_http_reuse;
 
 /* 请求按值进入固定队列，避免调用者栈内字符串在异步执行前失效。 */
 typedef struct {
@@ -127,6 +141,9 @@ static uint32_t s_response_epoch;
 static int s_response_status;
 static atomic_bool s_binding_retry;
 static atomic_bool s_mqtt_connected;
+static platform_online_callback_t s_online_callback;
+static void *s_online_user_data;
+static volatile bool s_request_worker_ready;
 static volatile bool s_provisioning;
 static bool s_services_ready;
 static char s_verification_code[17];
@@ -138,14 +155,133 @@ static int s_mqtt_message_id = -1;
 
 /* ===== 有界 HTTP 与 JSON 基础函数 ===== */
 
+/* Never log arbitrary paths, queries, device IDs or signed URLs. */
+static const char *http_api_name(const char *url_or_path)
+{
+    if (url_or_path == NULL) return "unknown";
+    const char *scheme = strstr(url_or_path, "://");
+    const char *path = scheme == NULL ? url_or_path : strchr(scheme + 3, '/');
+    if (path == NULL) return "unknown";
+    size_t length = strcspn(path, "?#");
+    static const char *const names[] = {
+        "/services", "/v1/device/token", "/v1/device/report", "/v1/device/tts",
+        "/v1/ai/token", "/v1/call/device/contacts", "/v1/call/device/info",
+        "/v1/call/request", "/v1/call/room", "/v1/call/cancel",
+        "/v1/call/hangup", "/v1/call/reject", "/v1/device/profile",
+        "/v1/voip/device/call", "/v1/wxvoip/reject",
+        "/v1/call/group/device/assignment", "/v1/call/group/device/create",
+        "/v1/call/group/device/join", "/v1/call/group/device/leave",
+        "/v1/call/group/device/connect-token", "/v1/call/group/device/presence",
+    };
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
+        if (strlen(names[i]) == length && strncmp(path, names[i], length) == 0) return names[i];
+    }
+    return "other";
+}
+
+static void http_log_result(const char *url, bool post, uint32_t started_ms,
+                            uint32_t queue_ms, uint32_t prep_ms, uint32_t io_ms,
+                            esp_err_t err, int status, const platform_http_trace_t *trace,
+                            bool redirected)
+{
+    uint32_t total_ms = (uint32_t)(esp_timer_get_time() / 1000) - started_ms;
+    const char *api = http_api_name(url);
+    if (queue_ms < 100U && total_ms < 500U && err == ESP_OK &&
+        status >= 200 && status < 300 && strcmp(api, "/v1/ai/token") != 0) return;
+    /* link includes TCP/TLS/local scheduling; wait includes network + server.
+     * Neither is pure server time. Redirect/auth exchanges may have several
+     * response intervals, so do not invent a single wait duration for them. */
+    bool single = trace->enabled && !redirected && trace->connect_calls <= 1U &&
+                  trace->first_rx_ms != UINT32_MAX && trace->write_ms != UINT32_MAX &&
+                  trace->first_rx_ms >= trace->write_ms;
+    long wait_ms = single ? (long)(trace->first_rx_ms - trace->write_ms) : -1;
+    long link_ms = trace->enabled && trace->connect_ms >= trace->dns_ms
+                       ? (long)(trace->connect_ms - trace->dns_ms) : -1;
+    ESP_LOGI(TAG,
+             "HTTP t=%lu api=%s m=%s q=%lu prep=%lu dns=%ld/%lu drc=%d link=%ld sock=%lu tcp_wait=%lu/%d wait=%ld io=%lu total=%lu conn=%lu redir=%d tx=%lu rx=%lu rc=%d status=%d",
+             (unsigned long)started_ms, api, post ? "POST" : "GET",
+             (unsigned long)queue_ms, (unsigned long)prep_ms,
+             trace->enabled ? (long)trace->dns_ms : -1,
+             (unsigned long)trace->dns_calls, trace->dns_rc, link_ms,
+             (unsigned long)trace->socket_ms, (unsigned long)trace->tcp_wait_ms,
+             trace->tcp_wait_rc, wait_ms,
+             (unsigned long)io_ms, (unsigned long)total_ms,
+             (unsigned long)trace->connect_calls, (int)redirected,
+             (unsigned long)trace->tx_bytes, (unsigned long)trace->rx_bytes,
+             (int)err, status);
+}
+
+static bool http_origin(const char *url, char *origin, size_t capacity)
+{
+    struct http_parser_url parsed;
+    http_parser_url_init(&parsed);
+    if (url == NULL || http_parser_parse_url(url, strlen(url), 0, &parsed) != 0 ||
+        !(parsed.field_set & (1U << UF_SCHEMA)) ||
+        !(parsed.field_set & (1U << UF_HOST)) ||
+        (parsed.field_set & (1U << UF_USERINFO))) return false;
+    size_t scheme = parsed.field_data[UF_SCHEMA].len;
+    if (!((scheme == 4U && strncasecmp(url, "http", 4) == 0) ||
+          (scheme == 5U && strncasecmp(url, "https", 5) == 0))) return false;
+    size_t authority = scheme + 3U;
+    size_t length = authority + strcspn(url + authority, "/?#");
+    if (length >= capacity) return false;
+    memcpy(origin, url, length);
+    origin[length] = '\0';
+    return true;
+}
+
+static void http_reuse_close(void)
+{
+    if (s_http_reuse.client != NULL) esp_http_client_cleanup(s_http_reuse.client);
+    memset(&s_http_reuse, 0, sizeof(s_http_reuse));
+}
+
+static void http_reuse_expire(void)
+{
+    if (s_http_reuse.client != NULL &&
+        (uint32_t)(esp_timer_get_time() / 1000) - s_http_reuse.idle_since_ms >=
+            PLATFORM_HTTP_REUSE_IDLE_MS) http_reuse_close();
+}
+
+static esp_http_client_handle_t http_reuse_take(const char *url)
+{
+    char origin[sizeof(s_http_reuse.origin)];
+    http_reuse_expire();
+    if (s_http_reuse.client == NULL) return NULL;
+    if (!http_origin(url, origin, sizeof(origin)) ||
+        strcasecmp(origin, s_http_reuse.origin) != 0) {
+        http_reuse_close();
+        return NULL;
+    }
+    esp_http_client_handle_t client = s_http_reuse.client;
+    s_http_reuse.client = NULL;
+    return client;
+}
+
+static void http_reuse_put(esp_http_client_handle_t client, const char *url)
+{
+    http_reuse_close();
+    if (!esp_http_client_is_persistent_connection(client) ||
+        !http_origin(url, s_http_reuse.origin, sizeof(s_http_reuse.origin))) {
+        esp_http_client_cleanup(client);
+        return;
+    }
+    s_http_reuse.client = client;
+    s_http_reuse.idle_since_ms = (uint32_t)(esp_timer_get_time() / 1000);
+}
+
 /* esp_http_client 可能分片回调；按容量拼接，溢出时整次请求失败。 */
 static esp_err_t http_event(esp_http_client_event_t *event)
 {
+    http_output_t *output = event->user_data;
+    if (event->event_id == HTTP_EVENT_ON_HEADER && output != NULL &&
+        event->header_key != NULL && strcasecmp(event->header_key, "Location") == 0) {
+        output->redirected = true;
+    }
     if (event->event_id != HTTP_EVENT_ON_DATA || event->data == NULL ||
         event->data_len <= 0) {
         return ESP_OK;
     }
-    http_output_t *output = event->user_data;
     if (output == NULL || output->overflow ||
         output->length + (size_t)event->data_len >= output->capacity) {
         if (output != NULL) {
@@ -159,7 +295,7 @@ static esp_err_t http_event(esp_http_client_event_t *event)
     return ESP_OK;
 }
 
-static esp_err_t http_request(const char *url,
+static esp_err_t http_request_timed(const char *url,
                               const char *json_body,
                               const char *bearer,
                               const char *const header_names[],
@@ -168,8 +304,18 @@ static esp_err_t http_request(const char *url,
                               char *response,
                               size_t response_size,
                               unsigned timeout_ms,
-                              int *status)
+                              int *status,
+                              uint32_t queued_ms)
 {
+    uint32_t started_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    uint32_t queue_ms = queued_ms == 0 ? 0 : started_ms - queued_ms;
+    uint32_t prep_ms = 0, io_ms = 0;
+    platform_http_trace_t trace = {0};
+    if (status != NULL) *status = 0;
+    if (url == NULL || response == NULL || response_size == 0 ||
+        (header_count != 0 && (header_names == NULL || header_values == NULL))) {
+        return ESP_ERR_INVALID_ARG;
+    }
     /* response 由调用者提供，函数返回时总是以 NUL 结尾或报告容量错误。 */
     http_output_t output = {
         .data = response,
@@ -186,38 +332,93 @@ static esp_err_t http_request(const char *url,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .disable_auto_redirect = false,
     };
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == NULL) {
-        return ESP_ERR_NO_MEM;
-    }
-    if (json_body != NULL) {
-        esp_http_client_set_method(client, HTTP_METHOD_POST);
-        esp_http_client_set_header(client, "Content-Type", "application/json");
-        esp_http_client_set_post_field(client, json_body, strlen(json_body));
-    }
+    esp_http_client_handle_t client = http_reuse_take(url);
+    esp_err_t err = ESP_ERR_NO_MEM;
+    int response_status = 0;
     char authorization[1100];
+    if (client != NULL) {
+        err = esp_http_client_set_url(client, url);
+        if (err != ESP_OK) goto done;
+        err = esp_http_client_set_timeout_ms(client, config.timeout_ms);
+        if (err != ESP_OK) goto done;
+        err = esp_http_client_set_user_data(client, &output);
+        if (err != ESP_OK) goto done;
+    } else {
+        client = esp_http_client_init(&config);
+    }
+    if (client == NULL) goto done;
+    if (json_body != NULL) {
+        err = esp_http_client_set_method(client, HTTP_METHOD_POST);
+        if (err != ESP_OK) goto done;
+        err = esp_http_client_set_header(client, "Content-Type", "application/json");
+        if (err != ESP_OK) goto done;
+        err = esp_http_client_set_post_field(client, json_body, strlen(json_body));
+        if (err != ESP_OK) goto done;
+    }
     if (bearer != NULL && bearer[0] != '\0') {
         int count = snprintf(authorization, sizeof(authorization), "Bearer %s", bearer);
         if (count <= 0 || (size_t)count >= sizeof(authorization)) {
-            mbedtls_platform_zeroize(authorization, sizeof(authorization));
-            esp_http_client_cleanup(client);
-            return ESP_ERR_INVALID_SIZE;
+            err = ESP_ERR_INVALID_SIZE;
+            goto done;
         }
-        esp_http_client_set_header(client, "Authorization", authorization);
+        err = esp_http_client_set_header(client, "Authorization", authorization);
+        if (err != ESP_OK) goto done;
     }
     for (size_t i = 0; i < header_count; ++i) {
-        esp_http_client_set_header(client, header_names[i], header_values[i]);
+        err = esp_http_client_set_header(client, header_names[i], header_values[i]);
+        if (err != ESP_OK) goto done;
     }
 
-    esp_err_t err = esp_http_client_perform(client);
-    if (status != NULL) {
-        *status = esp_http_client_get_status_code(client);
-    }
-    esp_http_client_cleanup(client);
-    mbedtls_platform_zeroize(authorization, sizeof(authorization));
+    prep_ms = (uint32_t)(esp_timer_get_time() / 1000) - started_ms;
+    platform_http_trace_begin(&trace);
+    err = esp_http_client_perform(client);
+    platform_http_trace_end(&trace);
+    io_ms = (uint32_t)(esp_timer_get_time() / 1000) - trace.started_ms;
+    response_status = esp_http_client_get_status_code(client);
     if (err == ESP_OK && output.overflow) {
-        return ESP_ERR_INVALID_SIZE;
+        err = ESP_ERR_INVALID_SIZE;
     }
+done:
+    if (client != NULL) {
+        bool reusable = err == ESP_OK && response_status >= 200 && response_status < 300 &&
+                        !output.redirected && !output.overflow;
+        /* Never retain caller stack pointers, signed headers or a previous
+         * POST body. A failed/stale connection is closed, not silently replayed:
+         * a call/create POST may already have executed on the server. */
+        if (reusable) {
+            for (size_t i = 0; i < header_count; ++i)
+                (void)esp_http_client_delete_header(client, header_names[i]);
+            (void)esp_http_client_delete_header(client, "Authorization");
+            (void)esp_http_client_delete_header(client, "Content-Type");
+            (void)esp_http_client_delete_header(client, "Content-Length");
+            /* IDF clears post_data before deleting Content-Type; absent GET
+             * headers return NOT_FOUND even though the pointer was cleared. */
+            esp_err_t cleared = esp_http_client_set_post_field(client, NULL, 0);
+            reusable = (cleared == ESP_OK || cleared == ESP_ERR_NOT_FOUND) &&
+                       esp_http_client_set_method(client, HTTP_METHOD_GET) == ESP_OK &&
+                       esp_http_client_set_user_data(client, NULL) == ESP_OK;
+        }
+        if (reusable) http_reuse_put(client, url);
+        else esp_http_client_cleanup(client);
+    }
+    mbedtls_platform_zeroize(authorization, sizeof(authorization));
+    if (!trace.enabled) prep_ms = (uint32_t)(esp_timer_get_time() / 1000) - started_ms - io_ms;
+    if (status != NULL) *status = response_status;
+    http_log_result(url, json_body != NULL, started_ms, queue_ms, prep_ms,
+                    io_ms, err, response_status, &trace, output.redirected);
+    return err;
+}
+
+/* Provisioning may wait for user input for minutes and has no expiry loop.
+ * Keep discovery, signed login and binding one-shot on their existing owner. */
+static esp_err_t http_request(const char *url, const char *json_body, const char *bearer,
+                             const char *const header_names[], const char *const header_values[],
+                             size_t header_count, char *response, size_t response_size,
+                             unsigned timeout_ms, int *status)
+{
+    esp_err_t err = http_request_timed(url, json_body, bearer, header_names, header_values,
+                                      header_count, response, response_size, timeout_ms, status, 0);
+    http_reuse_close();
     return err;
 }
 
@@ -479,7 +680,7 @@ static void process_request(const platform_request_t *request)
     int status = 0;
     esp_err_t err = url_length <= 0 || (size_t)url_length >= sizeof(url)
                         ? ESP_ERR_INVALID_SIZE
-                        : http_request(url,
+                        : http_request_timed(url,
                                        request->post ? request->body : NULL,
                                        s_mqtt_token,
                                        NULL,
@@ -488,11 +689,12 @@ static void process_request(const platform_request_t *request)
                                        response,
                                        sizeof(response),
                                        request->timeout_ms,
-                                       &status);
+                                       &status,
+                                       request->queued_ms);
     s_response_status = status;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "platform request %s failed: %s HTTP=%d",
-                 request->path, esp_err_to_name(err), status);
+                 http_api_name(request->path), esp_err_to_name(err), status);
         if (request->callback != NULL) {
             request->callback(NULL, request->user_data);
         }
@@ -500,7 +702,7 @@ static void process_request(const platform_request_t *request)
     }
     if (status < 200 || status >= 300) {
         ESP_LOGW(TAG, "platform request %s returned HTTP=%d",
-                 request->path, status);
+                 http_api_name(request->path), status);
     }
     if (request->callback != NULL) {
         /* A request already in flight may finish after unbind. Do not deliver
@@ -536,6 +738,7 @@ static void request_loop(void)
     int64_t next_heartbeat_ms = esp_timer_get_time() / 1000 + 30000;
     for (;;) {
         if (atomic_load(&s_rebind_quiesced)) return;
+        http_reuse_expire();
         platform_request_t request;
         if (xQueueReceive(s_request_queue, &request, pdMS_TO_TICKS(1000)) == pdTRUE) {
             /* 空 path 是重绑静默唤醒哨兵，不是业务请求。 */
@@ -555,6 +758,15 @@ static void dispatch_mqtt_signal(const char *json, size_t length)
 {
     if (s_signal_callback != NULL) {
         s_signal_callback(json, length, s_signal_user_data);
+    }
+}
+
+static void notify_platform_online(void)
+{
+    /* 回调只用于投递上层状态事件，不能在 MQTT 事件上下文做网络 I/O。 */
+    if (platform_client_ready() && s_mqtt_connected && s_request_worker_ready &&
+        s_online_callback != NULL) {
+        s_online_callback(s_online_user_data);
     }
 }
 
@@ -578,6 +790,7 @@ static void mqtt_event(void *handler_args,
         (void)esp_mqtt_client_subscribe(s_mqtt, notify_topic, 1);
         s_mqtt_connected = true;
         ESP_LOGI(TAG, "MQTT connected and device topics subscribed");
+        notify_platform_online();
     } else if (event_id == MQTT_EVENT_DISCONNECTED) {
         s_mqtt_connected = false;
         ESP_LOGW(TAG, "MQTT disconnected; client will reconnect");
@@ -1383,6 +1596,9 @@ esp_err_t platform_client_run_request_loop(void)
             return ESP_ERR_NO_MEM;
         }
     }
+    s_request_worker_ready = true;
+    /* MQTT 往往先于 HTTP worker 建连；此处补发首次上线通知。 */
+    notify_platform_online();
     request_loop();
     return ESP_ERR_NOT_FOUND;
 }
@@ -1427,6 +1643,7 @@ esp_err_t platform_client_prepare_rebind(void)
      * No NVS is erased: device identity survives an ownership change. */
     if (!atomic_load(&s_rebind_quiesced)) return ESP_ERR_INVALID_STATE;
     s_ready = false;
+    http_reuse_close();
     esp_err_t err = stop_mqtt();
     if (err != ESP_OK) return err;
     mbedtls_platform_zeroize(s_mqtt_token, sizeof(s_mqtt_token));
@@ -1448,6 +1665,7 @@ void platform_client_complete_rebind(void)
     if (!s_ready) return;
     atomic_store(&s_rebind_quiesced, false);
     atomic_store(&s_rebind_request, 0);
+    notify_platform_online();
 }
 
 bool platform_client_mqtt_connected(void)
@@ -1525,4 +1743,11 @@ void platform_client_set_signal_handler(platform_signal_callback_t callback,
 {
     s_signal_callback = callback;
     s_signal_user_data = user_data;
+}
+
+void platform_client_set_online_handler(platform_online_callback_t callback,
+                                        void *user_data)
+{
+    s_online_callback = callback;
+    s_online_user_data = user_data;
 }
