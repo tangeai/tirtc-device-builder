@@ -17,7 +17,11 @@ import {
   requireAgentClient,
 } from "../bin/agent-clients.js";
 import { inspectDeviceKit } from "../bin/setup-esp32.js";
-import { ESP32_KIT } from "../bin/esp32-kit-metadata.js";
+import {
+  ESP32_KIT,
+  ESP32_KITS,
+  ESP32_P4_KIT,
+} from "../bin/esp32-kit-metadata.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(ROOT, "bin", "tirtc-device-builder.js");
@@ -459,4 +463,21 @@ test("setup does not accept an explicit older Kit as the pinned Kit", async () =
     assert.match(result.stdout, /version 1\.0\.0; expected 1\.1\.7/);
     assert.match(result.stdout, /OVERALL: NEEDS_SETUP/);
   });
+});
+
+test("Kit metadata exposes both targets without fabricating the P4 release", () => {
+  assert.deepEqual(Object.keys(ESP32_KITS), ["esp32s3", "esp32p4"]);
+  assert.equal(ESP32_KITS.esp32s3, ESP32_KIT);
+  assert.equal(ESP32_KITS.esp32p4, ESP32_P4_KIT);
+  assert.equal(ESP32_KIT.target, "esp32s3");
+  assert.equal(ESP32_KIT.platform, "espressif-esp32s3");
+  assert.equal(ESP32_KIT.released, true);
+  assert.equal(typeof ESP32_KIT.sha256, "string");
+  assert.equal(ESP32_P4_KIT.target, "esp32p4");
+  assert.equal(ESP32_P4_KIT.platform, "espressif-esp32p4");
+  assert.equal(ESP32_P4_KIT.sdkVersion, "2.5.0");
+  assert.equal(ESP32_P4_KIT.released, false);
+  assert.equal(ESP32_P4_KIT.sha256, null);
+  assert.equal(ESP32_P4_KIT.url, null);
+  assert.equal(ESP32_P4_KIT.sourceCommit, null);
 });

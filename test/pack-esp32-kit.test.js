@@ -28,35 +28,24 @@ function writeFixture(root, relative, content = "fixture\n") {
   writeFileSync(path, content);
 }
 
-function createSource(root) {
-  const thingConnect = join(root, "thing-connect");
-  const files = [
-    "device-sim/scripts/create_esp32_project.py",
-    "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
-    "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
-    "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
-    "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
-    "device-sim/templates/esp32-h5-ai/README.md",
-    "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
-    "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
-    "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
+/* The shared wifi_manager fixtures satisfy the SoftAP contract for both kits. */
+function writeWifiFixtures(thingConnect) {
+  writeFixture(
+    thingConnect,
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
+  );
+  writeFixture(
+    thingConnect,
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.c",
+  );
+  writeFixture(
+    thingConnect,
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.h",
-    "device-sim/device-sim-esp32/components/wifi_manager/web/setup.html",
+  );
+  writeFixture(
+    thingConnect,
     "device-sim/device-sim-esp32/components/wifi_manager/Kconfig",
-    "device-sim/sdk/espressif-esp32s3/2.5.0/include/tirtc/tiRTC.h",
-    "device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a",
-    "device-sim/sdk/espressif-esp32s3/2.5.0/manifest/build-contract.env",
-    "device-integration.md",
-    "device-h5-live.md",
-    "device-ai.md",
-    "device-session-model.md",
-    "device-session-arbiter.md",
-  ];
-  for (const file of files) {
-    writeFixture(thingConnect, file);
-  }
+  );
   writeFixture(
     thingConnect,
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
@@ -95,10 +84,81 @@ void captive(void) {
     "<!doctype html><title>小钛 · Wi-Fi 配网</title>"
       + "<script>fetch('/api/networks')</script>\n",
   );
+}
+
+function createSource(root) {
+  const thingConnect = join(root, "thing-connect");
+  const files = [
+    "device-sim/scripts/create_esp32_project.py",
+    "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
+    "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
+    "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
+    "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
+    "device-sim/templates/esp32-h5-ai/README.md",
+    "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
+    "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
+    "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
+    "device-sim/sdk/espressif-esp32s3/2.5.0/include/tirtc/tiRTC.h",
+    "device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a",
+    "device-sim/sdk/espressif-esp32s3/2.5.0/manifest/build-contract.env",
+    "device-integration.md",
+    "device-h5-live.md",
+    "device-ai.md",
+    "device-session-model.md",
+    "device-session-arbiter.md",
+  ];
+  for (const file of files) {
+    writeFixture(thingConnect, file);
+  }
+  writeWifiFixtures(thingConnect);
   writeFixture(
     thingConnect,
     "device-sim/templates/esp32-h5-ai/README.md",
     "设备启动 XiaoTai-XXXX 开放 SoftAP，无需密码；通过 captive portal 自动打开 http://192.168.6.1 配网。\n",
+  );
+  writeFixture(root, "LICENSE", "fixture license\n");
+  return thingConnect;
+}
+
+function createP4Source(root) {
+  const thingConnect = join(root, "thing-connect");
+  const files = [
+    "device-sim/scripts/create_esp32_project.py",
+    "device-sim/device-sim-p4/CMakeLists.txt",
+    "device-sim/device-sim-p4/main/CMakeLists.txt",
+    "device-sim/device-sim-p4/main/xiaotai_main.c",
+    "device-sim/device-sim-p4/main/Kconfig.xiaotai",
+    "device-sim/device-sim-p4/sdkconfig.defaults",
+    "device-sim/device-sim-p4/partitions.csv",
+    "device-sim/device-sim-p4/dependencies.lock",
+    "device-sim/device-sim-p4/README.md",
+    "device-sim/device-sim-p4/LICENSE",
+    "device-sim/device-sim-p4/THIRD_PARTY.md",
+    "device-sim/device-sim-p4/components/tirtc_sdk/CMakeLists.txt",
+    "device-sim/device-sim-p4/components/starter_runtime/CMakeLists.txt",
+    "device-sim/device-sim-p4/components/starter_tirtc/CMakeLists.txt",
+    "device-sim/device-sim-p4/components/starter_product/CMakeLists.txt",
+    "device-sim/device-sim-p4/components/starter_voice/model/nihaoxiaotai.tflite",
+    "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
+    "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
+    "device-sim/sdk/espressif-esp32p4/2.5.0/README.md",
+    "device-sim/sdk/espressif-esp32p4/2.5.0/include/tirtc/tiRTC.h",
+    "device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a",
+    "device-sim/sdk/espressif-esp32p4/2.5.0/manifest/build-contract.env",
+    "device-integration.md",
+    "device-h5-live.md",
+    "device-ai.md",
+    "device-session-model.md",
+    "device-session-arbiter.md",
+  ];
+  for (const file of files) {
+    writeFixture(thingConnect, file);
+  }
+  writeWifiFixtures(thingConnect);
+  writeFixture(
+    thingConnect,
+    "device-sim/device-sim-p4/README.md",
+    "小钛 P4 参考固件：设备启动 XiaoTai-XXXX 开放 SoftAP，配网页 http://192.168.6.1。\n",
   );
   writeFixture(root, "LICENSE", "fixture license\n");
   return thingConnect;
@@ -449,4 +509,151 @@ test("npm publication requires the pinned Kit release archive", () => {
   assert.match(workflow, /ESP32_KIT\.sha256/);
   assert.match(workflow, /curl --fail --location/);
   assert.match(workflow, /test "\$\{actual_sha256\}" = "\$\{expected_sha256\}"/);
+});
+
+test("pack:esp32-kit creates a versioned, checksummed P4 Kit", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-p4-test-"));
+  try {
+    const source = createP4Source(join(temporary, "source"));
+    const output = join(temporary, "dist");
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        "--source",
+        source,
+        "--kit-version",
+        "1.0.0",
+        "--target",
+        "esp32p4",
+        "--source-commit",
+        COMMIT,
+        "--output",
+        output,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+
+    const archive = join(output, "tirtc-esp32p4-kit-1.0.0.tar.gz");
+    const actual = createHash("sha256")
+      .update(readFileSync(archive))
+      .digest("hex");
+    assert.match(
+      readFileSync(`${archive}.sha256`, "utf8"),
+      new RegExp(`^${actual}  `),
+    );
+
+    const extracted = join(temporary, "extracted");
+    mkdirSync(extracted);
+    const unpack = spawnSync("tar", ["-xzf", archive, "-C", extracted], {
+      encoding: "utf8",
+    });
+    assert.equal(unpack.status, 0, unpack.stderr);
+    const kit = join(extracted, "tirtc-esp32p4-kit-1.0.0");
+    const manifest = JSON.parse(readFileSync(join(kit, "manifest.json"), "utf8"));
+    assert.equal(manifest.platform, "espressif-esp32p4");
+    assert.equal(manifest.target, "esp32p4");
+    assert.equal(manifest.idf_version, "5.5.4");
+    assert.equal(manifest.tirtc_sdk_version, "2.5.0");
+    assert.equal(
+      existsSync(join(kit, "device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a")),
+      true,
+    );
+    assert.equal(
+      existsSync(
+        join(kit, "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c"),
+      ),
+      true,
+    );
+    assert.equal(
+      existsSync(join(kit, "device-sim/device-sim-p4/main/xiaotai_main.c")),
+      true,
+    );
+
+    const installed = join(temporary, "installed-kit");
+    installEsp32KitArchive(archive, installed, {
+      target: "esp32p4",
+      platform: "espressif-esp32p4",
+      archiveName: "tirtc-esp32p4-kit-1.0.0.tar.gz",
+      archiveRoot: "tirtc-esp32p4-kit-1.0.0",
+      releaseTag: "test",
+      sha256: actual,
+      sdkVersion: "2.5.0",
+      url: "https://example.invalid/test.tar.gz",
+      version: "1.0.0",
+    });
+    assert.equal(
+      existsSync(
+        join(installed, "device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a"),
+      ),
+      true,
+    );
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("pack:esp32-kit includes the repository-owned ESP32-P4 SDK 2.5.0", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-p4-source-test-"));
+  try {
+    const output = join(temporary, "dist");
+    const result = spawnSync(process.execPath, [
+      SCRIPT,
+      "--kit-version", "1.0.0",
+      "--target", "esp32p4",
+      "--source-commit", COMMIT,
+      "--output", output,
+    ], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+
+    const archive = join(output, "tirtc-esp32p4-kit-1.0.0.tar.gz");
+    const extracted = join(temporary, "extracted");
+    mkdirSync(extracted);
+    const unpack = spawnSync("tar", ["-xzf", archive, "-C", extracted], {
+      encoding: "utf8",
+    });
+    assert.equal(unpack.status, 0, unpack.stderr);
+    const kit = join(extracted, "tirtc-esp32p4-kit-1.0.0");
+    const sdkPath = "device-sim/sdk/espressif-esp32p4/2.5.0";
+    assert.deepEqual(
+      readFileSync(join(kit, sdkPath, "lib/libTiRTC.a")),
+      readFileSync(join(ROOT, "kit-src", sdkPath, "lib/libTiRTC.a")),
+    );
+    assert.equal(
+      existsSync(join(kit, "device-sim/sdk/espressif-esp32s3")),
+      false,
+    );
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
+});
+
+test("pack:esp32-kit rejects incomplete P4 sources", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "tirtc-kit-p4-test-"));
+  try {
+    const source = join(temporary, "thing-connect");
+    writeFixture(source, "device-sim/scripts/create_esp32_project.py");
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        "--source",
+        source,
+        "--kit-version",
+        "1.0.0",
+        "--target",
+        "esp32p4",
+        "--source-commit",
+        COMMIT,
+        "--output",
+        join(temporary, "dist"),
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /required Kit source is missing/);
+  } finally {
+    rmSync(temporary, { force: true, recursive: true });
+  }
 });
