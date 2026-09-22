@@ -44,6 +44,24 @@ printf '%s\n' "$TIRTC_THING_CONNECT_ROOT"
 
 已有完整 ThingConnect 工作区仍可通过 `--thing-connect-root` 显式复用，主要用于维护模板或协议时的开发场景。
 
+### ESP32-P4 Device Kit
+
+P4 不上 managed 安装（需要独立的 RISC-V 工具链）。从 GitHub Release 下载
+`tirtc-esp32p4-kit`（小钛 P4 参考固件 1.4.0：hosted C6 Wi-Fi + LVGL UI +
+摄像头，含 P4 SDK 2.5.0 与构建契约）并校验 SHA-256 后：
+
+```bash
+python3 <解包目录>/device-sim/scripts/create_esp32_project.py \
+  /absolute/path/my-p4-device my_p4_device --target esp32p4
+cd /absolute/path/my-p4-device
+idf.py set-target esp32p4
+idf.py build   # 需要 ESP-IDF 5.5.4 与 riscv32-esp-elf（install.sh esp32p4）
+```
+
+诊断使用 `--target esp32p4`；P4 永远不得链接 S3 的 `libTiRTC.a`。板级差异
+（屏幕、摄像头、Codec、按键）位于参考固件的板级组件内，共享传输组件
+（platform_client/runtime_config/wifi_manager）与 S3 同源。
+
 ## 常见输入方式
 
 只有板卡型号：

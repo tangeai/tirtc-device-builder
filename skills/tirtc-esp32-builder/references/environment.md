@@ -59,10 +59,19 @@ protocols and non-ESP32 simulators. Cloning is an external write and requires
 user authorization. Do not track a moving default branch as build evidence.
 
 ESP32-P4 uses a separate `espressif_esp32p4` SDK archive and RISC-V toolchain.
-The managed setup does not install that archive or generate a P4 starter. A P4
-task therefore needs an explicit BSP/network project plus the exact P4 SDK and
-`manifest/build-contract.env`; run Doctor with `--target esp32p4` and never accept
-the packaged S3 archive as a compatible fallback.
+The managed setup does not install that archive; P4 projects come from the
+published `tirtc-esp32p4-kit` (the XiaoTai P4 reference firmware, released
+alongside the S3 Kit). The P4 flow is:
+
+1. Download the `tirtc-esp32p4-kit` GitHub release, verify its SHA-256, and
+   extract it (or point `--thing-connect-root` at this repository's `kit-src`).
+2. `python3 device-sim/scripts/create_esp32_project.py <out> <name> --target esp32p4`
+   (copies the full reference firmware and materializes the shared transport
+   components and the P4 SDK under `third_party/tirtc`).
+3. `idf.py set-target esp32p4`, build with the RISC-V toolchain
+   (`install.sh esp32p4`; the pinned SDK requires ESP-IDF 5.5.4 exactly).
+4. Run Doctor with `--target esp32p4` and never accept the packaged S3 archive
+   as a compatible fallback.
 
 SDK resolution is independent after generation: an explicit `--sdk-dir` wins, followed by `<project>/third_party/tirtc`, then the SDK packaged in the resolved Device Kit or legacy workspace. The generated project remains diagnosable after it is moved away from the Kit.
 

@@ -26,8 +26,17 @@ This project follows Semantic Versioning.
 - Extend the Kit packing contract and generator tests to cover the new
   portal endpoints, history component, embedded setup page, and portal
   isolation; keep the `XiaoTai-` / open-auth / 192.168.6.1 SoftAP contract.
-- Device Kit release (1.2.0) and checksum pinning are deferred to the
-  release workflow; no sha256 is fabricated in this changelog.
+- Add the ESP32-P4 Device Kit: TiRTC P4 SDK 2.5.0 (vendor baseline
+  `9b4e35c7`, IDF 5.5.4 / 1000 Hz / LWIP_MAX_SOCKETS=10 contract), the
+  XiaoTai P4 1.4.0 reference firmware imported as `device-sim-p4` (shared
+  transport components resolve from the S3 reference; the P4 `tirtc_sdk`
+  wrapper re-pins the archive), generator `--target esp32p4` copy mode,
+  per-target pack/metadata/installer plumbing, a `publish-p4` release job
+  that fails until the P4 kit is pinned, and P4-aware Doctor SDK resolution
+  and contract keys. Managed `setup` stays ESP32-S3-only.
+- Device Kit releases (1.2.0 for S3, 1.0.0 for P4) and checksum pinning
+  are deferred to the release workflow; no sha256 is fabricated in this
+  changelog.
 
 ## 0.9.7
 

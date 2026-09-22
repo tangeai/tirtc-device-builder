@@ -8,11 +8,12 @@ TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入�
 |---|---|---|
 | `tirtc-esp32-builder` | ESP32-S3 / ESP32-P4、ESP-IDF 5.5.x | 板型识别、Hardware IR、工程生成/移植、H5/AI/设备互呼/微信 VoIP、AEC 门禁、编译烧录和分层验收 |
 
-H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。ESP32 示例源码由本仓库的 `kit-src/` 维护；设备互呼或微信 VoIP 的移植可参考其中的独立示例。ESP32-P4 必须使用匹配的 P4 SDK、BSP 与网络方案，不能复用 S3 预编译库。
+H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。ESP32 示例源码由本仓库的 `kit-src/` 维护；设备互呼或微信 VoIP 的移植可参考其中的独立示例。ESP32-P4 使用独立发布的 `tirtc-esp32p4-kit`（小钛 P4 参考固件：hosted C6 Wi-Fi + LVGL UI + 摄像头 + P4 SDK 2.5.0），通过生成器 `--target esp32p4` 复制生成，不能复用 S3 预编译库。
 
 - npm 包：[tirtc-device-builder](https://www.npmjs.com/package/tirtc-device-builder)
 - GitHub 仓库：[tangeai/tirtc-device-builder](https://github.com/tangeai/tirtc-device-builder)
 - ESP32 Device Kit：[kit-esp32s3-v1.1.7](https://github.com/tangeai/tirtc-device-builder/releases/tag/kit-esp32s3-v1.1.7)
+- ESP32-P4 Device Kit：`tirtc-esp32p4-kit`（首次发布前以 `kit-esp32p4-v*` tag 发布的 GitHub Release 为准）
 
 文档导航：
 

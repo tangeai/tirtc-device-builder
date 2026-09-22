@@ -27,9 +27,10 @@ past build as proof for a new artifact.
    Clone or download it only when the user authorizes that external write.
    Read the exact business documents routed by `workflow.md`.
 4. Run Doctor for the exact target and SDK package. Managed generation currently
-   automates ESP32-S3. ESP32-P4 is valid only with an evidenced P4 BSP/network
-   path and the matching `espressif_esp32p4` SDK/build contract; never link the
-   S3 archive into a P4 image.
+   automates ESP32-S3. For ESP32-P4 use the published `tirtc-esp32p4-kit`
+   (the XiaoTai P4 reference firmware with hosted C6 Wi-Fi and LVGL UI): copy it
+   with `create_esp32_project.py --target esp32p4`, build with the RISC-V
+   toolchain on ESP-IDF 5.5.4, and never link the S3 archive into a P4 image.
 
 ## 2. Identify the board and query knowledge
 

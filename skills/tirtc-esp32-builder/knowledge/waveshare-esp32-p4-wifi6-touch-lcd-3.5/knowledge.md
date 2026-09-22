@@ -5,6 +5,15 @@ contains source-correlated observations and targeted regressions, not an
 installable adapter or complete Hardware IR. A matching sales name does not
 authorize pin reuse. No credentials, raw call logs or user media are retained.
 
+## Current kit status (2026-09-22)
+
+The builder repository now ships the XiaoTai P4 reference firmware (product
+1.4.0, source `f33b7d2`) in `kit-src/device-sim/device-sim-p4/` and packs the
+TiRTC ESP32-P4 SDK 2.5.0 vendor baseline (libTiRTC.a sha256
+`9b4e35c7…`) into the `tirtc-esp32p4-kit` release. The historical observations
+below (TiRTC 2.3.0, archive `a7a01ffd…`, IDF 5.5.4-dirty) remain historical
+artifacts and do not describe the current kit baseline.
+
 ## Read only the needed source
 
 | Baseline | Pinned source | Locate next |
