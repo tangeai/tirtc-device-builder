@@ -149,7 +149,9 @@ class DoctorTest(unittest.TestCase):
             generator.parent.mkdir(parents=True)
             generator.write_text("# test generator\n", encoding="utf-8")
             self.assertEqual(kit_src.resolve(), MODULE.normalize_thing_connect_root(repository))
-            sdk = self.create_sdk(kit_src / MODULE.SDK_RELATIVE_ROOT / "2.5.0")
+            sdk = self.create_sdk(
+                kit_src / MODULE.sdk_relative_root(None, "esp32s3") / "2.5.0"
+            )
             actual, source = MODULE.resolve_sdk_dir(None, None, kit_src)
             self.assertEqual(sdk, actual)
             self.assertEqual("ESP32 source workspace", source)
@@ -157,7 +159,9 @@ class DoctorTest(unittest.TestCase):
     def test_managed_kit_sdk_version_follows_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            sdk = self.create_sdk(root / MODULE.SDK_RELATIVE_ROOT / "2.3.0")
+            sdk = self.create_sdk(
+                root / MODULE.sdk_relative_root(None, "esp32s3") / "2.3.0"
+            )
             (root / MODULE.DEVICE_KIT_MANIFEST).write_text(
                 '{"kit_version":"1.1.4","tirtc_sdk_version":"2.3.0"}',
                 encoding="utf-8",
@@ -165,6 +169,53 @@ class DoctorTest(unittest.TestCase):
             actual, source = MODULE.resolve_sdk_dir(None, None, root)
             self.assertEqual(sdk, actual)
             self.assertEqual("Device Kit", source)
+
+    def test_p4_sdk_resolution_follows_manifest_platform(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            p4_sdk = self.create_sdk(
+                root / MODULE.sdk_relative_root("espressif-esp32p4", "esp32p4") / "2.5.0"
+            )
+            (root / MODULE.DEVICE_KIT_MANIFEST).write_text(
+                '{"kit_version":"1.0.0","tirtc_sdk_version":"2.5.0",'
+                '"platform":"espressif-esp32p4","target":"esp32p4"}',
+                encoding="utf-8",
+            )
+            actual, source = MODULE.resolve_sdk_dir(None, None, root, "esp32p4")
+            self.assertEqual(p4_sdk, actual)
+            self.assertEqual("Device Kit", source)
+
+    def test_p4_sdk_resolution_never_falls_back_to_s3(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.create_sdk(
+                root / MODULE.sdk_relative_root(None, "esp32s3") / "2.5.0"
+            )
+            actual, source = MODULE.resolve_sdk_dir(None, None, root, "esp32p4")
+            self.assertEqual(
+                root / MODULE.sdk_relative_root(None, "esp32p4") / "2.5.0",
+                actual,
+            )
+            self.assertEqual("ESP32 source workspace", source)
+
+    def test_p4_contract_requires_lwip_socket_budget(self) -> None:
+        contract = {key: "off" for key in MODULE.CONTRACT_KEYS}
+        contract["CONFIG_LWIP_MAX_SOCKETS"] = "10"
+        config = dict(contract)
+        self.assertEqual(
+            [],
+            MODULE.compare_contract(contract, config, MODULE.contract_keys("esp32p4")),
+        )
+        contract_without_budget = {key: "off" for key in MODULE.CONTRACT_KEYS}
+        mismatches = MODULE.compare_contract(
+            contract_without_budget,
+            config,
+            MODULE.contract_keys("esp32p4"),
+        )
+        self.assertTrue(any("CONFIG_LWIP_MAX_SOCKETS" in item for item in mismatches))
+        # S3 keeps the original key set.
+        s3_mismatches = MODULE.compare_contract(contract, config)
+        self.assertEqual([], s3_mismatches)
 
     def test_workspace_uses_environment_path(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -203,7 +254,7 @@ class DoctorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = self.create_workspace(root)
-            self.create_sdk(workspace / MODULE.SDK_RELATIVE_ROOT / "2.5.0")
+            self.create_sdk(workspace / MODULE.sdk_relative_root(None, "esp32s3") / "2.5.0")
             self.write_kit_manifest(workspace, "1.0.0")
             idf_py = root / "idf.py"
             idf_py.write_text("# test\n", encoding="utf-8")
@@ -228,7 +279,7 @@ class DoctorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             workspace = self.create_workspace(root)
-            self.create_sdk(workspace / MODULE.SDK_RELATIVE_ROOT / "2.5.0")
+            self.create_sdk(workspace / MODULE.sdk_relative_root(None, "esp32s3") / "2.5.0")
             self.write_kit_manifest(workspace, "1.1.1")
             idf_py = root / "idf.py"
             idf_py.write_text("# test\n", encoding="utf-8")

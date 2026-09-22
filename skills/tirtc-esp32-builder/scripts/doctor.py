@@ -22,10 +22,29 @@ CONTRACT_KEYS = {
     "CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS",
     "CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS",
 }
+# The P4 archive additionally pins the socket budget (absent from the S3 contract).
+CONTRACT_KEYS_P4 = CONTRACT_KEYS | {"CONFIG_LWIP_MAX_SOCKETS"}
 THING_CONNECT_ENV = "TIRTC_THING_CONNECT_ROOT"
 GENERATOR_RELATIVE_PATH = Path("device-sim/scripts/create_esp32_project.py")
-SDK_RELATIVE_ROOT = Path("device-sim/sdk/espressif-esp32s3")
 DEVICE_KIT_MANIFEST = "manifest.json"
+SDK_FALLBACK_VERSIONS = {
+    "esp32s3": ("2.5.0", "2.3.0"),
+    "esp32p4": ("2.5.0",),
+}
+
+
+def sdk_relative_root(platform: str | None, target: str) -> Path:
+    """SDK root inside the Kit; the manifest platform wins, the target is the
+    fallback. A P4 target never resolves the ESP32-S3 SDK archive."""
+    if platform == "espressif-esp32p4" or target == "esp32p4":
+        return Path("device-sim/sdk/espressif-esp32p4")
+    return Path("device-sim/sdk/espressif-esp32s3")
+
+
+def contract_keys(target: str) -> set[str]:
+    if target == "esp32p4":
+        return CONTRACT_KEYS_P4
+    return CONTRACT_KEYS
 
 
 def check(name: str, status: str, detail: str, required: bool = True) -> dict[str, Any]:
@@ -115,10 +134,10 @@ def parse_kconfig(path: Path) -> dict[str, str]:
 
 
 def compare_contract(
-    contract: dict[str, str], config: dict[str, str]
+    contract: dict[str, str], config: dict[str, str], keys: set[str] | None = None
 ) -> list[str]:
     mismatches: list[str] = []
-    for key in sorted(CONTRACT_KEYS):
+    for key in sorted(keys if keys is not None else CONTRACT_KEYS):
         expected = contract.get(key)
         actual = config.get(key)
         if expected is None:
@@ -238,6 +257,7 @@ def resolve_sdk_dir(
     explicit: Path | None,
     project: Path | None,
     thing_connect_root: Path | None,
+    target: str = "esp32s3",
 ) -> tuple[Path | None, str]:
     if explicit is not None:
         return explicit.expanduser().resolve(), "explicit --sdk-dir"
@@ -251,15 +271,22 @@ def resolve_sdk_dir(
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                 version = manifest.get("tirtc_sdk_version")
+                platform = manifest.get("platform")
                 if isinstance(version, str) and re.fullmatch(r"\d+\.\d+\.\d+", version):
-                    return thing_connect_root / SDK_RELATIVE_ROOT / version, "Device Kit"
+                    return (
+                        thing_connect_root / sdk_relative_root(platform, target) / version,
+                        "Device Kit",
+                    )
             except (OSError, json.JSONDecodeError):
                 pass
-        for version in ("2.5.0", "2.3.0"):
-            candidate = thing_connect_root / SDK_RELATIVE_ROOT / version
+        for version in SDK_FALLBACK_VERSIONS.get(target, SDK_FALLBACK_VERSIONS["esp32s3"]):
+            candidate = thing_connect_root / sdk_relative_root(None, target) / version
             if candidate.is_dir():
                 return candidate, "ESP32 source workspace"
-        return thing_connect_root / SDK_RELATIVE_ROOT / "2.5.0", "ESP32 source workspace"
+        return (
+            thing_connect_root / sdk_relative_root(None, target) / "2.5.0",
+            "ESP32 source workspace",
+        )
     return None, "not found"
 
 
@@ -373,6 +400,7 @@ def diagnose(args: argparse.Namespace) -> dict[str, Any]:
         args.sdk_dir,
         args.project,
         thing_connect_root,
+        args.target,
     )
     if sdk_dir is None:
         sdk_files: list[Path] = []
@@ -427,7 +455,9 @@ def diagnose(args: argparse.Namespace) -> dict[str, Any]:
             checks.append(check("TiRTC build contract", "FAIL", detail))
         else:
             mismatches = compare_contract(
-                parse_env_file(contract_path), parse_kconfig(config_path)
+                parse_env_file(contract_path),
+                parse_kconfig(config_path),
+                contract_keys(args.target),
             )
             checks.append(
                 check(
