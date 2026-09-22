@@ -2,10 +2,11 @@
 
 This project follows Semantic Versioning.
 
-## 0.10.0 (planned; ships Device Kit 1.2.0)
+## 0.10.0
 
 - Align the Kit's provisioning and device-binding implementation with the
-  reference XiaoTai product firmware:
+  reference XiaoTai product firmware (ships in the ESP32-S3 Device Kit
+  1.2.0 release, tagged separately):
   - Wi-Fi provisioning: the embedded setup page gains a live scan list
     (`POST /api/scan`, `GET /api/networks`), saved-network history with
     `use_saved` password reuse, portal isolation to the SoftAP interface and
@@ -35,8 +36,9 @@ This project follows Semantic Versioning.
   that fails until the P4 kit is pinned, and P4-aware Doctor SDK resolution
   and contract keys. Managed `setup` stays ESP32-S3-only.
 - Device Kit releases (1.2.0 for S3, 1.0.0 for P4) and checksum pinning
-  are deferred to the release workflow; no sha256 is fabricated in this
-  changelog.
+  are deferred to their release workflows; no sha256 is fabricated in this
+  changelog. Until the S3 Kit 1.2.0 is tagged, managed setup keeps
+  installing the pinned 1.1.7 Kit.
 
 ## 0.9.7
 
