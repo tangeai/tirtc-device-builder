@@ -1,11 +1,7 @@
-idf_component_register(
-    INCLUDE_DIRS "${TIRTC_SDK_DIR}/include" "include"
-    REQUIRES freertos esp_http_client esp_netif esp_timer hal json lwip mbedtls soc
-)
-
 # The P4 archive lives in the versioned kit SDK tree; generated projects
 # materialize it under third_party/tirtc. Both are located through the same
 # resolution order: TIRTC_SDK_DIR (CMake/env) > third_party/tirtc > kit SDK.
+# Resolve before idf_component_register: the include dirs reference it.
 if(NOT DEFINED TIRTC_SDK_DIR OR TIRTC_SDK_DIR STREQUAL "")
     if(DEFINED ENV{TIRTC_SDK_DIR} AND NOT "$ENV{TIRTC_SDK_DIR}" STREQUAL "")
         set(TIRTC_SDK_DIR "$ENV{TIRTC_SDK_DIR}")
@@ -22,6 +18,11 @@ endif()
 set(TIRTC_HEADER "${TIRTC_SDK_DIR}/include/tirtc/tiRTC.h")
 set(TIRTC_LIBRARY "${TIRTC_SDK_DIR}/lib/libTiRTC.a")
 set(TIRTC_CONTRACT "${TIRTC_SDK_DIR}/manifest/build-contract.env")
+
+idf_component_register(
+    INCLUDE_DIRS "${TIRTC_SDK_DIR}/include" "include"
+    REQUIRES freertos esp_http_client esp_netif esp_timer hal json lwip mbedtls soc
+)
 
 if(NOT EXISTS "${TIRTC_LIBRARY}")
     message(FATAL_ERROR "TiRTC static library not found: ${TIRTC_LIBRARY}")
