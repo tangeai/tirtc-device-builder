@@ -16,15 +16,30 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ESP32_KIT } from "./esp32-kit-metadata.js";
+import { ESP32_KIT, ESP32_KITS } from "./esp32-kit-metadata.js";
 
-const REQUIRED_FILES = [
-  "manifest.json",
-  "device-sim/scripts/create_esp32_project.py",
-  "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
-  "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
-  "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
-];
+const REQUIRED_FILES_BY_TARGET = {
+  esp32s3: [
+    "manifest.json",
+    "device-sim/scripts/create_esp32_project.py",
+    "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
+    "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
+    "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
+  ],
+  esp32p4: [
+    "manifest.json",
+    "device-sim/scripts/create_esp32_project.py",
+    "device-sim/device-sim-p4/CMakeLists.txt",
+    "device-sim/device-sim-p4/sdkconfig.defaults",
+    "device-sim/device-sim-p4/dependencies.lock",
+    "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
+  ],
+};
+
+const SDK_VERSION_PATTERN_BY_TARGET = {
+  esp32s3: /^(?:2\.3\.0|2\.5\.0)$/,
+  esp32p4: /^2\.5\.0$/,
+};
 
 function hashFile(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -77,7 +92,8 @@ function assertNoLinks(root, current = root) {
 }
 
 function validateExtractedKit(root, metadata) {
-  const missing = REQUIRED_FILES.filter((path) => !existsSync(join(root, path)));
+  const requiredFiles = REQUIRED_FILES_BY_TARGET[metadata.target] ?? [];
+  const missing = requiredFiles.filter((path) => !existsSync(join(root, path)));
   if (missing.length > 0) {
     throw new Error(`Device Kit is incomplete: ${missing.join(", ")}`);
   }
@@ -95,12 +111,15 @@ function validateExtractedKit(root, metadata) {
       `Device Kit version mismatch: expected ${metadata.version}, got ${manifest.kit_version}`,
     );
   }
-  if (manifest.target !== "esp32s3" ||
-      !/^(?:2\.3\.0|2\.5\.0)$/.test(manifest.tirtc_sdk_version) ||
+  const sdkPattern = SDK_VERSION_PATTERN_BY_TARGET[metadata.target];
+  if (!sdkPattern ||
+      manifest.target !== metadata.target ||
+      manifest.platform !== metadata.platform ||
+      !sdkPattern.test(manifest.tirtc_sdk_version) ||
       (metadata.sdkVersion && manifest.tirtc_sdk_version !== metadata.sdkVersion)) {
     throw new Error("Device Kit target or TiRTC SDK version is incompatible");
   }
-  const sdkRoot = `device-sim/sdk/espressif-esp32s3/${manifest.tirtc_sdk_version}`;
+  const sdkRoot = `device-sim/sdk/${metadata.platform}/${manifest.tirtc_sdk_version}`;
   const sdkFiles = [
     `${sdkRoot}/include/tirtc/tiRTC.h`,
     `${sdkRoot}/lib/libTiRTC.a`,
@@ -170,17 +189,20 @@ async function download(url, destination) {
 function parseArgs(args) {
   let archive = null;
   let target = null;
+  let kit = "esp32s3";
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === "--archive" || argument === "--target") {
+    if (argument === "--archive" || argument === "--target" || argument === "--kit") {
       const value = args[index + 1];
       if (!value || value.startsWith("--")) {
-        throw new Error(`${argument} requires a path`);
+        throw new Error(`${argument} requires a value`);
       }
       if (argument === "--archive") {
         archive = resolve(value);
-      } else {
+      } else if (argument === "--target") {
         target = resolve(value);
+      } else {
+        kit = value;
       }
       index += 1;
       continue;
@@ -190,20 +212,29 @@ function parseArgs(args) {
   if (!target) {
     throw new Error("--target is required");
   }
-  return { archive, target };
+  if (!(kit in ESP32_KITS)) {
+    throw new Error(`unknown Device Kit target selector: ${kit}`);
+  }
+  return { archive, target, metadata: ESP32_KITS[kit] };
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  const metadata = options.metadata;
   let archive = options.archive;
   let downloadDirectory = null;
   try {
     if (!archive) {
+      if (!metadata.released) {
+        throw new Error(
+          `Device Kit ${metadata.target} metadata is not yet pinned to a release; pass --archive`,
+        );
+      }
       downloadDirectory = mkdtempSync(join(tmpdir(), "tirtc-kit-download-"));
-      archive = join(downloadDirectory, ESP32_KIT.archiveName);
-      await download(ESP32_KIT.url, archive);
+      archive = join(downloadDirectory, metadata.archiveName);
+      await download(metadata.url, archive);
     }
-    installEsp32KitArchive(archive, options.target);
+    installEsp32KitArchive(archive, options.target, metadata);
   } finally {
     if (downloadDirectory) {
       rmSync(downloadDirectory, { force: true, recursive: true });

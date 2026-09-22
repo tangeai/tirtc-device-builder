@@ -24,19 +24,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_REPOSITORY =
   "https://github.com/tangeai/tirtc-device-builder";
 const DEFAULT_SOURCE = join(ROOT, "kit-src");
-const TARGET = "esp32s3";
-const IDF_VERSION = "5.5.x";
-const SDK_VERSION = "2.5.0";
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
 
-const COPY_ITEMS = [
-  "device-sim/scripts/create_esp32_project.py",
-  "device-sim/templates/esp32-h5-ai",
-  "device-sim/device-sim-esp32/components/platform_client",
-  "device-sim/device-sim-esp32/components/runtime_config",
-  "device-sim/device-sim-esp32/components/wifi_manager",
-  `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}`,
+const PROTOCOL_DOCS = [
   "device-integration.md",
   "device-h5-live.md",
   "device-ai.md",
@@ -44,33 +35,18 @@ const COPY_ITEMS = [
   "device-session-arbiter.md",
 ];
 
-const REQUIRED_FILES = [
-  "device-sim/scripts/create_esp32_project.py",
-  "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
-  "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
-  "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
-  "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
-  "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
-  "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
-  "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
-  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
-  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.c",
-  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_captive_dns.h",
-  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.c",
-  "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_history.h",
-  "device-sim/device-sim-esp32/components/wifi_manager/web/setup.html",
-  "device-sim/device-sim-esp32/components/wifi_manager/Kconfig",
-  `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/include/tirtc/tiRTC.h`,
-  `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/lib/libTiRTC.a`,
-  `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/manifest/build-contract.env`,
-  "device-integration.md",
-  "device-h5-live.md",
-  "device-ai.md",
-  "device-session-model.md",
-  "device-session-arbiter.md",
-];
+/* The SoftAP contract fragments are asserted on the SHARED wifi_manager
+ * component, so both kits validate the same sources; only the documented
+ * README differs per target. */
+const SHARED_WIFI_COMPONENT = "device-sim/device-sim-esp32/components/wifi_manager";
 
-const KIT_NOTICE = `TiRTC ESP32-S3 Device Kit
+const TARGETS = {
+  esp32s3: {
+    platform: "espressif-esp32s3",
+    idfVersion: "5.5.x",
+    sdkVersion: "2.5.0",
+    kitPrefix: "tirtc-esp32s3-kit-",
+    notice: `TiRTC ESP32-S3 Device Kit
 Copyright 2026 探鸽智能 (TangeAI)
 
 This kit contains the TiRTC ESP32-S3 SDK 2.5.0, including libTiRTC.a,
@@ -78,15 +54,117 @@ redistributed by TangeAI for TiRTC device development. It also contains a
 focused selection of MIT-licensed ESP32 example sources and versioned
 ThingConnect protocol documentation. ESP-IDF, board BSPs, credentials, and captured media are not
 included and remain subject to their own licenses and terms.
-`;
+`,
+    copyItems: [
+      "device-sim/scripts/create_esp32_project.py",
+      "device-sim/templates/esp32-h5-ai",
+      "device-sim/device-sim-esp32/components/platform_client",
+      "device-sim/device-sim-esp32/components/runtime_config",
+      SHARED_WIFI_COMPONENT,
+      `device-sim/sdk/espressif-esp32s3/2.5.0`,
+      ...PROTOCOL_DOCS,
+    ],
+    requiredFiles: [
+      "device-sim/scripts/create_esp32_project.py",
+      "device-sim/templates/esp32-h5-ai/CMakeLists.txt",
+      "device-sim/templates/esp32-h5-ai/sdkconfig.defaults",
+      "device-sim/templates/esp32-h5-ai/platform-media-contract.json",
+      "device-sim/templates/esp32-h5-ai/tirtc-runtime-contract.json",
+      "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
+      "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
+      `${SHARED_WIFI_COMPONENT}/CMakeLists.txt`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_manager.c`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_captive_dns.c`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_captive_dns.h`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_history.c`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_history.h`,
+      `${SHARED_WIFI_COMPONENT}/web/setup.html`,
+      `${SHARED_WIFI_COMPONENT}/Kconfig`,
+      `device-sim/sdk/espressif-esp32s3/2.5.0/include/tirtc/tiRTC.h`,
+      `device-sim/sdk/espressif-esp32s3/2.5.0/lib/libTiRTC.a`,
+      `device-sim/sdk/espressif-esp32s3/2.5.0/manifest/build-contract.env`,
+      ...PROTOCOL_DOCS,
+    ],
+    softApReadme: "device-sim/templates/esp32-h5-ai/README.md",
+    softApReadmeContains: [
+      "XiaoTai-XXXX",
+      "无需密码",
+      "http://192.168.6.1",
+      "captive portal",
+    ],
+    softApReadmeOmits: ["192.168.4.1"],
+  },
+  esp32p4: {
+    platform: "espressif-esp32p4",
+    idfVersion: "5.5.4",
+    sdkVersion: "2.5.0",
+    kitPrefix: "tirtc-esp32p4-kit-",
+    notice: `TiRTC ESP32-P4 Device Kit
+Copyright 2026 探鸽智能 (TangeAI)
+
+This kit contains the TiRTC ESP32-P4 SDK 2.5.0, including libTiRTC.a,
+redistributed by TangeAI for TiRTC device development. It also contains the
+XiaoTai P4 reference firmware (MIT) with vendored Apache-2.0 ESP-IDF
+components and versioned ThingConnect protocol documentation. ESP-IDF, board
+BSPs, credentials, and captured media are not included and remain subject to
+their own licenses and terms.
+`,
+    copyItems: [
+      "device-sim/scripts/create_esp32_project.py",
+      "device-sim/device-sim-p4",
+      "device-sim/device-sim-esp32/components/platform_client",
+      "device-sim/device-sim-esp32/components/runtime_config",
+      SHARED_WIFI_COMPONENT,
+      `device-sim/sdk/espressif-esp32p4/2.5.0`,
+      ...PROTOCOL_DOCS,
+    ],
+    requiredFiles: [
+      "device-sim/scripts/create_esp32_project.py",
+      "device-sim/device-sim-p4/CMakeLists.txt",
+      "device-sim/device-sim-p4/main/CMakeLists.txt",
+      "device-sim/device-sim-p4/main/xiaotai_main.c",
+      "device-sim/device-sim-p4/main/Kconfig.xiaotai",
+      "device-sim/device-sim-p4/sdkconfig.defaults",
+      "device-sim/device-sim-p4/partitions.csv",
+      "device-sim/device-sim-p4/dependencies.lock",
+      "device-sim/device-sim-p4/README.md",
+      "device-sim/device-sim-p4/LICENSE",
+      "device-sim/device-sim-p4/THIRD_PARTY.md",
+      "device-sim/device-sim-p4/components/tirtc_sdk/CMakeLists.txt",
+      "device-sim/device-sim-p4/components/starter_runtime/CMakeLists.txt",
+      "device-sim/device-sim-p4/components/starter_tirtc/CMakeLists.txt",
+      "device-sim/device-sim-p4/components/starter_product/CMakeLists.txt",
+      "device-sim/device-sim-p4/components/starter_voice/model/nihaoxiaotai.tflite",
+      "device-sim/device-sim-esp32/components/platform_client/CMakeLists.txt",
+      "device-sim/device-sim-esp32/components/runtime_config/CMakeLists.txt",
+      `${SHARED_WIFI_COMPONENT}/CMakeLists.txt`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_manager.c`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_captive_dns.c`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_captive_dns.h`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_history.c`,
+      `${SHARED_WIFI_COMPONENT}/src/wifi_history.h`,
+      `${SHARED_WIFI_COMPONENT}/web/setup.html`,
+      `${SHARED_WIFI_COMPONENT}/Kconfig`,
+      `device-sim/sdk/espressif-esp32p4/2.5.0/README.md`,
+      `device-sim/sdk/espressif-esp32p4/2.5.0/include/tirtc/tiRTC.h`,
+      `device-sim/sdk/espressif-esp32p4/2.5.0/lib/libTiRTC.a`,
+      `device-sim/sdk/espressif-esp32p4/2.5.0/manifest/build-contract.env`,
+      ...PROTOCOL_DOCS,
+    ],
+    softApReadme: "device-sim/device-sim-p4/README.md",
+    softApReadmeContains: ["XiaoTai-XXXX", "http://192.168.6.1"],
+    softApReadmeOmits: ["192.168.4.1"],
+  },
+};
 
 function printHelp() {
   console.log(`Usage:
-  npm run pack:esp32-kit -- --kit-version <version> [--source <kit-source-root>]
+  npm run pack:esp32-kit -- --kit-version <version> [--target esp32s3|esp32p4] [--source <kit-source-root>]
 
 Options:
   --source <path>         ESP32 Kit source root (default: ./kit-src)
   --kit-version <semver>  Device Kit version, for example 1.0.0
+  --target <name>         Chip target (default: esp32s3)
   --output <path>         Output directory (default: ./dist)
   --source-commit <sha>   Override the detected 40-character source commit
   -h, --help              Show this help
@@ -110,6 +188,7 @@ function parseOptions(args) {
     output: join(ROOT, "dist"),
     source: DEFAULT_SOURCE,
     sourceCommit: null,
+    target: "esp32s3",
   };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
@@ -121,7 +200,8 @@ function parseOptions(args) {
       argument === "--source" ||
       argument === "--kit-version" ||
       argument === "--output" ||
-      argument === "--source-commit"
+      argument === "--source-commit" ||
+      argument === "--target"
     ) {
       const value = takeValue(args, index, argument);
       if (argument === "--source") {
@@ -130,6 +210,8 @@ function parseOptions(args) {
         options.kitVersion = value;
       } else if (argument === "--output") {
         options.output = resolve(value);
+      } else if (argument === "--target") {
+        options.target = value;
       } else {
         options.sourceCommit = value;
       }
@@ -143,6 +225,9 @@ function parseOptions(args) {
   }
   if (!options.kitVersion || !VERSION_PATTERN.test(options.kitVersion)) {
     throw new Error("--kit-version must be a semantic version such as 1.0.0");
+  }
+  if (!(options.target in TARGETS)) {
+    throw new Error(`--target must be one of: ${Object.keys(TARGETS).join(", ")}`);
   }
   if (options.sourceCommit && !COMMIT_PATTERN.test(options.sourceCommit)) {
     throw new Error("--source-commit must be a 40-character Git commit");
@@ -198,12 +283,12 @@ function sourceCommit(thingConnectRoot, override) {
   return commit.toLowerCase();
 }
 
-function assertSelectedSourceIsClean(thingConnectRoot, override) {
+function assertSelectedSourceIsClean(thingConnectRoot, override, target) {
   if (override) {
     return;
   }
   const repository = repositoryRoot(thingConnectRoot);
-  const selected = COPY_ITEMS.map((item) =>
+  const selected = target.copyItems.map((item) =>
     relative(repository, join(thingConnectRoot, item)),
   );
   const status = run("git", [
@@ -227,6 +312,7 @@ function copyFilter(source) {
     name === ".git" ||
     name === "__pycache__" ||
     name === "build" ||
+    name === "managed_components" ||
     name === "sdkconfig" ||
     name === "sdkconfig.old" ||
     name.endsWith(".pyc") ||
@@ -281,14 +367,16 @@ function copyLicense(thingConnectRoot, destination) {
   copyFileSync(license, destination);
 }
 
-function assertRequiredFiles(root) {
-  const missing = REQUIRED_FILES.filter((path) => !existsSync(join(root, path)));
+function assertRequiredFiles(root, target) {
+  const missing = target.requiredFiles.filter(
+    (path) => !existsSync(join(root, path)),
+  );
   if (missing.length > 0) {
     throw new Error(`Device Kit source is incomplete:\n${missing.join("\n")}`);
   }
   const library = join(
     root,
-    `device-sim/sdk/espressif-esp32s3/${SDK_VERSION}/lib/libTiRTC.a`,
+    `device-sim/sdk/${target.platform}/${target.sdkVersion}/lib/libTiRTC.a`,
   );
   if (statSync(library).size === 0) {
     throw new Error("TiRTC static library is empty");
@@ -307,7 +395,7 @@ function assertOmits(content, fragment, label) {
   }
 }
 
-function assertSoftApContract(root) {
+function assertSoftApContract(root, target) {
   const sourcePath = join(
     root,
     "device-sim/device-sim-esp32/components/wifi_manager/src/wifi_manager.c",
@@ -320,7 +408,7 @@ function assertSoftApContract(root) {
     root,
     "device-sim/device-sim-esp32/components/wifi_manager/CMakeLists.txt",
   );
-  const readmePath = join(root, "device-sim/templates/esp32-h5-ai/README.md");
+  const readmePath = join(root, target.softApReadme);
   if (
     !existsSync(sourcePath) ||
     !existsSync(dnsPath) ||
@@ -374,11 +462,12 @@ function assertSoftApContract(root) {
   assertContains(html, "/api/networks", "setup page network list");
 
   const readme = readFileSync(readmePath, "utf8");
-  assertContains(readme, "XiaoTai-XXXX", "documented SSID prefix");
-  assertContains(readme, "无需密码", "documented open authentication");
-  assertContains(readme, "http://192.168.6.1", "documented provisioning URL");
-  assertContains(readme, "captive portal", "documented automatic portal discovery");
-  assertOmits(readme, "192.168.4.1", "the legacy documented address");
+  for (const fragment of target.softApReadmeContains) {
+    assertContains(readme, fragment, `documented fragment ${fragment}`);
+  }
+  for (const fragment of target.softApReadmeOmits) {
+    assertOmits(readme, fragment, `the legacy documented fragment ${fragment}`);
+  }
 }
 
 function createArchive(staging, kitName, temporary) {
@@ -408,17 +497,18 @@ function createArchive(staging, kitName, temporary) {
 }
 
 function build(options) {
+  const target = TARGETS[options.target];
   const thingConnectRoot = normalizeKitSourceRoot(options.source);
-  assertSelectedSourceIsClean(thingConnectRoot, options.sourceCommit);
+  assertSelectedSourceIsClean(thingConnectRoot, options.sourceCommit, target);
   const commit = sourceCommit(thingConnectRoot, options.sourceCommit);
-  const kitName = `tirtc-esp32s3-kit-${options.kitVersion}`;
+  const kitName = `${target.kitPrefix}${options.kitVersion}`;
   const temporary = mkdtempSync(join(tmpdir(), "tirtc-esp32-kit-"));
   try {
     const staging = join(temporary, "staging");
     const kitRoot = join(staging, kitName);
     mkdirSync(kitRoot, { recursive: true });
 
-    for (const item of COPY_ITEMS) {
+    for (const item of target.copyItems) {
       const source = join(thingConnectRoot, item);
       if (!existsSync(source)) {
         throw new Error(`required Kit source is missing: ${source}`);
@@ -433,9 +523,9 @@ function build(options) {
     }
 
     copyLicense(thingConnectRoot, join(kitRoot, "LICENSE"));
-    writeFileSync(join(kitRoot, "NOTICE"), KIT_NOTICE, "utf8");
-    assertRequiredFiles(kitRoot);
-    assertSoftApContract(kitRoot);
+    writeFileSync(join(kitRoot, "NOTICE"), target.notice, "utf8");
+    assertRequiredFiles(kitRoot, target);
+    assertSoftApContract(kitRoot, target);
 
     const files = Object.fromEntries(
       listFiles(kitRoot).map((path) => [path, hashFile(join(kitRoot, path))]),
@@ -443,10 +533,10 @@ function build(options) {
     const manifest = {
       schema_version: 1,
       kit_version: options.kitVersion,
-      platform: "espressif-esp32s3",
-      target: TARGET,
-      idf_version: IDF_VERSION,
-      tirtc_sdk_version: SDK_VERSION,
+      platform: target.platform,
+      target: options.target,
+      idf_version: target.idfVersion,
+      tirtc_sdk_version: target.sdkVersion,
       generator: "device-sim/scripts/create_esp32_project.py",
       source_repository: SOURCE_REPOSITORY,
       source_commit: commit,

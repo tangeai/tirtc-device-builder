@@ -205,6 +205,8 @@ test("pack:esp32-kit creates a versioned, checksummed minimal Kit", () => {
 
     const installed = join(temporary, "installed-kit");
     installEsp32KitArchive(archive, installed, {
+      target: "esp32s3",
+      platform: "espressif-esp32s3",
       archiveName: "tirtc-esp32s3-kit-1.0.0.tar.gz",
       archiveRoot: "tirtc-esp32s3-kit-1.0.0",
       releaseTag: "test",
