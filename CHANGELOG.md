@@ -2,6 +2,15 @@
 
 This project follows Semantic Versioning.
 
+## 0.10.1
+
+- Add a knowledge-only Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3-C V1.0 package
+  with artifact-bound ST7701 display, GT911 touch and ES7210 TDM/AEC lessons.
+- Add RAM-less DSI display guidance covering safe initial back-buffer selection,
+  VSYNC ownership, partial-refresh damage carry-forward, LVGL software rotation,
+  RGB565 byte order, touch mapping and runtime display-size scaling.
+- Test exact 4.3-C registry matching while keeping adapter reuse disabled.
+
 ## 0.10.0
 
 - Align the Kit's provisioning and device-binding implementation with the

@@ -123,6 +123,45 @@ class BoardRegistryTests(unittest.TestCase):
         errors = validate_registry({"schema_version": 1, "boards": [item]}, path)
         self.assertTrue(any("hardware_revision" in error for error in errors))
 
+    def test_packaged_waveshare_43c_exact_match_routes_verified_lessons(self) -> None:
+        path = Path(__file__).resolve().parent.parent / "knowledge/board-registry.json"
+        registry = json.loads(path.read_text())
+        query = {
+            "schema_version": 1,
+            "declared": {
+                "vendor": "Waveshare",
+                "model": "ESP32-P4-WIFI6-Touch-LCD-4.3-C",
+                "hardware_revision": "V1.0",
+            },
+            "observed": {
+                "target": "esp32p4",
+                "module": "ESP32-P4NRW32 + ESP32-C6-MINI-1-N4",
+                "flash_mb": 32,
+                "psram_mb": 32,
+                "components": [
+                    {"kind": "camera", "model": "OV5647"},
+                    {"kind": "audio_input", "model": "ES7210"},
+                    {"kind": "display", "model": "ST7701"},
+                    {"kind": "touch", "model": "GT911"},
+                ],
+                "probes": [
+                    {"kind": "camera_pid", "value": "0x5647", "required_for_exact": True},
+                    {"kind": "touch_id", "value": "911", "required_for_exact": True},
+                    {"kind": "es7210_i2c_7bit", "value": "0x40", "required_for_exact": True},
+                ],
+            },
+        }
+        result = match_registry(registry, query)
+        self.assertEqual("exact", result["result"])
+        self.assertFalse(result["safe_registered_reuse"])
+        match = result["matches"][0]
+        self.assertEqual("knowledge_only", match["reuse"])
+        self.assertEqual(3, len(match["applicable_lessons"]))
+        self.assertEqual(
+            ["waveshare-esp32-p4-wifi6-touch-lcd-4.3-c/knowledge.md"],
+            match["knowledge_refs"],
+        )
+
     def test_knowledge_reference_cannot_escape_or_be_missing(self) -> None:
         item = board()
         with tempfile.TemporaryDirectory() as directory:

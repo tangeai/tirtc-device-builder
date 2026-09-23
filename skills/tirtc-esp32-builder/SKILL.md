@@ -53,6 +53,10 @@ the user's business baseline separately from the hardware reference.
 For video orientation, unexpected cropping, or WeChat display-profile changes,
 read [video-orientation.md](references/video-orientation.md) before changing
 pixel transforms or UI angles.
+For device-panel tearing, flicker, stale regions, wrong colors, display rotation
+or touch-coordinate mismatch, read
+[display-pipeline.md](references/display-pipeline.md) before changing the panel,
+LVGL or framebuffer path.
 
 ## 3. Prove the business flows before board porting
 

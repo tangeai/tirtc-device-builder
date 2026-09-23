@@ -38,6 +38,68 @@
         }
       ]
     },
+    {
+      "package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0",
+      "status": "knowledge_only",
+      "identity": {
+        "vendor": "Waveshare",
+        "model": "ESP32-P4-WIFI6-Touch-LCD-4.3-C",
+        "aliases": ["Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3-C", "微雪 ESP32-P4-WIFI6-Touch-LCD-4.3-C", "ESP32-P4-WIFI6-Touch-LCD-4.3-C (SKU 33875)"],
+        "hardware_revision": "V1.0",
+        "target": "esp32p4",
+        "module": "ESP32-P4NRW32 + ESP32-C6-MINI-1-N4",
+        "flash_mb": 32,
+        "psram_mb": 32,
+        "components": [
+          {"kind": "camera", "model": "OV5647"},
+          {"kind": "audio_input", "model": "ES7210"},
+          {"kind": "audio_output", "model": "ES8311"},
+          {"kind": "display", "model": "ST7701"},
+          {"kind": "touch", "model": "GT911"},
+          {"kind": "network", "model": "ESP32-C6-MINI-1-N4"}
+        ],
+        "probes": [
+          {"kind": "camera_pid", "value": "0x5647", "required_for_exact": true},
+          {"kind": "touch_id", "value": "911", "required_for_exact": true},
+          {"kind": "es7210_i2c_7bit", "value": "0x40", "required_for_exact": true}
+        ]
+      },
+      "compatibility": {"idf": "5.5.4", "tirtc_sdk": "2.3.0-P4-validation-rebuild"},
+      "artifacts": {},
+      "knowledge_refs": ["waveshare-esp32-p4-wifi6-touch-lcd-4.3-c/knowledge.md"],
+      "lessons": [
+        {
+          "id": "waveshare_43c_dsi_partial_double_buffer",
+          "scope": "component",
+          "subject": "display:ST7701 partial double buffering",
+          "guidance": "For a RAM-less DSI panel, synchronize presented damage into the recycled back buffer after VSYNC and select a back buffer that is not initially scanned; allocating two buffers alone does not prevent tearing or stale regions.",
+          "action": "require",
+          "verification": "hil_verified",
+          "applies_to": {"kind": "display", "model": "ST7701"},
+          "evidence": [{"board_package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0", "source_ref": "waveshare-esp32-p4-wifi6-touch-lcd-4.3-c/knowledge.md#display-failures-and-resolution", "artifact_sha256": "2fb05d6985401b061ef3778f69b2f2b68a3d43cb6e7af145484d136de1ae2562"}]
+        },
+        {
+          "id": "waveshare_43c_display_orientation_color_touch",
+          "scope": "board",
+          "subject": "LVGL display orientation, RGB565 and touch",
+          "guidance": "For the verified V1.0 enclosure use LVGL 8.3 sw_rotate with ROT_90, one RGB565 byte swap when LV_COLOR_16_SWAP is enabled, and native GT911 coordinates so LVGL rotates touch with the display.",
+          "action": "prefer",
+          "verification": "hil_verified",
+          "applies_to": {"package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0"},
+          "evidence": [{"board_package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0", "source_ref": "waveshare-esp32-p4-wifi6-touch-lcd-4.3-c/knowledge.md#display-failures-and-resolution", "artifact_sha256": "2fb05d6985401b061ef3778f69b2f2b68a3d43cb6e7af145484d136de1ae2562"}]
+        },
+        {
+          "id": "waveshare_43c_es7210_address_slots",
+          "scope": "board",
+          "subject": "ES7210 address, TDM slots and AEC reference",
+          "guidance": "Probe 7-bit address 0x40, convert to the selected codec abstraction's 8-bit address form, and map compact DMA [MIC3 reference, MIC2 microphone] into the AEC microphone/reference contract.",
+          "action": "require",
+          "verification": "corroborated",
+          "applies_to": {"package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0"},
+          "evidence": [{"board_package_id": "waveshare_esp32p4_wifi6_touch_lcd_43c_v1_0", "source_ref": "waveshare-esp32-p4-wifi6-touch-lcd-4.3-c/knowledge.md#hardware-facts"}]
+        }
+      ]
+    },
     {"package_id":"lckfb_szpi_esp32s3_v1_0_1","status":"knowledge_only","identity":{"vendor":"深圳嘉立创科技集团股份有限公司（立创开发板）","model":"立创·实战派 ESP32-S3 开发板","aliases":["LCKFB SZPI ESP32-S3"],"hardware_revision":"V1.0.1","target":"esp32s3","module":"ESP32-S3 module","flash_mb":16,"psram_mb":8,"components":[{"kind":"camera","model":"GC2145"},{"kind":"aec_reference","model":"ES7210 MIC3 hardware reference"}],"probes":[]},"compatibility":{"idf":"5.5.4","tirtc_sdk":"2.3.0"},"artifacts":{},"lessons":[]},
     {"package_id":"alientek_atk_dnesp32s3_v1","status":"knowledge_only","identity":{"vendor":"正点原子 (ALIENTEK)","model":"ATK-DNESP32S3","aliases":[],"hardware_revision":"V1.0","target":"esp32s3","module":"ATK-MWS3S","flash_mb":16,"psram_mb":8,"components":[{"kind":"camera","model":"OV5640 PID 0x5640"},{"kind":"audio_codec","model":"ES8388"}],"probes":[]},"compatibility":{"idf":"5.5.4","tirtc_sdk":"2.3.0"},"artifacts":{},"lessons":[]}
   ]
