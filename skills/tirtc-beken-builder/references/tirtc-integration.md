@@ -60,7 +60,7 @@ documentation is context, not a substitute for the binary's build contract.
 
 Use `ERROR` for failed operations that cannot continue, `WARN` for degraded or
 recoverable behavior, `INFO` for lifecycle/state summaries, and `DEBUG` for wire
-diagnostics. Default product builds to INFO. At DEBUG, log complete HTTP method,
+diagnostics. The LCKFB development profile defaults to DEBUG. At DEBUG, log complete HTTP method,
 URL, headers, body and response; MQTT connect/subscribe/publish/receive fields and
 payloads; and TiRTC/WHIP descriptors, authorization values, callback results and
 generation identifiers. At INFO and above, do not print those complete network

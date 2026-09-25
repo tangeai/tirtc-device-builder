@@ -139,10 +139,9 @@ and its required active probes pass.
 Keep device keys, Wi-Fi passwords, MQTT/WHIP tokens, certificates, calibration
 data, MAC-derived identifiers, captured user audio and captured logs outside
 source control and generated reports. Use the conventional `ERROR`, `WARN`,
-`INFO`, `DEBUG` levels. Product/release firmware defaults to `INFO` and does not
-print complete network request or response payloads. A deliberately enabled
-`DEBUG` build may print complete HTTP, MQTT and TiRTC/WHIP inputs and results,
-including authorization values, for controlled integration work; handle that
-output as sensitive development data and return the build to `INFO` before
-release. Downloads, account access, flashing, erasing, factory-partition changes
-and publishing a reusable board profile retain separate authorization.
+`INFO`, `DEBUG` levels. The LCKFB XiaoTai development project defaults to
+`DEBUG`, which prints complete HTTP, MQTT and TiRTC/WHIP inputs and results,
+including authorization values. Switching to `INFO` suppresses those complete
+network payloads. Handle DEBUG output as sensitive development data. Downloads,
+account access, flashing, erasing, factory-partition changes and publishing a
+reusable board profile retain separate authorization.

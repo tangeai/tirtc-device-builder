@@ -141,12 +141,11 @@ Require a host contract test plus artifact-bound HIL. At minimum verify:
   connect/confirmation timeouts and late-callback rejection;
 - minimum/largest internal heap during DTLS, camera and full-duplex overlap.
 
-Use conventional `ERROR`, `WARN`, `INFO`, `DEBUG` levels. The checked-in release
-configuration defaults to `INFO`; at that level log failures, recovery and state
-transitions but not complete network inputs or responses. An explicitly enabled
-`DEBUG` build prints complete HTTP, MQTT and TiRTC/WHIP inputs and results,
-including authorization values, so developers can reproduce protocol failures.
+Use conventional `ERROR`, `WARN`, `INFO`, `DEBUG` levels. The checked-in
+development configuration defaults to `DEBUG` and prints complete HTTP, MQTT
+and TiRTC/WHIP inputs and results, including authorization values, so developers
+can reproduce protocol failures. Switching to `INFO` logs failures, recovery and
+state transitions but not complete network inputs or responses.
 Contract tests must keep those full-payload format strings behind `BK_LOGD` or
 an equivalent DEBUG guard and reject them at INFO/WARN/ERROR. Treat DEBUG logs as
-sensitive development artifacts, keep them out of source control and restore
-INFO before producing release firmware.
+sensitive development artifacts and keep them out of source control.

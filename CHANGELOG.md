@@ -2,6 +2,12 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.2
+
+- Make the LCKFB BK7258 XiaoTai development profile default to DEBUG logging,
+  with complete HTTP, MQTT and TiRTC/WHIP inputs and results available without
+  a separate diagnostic build; INFO remains available to suppress wire payloads.
+
 ## 0.11.1
 
 - Pin the BK7258 public baseline to the official Gitee
