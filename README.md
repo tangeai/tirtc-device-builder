@@ -2,11 +2,17 @@
 
 TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Agent Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立的 ESP-IDF 工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
 
-当前仓库提供一个 Skill：
+当前仓库提供两个平台 Skill：
 
 | Skill | 平台 | 主要用途 |
 |---|---|---|
 | `tirtc-esp32-builder` | ESP32-S3 / ESP32-P4、ESP-IDF 5.5.x | 板型识别、Hardware IR、工程生成/移植、H5/AI/设备互呼/微信 VoIP、AEC 门禁、编译烧录和分层验收 |
+| `tirtc-beken-builder` | BK7258 / BK7259、Beken Armino | 运行时硬件探测、显示/触摸/音频/内存能力判定、小钛业务移植与实机验收 |
+
+BK7258 多媒体项目优先从 Beken 官方 `bk_avdk_smp` 的正式
+`release/v3.1.1.x` tag 开始；移动的 `release/v3.1.1` 分支用于需要最新
+维护改动的开发。BK7259 使用前应按官方支持矩阵选择对应 release，不把
+BK7258 的 BSP、分区或二进制直接套用。
 
 H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。ESP32 示例源码由本仓库的 `kit-src/` 维护；设备互呼或微信 VoIP 的移植可参考其中的独立示例。ESP32-P4 使用独立发布的 `tirtc-esp32p4-kit`（小钛 P4 参考固件：hosted C6 Wi-Fi + LVGL UI + 摄像头 + P4 SDK 2.5.0），通过生成器 `--target esp32p4` 复制生成，不能复用 S3 预编译库。
 

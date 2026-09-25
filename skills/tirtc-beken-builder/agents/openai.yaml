@@ -1,0 +1,4 @@
+interface:
+  display_name: "TiRTC Beken Builder"
+  short_description: "诊断 BK7258/BK7259 硬件并集成小钛业务"
+  default_prompt: "Use $tirtc-beken-builder to probe my BK7258/BK7259 board, assess supported XiaoTai features, and create an evidence-backed TiRTC port."

@@ -99,10 +99,28 @@ test("--version reports package version", () => {
   assert.equal(result.stdout.trim(), PACKAGE.version);
 });
 
-test("list exposes the ESP32 skill", () => {
+test("list exposes every platform skill", () => {
   const result = run(["list"]);
   assert.equal(result.status, 0);
   assert.match(result.stdout, /esp32\s+tirtc-esp32-builder/);
+  assert.match(result.stdout, /beken\s+tirtc-beken-builder/);
+});
+
+test("install copies the Beken skill", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const skillsDir = join(directory, "skills");
+    const result = run(["install", "bk7258", "--skills-dir", skillsDir]);
+    const target = join(skillsDir, "tirtc-beken-builder");
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(join(target, "SKILL.md")), true);
+    assert.equal(existsSync(join(target, "scripts", "bk_probe_report.py")), true);
+    assert.equal(
+      readFileSync(join(target, "VERSION"), "utf8").trim(),
+      PACKAGE.version,
+    );
+    assert.match(result.stdout, /Installed tirtc-beken-builder/);
+  });
 });
 
 test("clients lists every supported Agent client", () => {

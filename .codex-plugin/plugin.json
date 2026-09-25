@@ -1,6 +1,6 @@
 {
   "name": "tirtc-device-builder",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "Codex workflows for building and validating TiRTC device firmware across supported chip platforms.",
   "author": {
     "name": "TangeAI",
@@ -13,6 +13,9 @@
     "tirtc",
     "esp32",
     "esp-idf",
+    "beken",
+    "bk7258",
+    "bk7259",
     "embedded",
     "ai-intercom"
   ],
@@ -29,6 +32,7 @@
     ],
     "defaultPrompt": [
       "Analyze my ESP32 board and generate a TiRTC project.",
+      "Probe my BK7258 or BK7259 board and assess XiaoTai capabilities.",
       "Check ESP-IDF and build my TiRTC ESP32 firmware.",
       "Assess whether this board can support H5 live view and AI intercom."
     ]

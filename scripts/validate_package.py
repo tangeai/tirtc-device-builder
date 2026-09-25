@@ -214,6 +214,20 @@ def validate_skills(errors: list[str]) -> None:
             ):
                 if not (skill_dir / relative).is_file():
                     error(errors, f"{skill_dir.relative_to(ROOT)} is missing {relative}")
+        if skill_dir.name == "tirtc-beken-builder":
+            for relative in (
+                "scripts/bk_probe_report.py",
+                "scripts/doctor.py",
+                "assets/probe-report.example.json",
+                "assets/bk-avdk-smp-v3.1.1/tirtc_bk_probe.c",
+                "assets/bk-avdk-smp-v3.1.1/tirtc_bk_probe.h",
+                "references/hardware-diagnostics.md",
+                "references/probe-porting.md",
+                "references/capability-rules.md",
+                "references/tirtc-integration.md",
+            ):
+                if not (skill_dir / relative).is_file():
+                    error(errors, f"{skill_dir.relative_to(ROOT)} is missing {relative}")
 
 
 def validate_repository_files(errors: list[str]) -> None:

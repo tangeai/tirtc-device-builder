@@ -136,6 +136,7 @@ try {
 
   const platforms = run(process.execPath, [cli, "list"]);
   assert.match(platforms.stdout, /esp32\s+tirtc-esp32-builder/);
+  assert.match(platforms.stdout, /beken\s+tirtc-beken-builder/);
 
   const clients = run(process.execPath, [cli, "clients"]);
   for (const client of [
@@ -174,6 +175,30 @@ try {
       "utf8",
     ).trim(),
     packageMetadata.version,
+  );
+
+  const bekenSkillsDir = join(temporary, "beken-skills");
+  run(process.execPath, [
+    cli,
+    "install",
+    "bk7258",
+    "--skills-dir",
+    bekenSkillsDir,
+  ]);
+  assert.equal(
+    existsSync(join(bekenSkillsDir, "tirtc-beken-builder", "SKILL.md")),
+    true,
+  );
+  assert.equal(
+    existsSync(
+      join(
+        bekenSkillsDir,
+        "tirtc-beken-builder",
+        "scripts",
+        "bk_probe_report.py",
+      ),
+    ),
+    true,
   );
 
   const qwenSkillsDir = join(temporary, "qwen-skills");

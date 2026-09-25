@@ -2,6 +2,18 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.0
+
+- Add the `tirtc-beken-builder` Skill and CLI platform aliases for BK7258 and
+  BK7259, covering evidence-first board intake, SDK pinning, hardware
+  capability reports and XiaoTai feature gating.
+- Add a BK7258 `bk_avdk_smp` release/v3.1.1 on-device probe component plus a
+  host collector, schema validator and deterministic capability assessor for
+  display/touch, speaker/microphone formats, Flash and memory diagnostics.
+- Document a separate BK7259 release/v4.0.1 adapter boundary instead of
+  assuming BK7258/BK7259 peripheral or ABI compatibility, and package Doctor,
+  fixtures, tests and official-source research with the Skill.
+
 ## 0.10.1
 
 - Add a knowledge-only Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3-C V1.0 package

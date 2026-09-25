@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "artifact_sha256": null,
+  "identity": {
+    "soc": "BK7258",
+    "chip_revision": null,
+    "board_model": null,
+    "pcb_revision": null,
+    "sdk": {"name": "Beken SDK", "version": null, "revision": null},
+    "board_config_sha256": null
+  },
+  "flash": {
+    "state": "unknown",
+    "method": null,
+    "source": null,
+    "jedec_id": null,
+    "recognized": null,
+    "physical_bytes": null,
+    "mapped_bytes": null,
+    "application_usable_bytes": null
+  },
+  "memory": {
+    "internal_sram": {"state": "unknown", "total_bytes": null, "free_boot_bytes": null, "minimum_free_bytes": null, "largest_free_block_bytes": null},
+    "psram": {"state": "unknown", "present": null, "total_bytes": null, "free_boot_bytes": null, "minimum_free_bytes": null, "largest_free_block_bytes": null}
+  },
+  "display": {
+    "state": "unknown",
+    "method": null,
+    "source": null,
+    "controller": null,
+    "bus": null,
+    "width_px": null,
+    "height_px": null,
+    "width_mm": null,
+    "height_mm": null,
+    "pixel_format": null,
+    "test": "not_run"
+  },
+  "touch": {
+    "state": "unknown",
+    "method": null,
+    "source": null,
+    "controller": null,
+    "bus": null,
+    "points": null,
+    "test": "not_run"
+  },
+  "camera": {
+    "state": "unknown",
+    "method": null,
+    "source": null,
+    "sensor": null,
+    "output_profiles": [],
+    "test": "not_run"
+  },
+  "audio": {
+    "microphone": {"state": "unknown", "method": null, "source": null, "channels": null, "sample_rates_hz": [], "sample_bits": [], "formats": [], "test": "not_run"},
+    "speaker": {"state": "unknown", "method": null, "source": null, "channels": null, "sample_rates_hz": [], "sample_bits": [], "formats": [], "test": "not_run"},
+    "duplex": {"simultaneous": null, "playback_reference": null, "aec_available": null, "aec_test": "not_run"}
+  },
+  "controls": {"verified_buttons": 0, "intent_map_approved": false},
+  "integration": {
+    "tirtc_sdk_compatible": null,
+    "audio_uplink_pipeline": null,
+    "audio_downlink_pipeline": null,
+    "video_uplink_pipeline": null,
+    "session_arbiter": null,
+    "device_call_protocol": null,
+    "wechat_voip_protocol": null
+  },
+  "requested_features": [],
+  "issues": []
+}

@@ -54,6 +54,11 @@ const required = [
   "skills/tirtc-esp32-builder/scripts/doctor.py",
   "skills/tirtc-esp32-builder/scripts/board_registry.py",
   "skills/tirtc-esp32-builder/knowledge/board-registry.json",
+  "skills/tirtc-beken-builder/SKILL.md",
+  "skills/tirtc-beken-builder/VERSION",
+  "skills/tirtc-beken-builder/scripts/bk_probe_report.py",
+  "skills/tirtc-beken-builder/scripts/doctor.py",
+  "skills/tirtc-beken-builder/assets/bk-avdk-smp-v3.1.1/tirtc_bk_probe.c",
 ];
 const allowedTopLevel = new Set([
   ".codex-plugin",

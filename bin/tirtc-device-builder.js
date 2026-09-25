@@ -34,6 +34,20 @@ const PLATFORMS = new Map([
       summary: "ESP32-S3 / ESP-IDF 5.5.x",
     },
   ],
+  [
+    "beken",
+    {
+      aliases: new Set([
+        "beken",
+        "bk",
+        "bk7258",
+        "bk7259",
+        "tirtc-beken-builder",
+      ]),
+      skill: "tirtc-beken-builder",
+      summary: "BK7258 / BK7259 / Beken Armino",
+    },
+  ],
 ]);
 
 function printHelp() {
@@ -50,9 +64,11 @@ Usage:
 
 Platforms:
   esp32       ESP32-S3 / ESP-IDF 5.5.x
+  beken       BK7258 / BK7259 / Beken Armino
 
 Examples:
   npx tirtc-device-builder install esp32
+  npx tirtc-device-builder install beken
   npx tirtc-device-builder install esp32 --client qwen-code
   npx tirtc-device-builder setup esp32
   npx tirtc-device-builder setup esp32 --install --client gemini
