@@ -2,6 +2,16 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.3
+
+- Add a complete Beken onboarding path to the public README: Skill installation,
+  official SDK baseline checks, Doctor usage, hardware-probe intake, XiaoTai
+  integration flow, update commands and troubleshooting.
+- Separate ESP32 and Beken requirements so users do not mistake `install beken`
+  for a managed SDK or Device Kit installation.
+- Add a regression test that keeps the Beken install and Doctor commands in the
+  packaged README.
+
 ## 0.11.2
 
 - Make the LCKFB BK7258 XiaoTai development profile default to DEBUG logging,

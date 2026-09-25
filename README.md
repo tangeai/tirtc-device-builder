@@ -1,6 +1,6 @@
 # TiRTC Device Builder
 
-TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Agent Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立的 ESP-IDF 工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
+TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 和 BK7258/BK7259 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Agent Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
 
 当前仓库提供两个平台 Skill：
 
@@ -9,10 +9,11 @@ TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 开发板接入 TiRTC。输入�
 | `tirtc-esp32-builder` | ESP32-S3 / ESP32-P4、ESP-IDF 5.5.x | 板型识别、Hardware IR、工程生成/移植、H5/AI/设备互呼/微信 VoIP、AEC 门禁、编译烧录和分层验收 |
 | `tirtc-beken-builder` | BK7258 / BK7259、Beken Armino | 运行时硬件探测、显示/触摸/音频/内存能力判定、小钛业务移植与实机验收 |
 
-BK7258 多媒体项目优先从 Beken 官方 `bk_avdk_smp` 的正式
-`release/v3.1.1.x` tag 开始；移动的 `release/v3.1.1` 分支用于需要最新
-维护改动的开发。BK7259 使用前应按官方支持矩阵选择对应 release，不把
-BK7258 的 BSP、分区或二进制直接套用。
+BK7258 多媒体项目固定从 Beken 官方 Gitee `bk_avdk_smp` 的
+`release/v3.1.1.8` tag、commit
+`1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7` 开始。本机或厂商交付的
+同名改版目录只能作为参考，不能冒充该公开基准。BK7259 使用前应按官方
+支持矩阵选择对应 release，不把 BK7258 的 BSP、分区或二进制直接套用。
 
 H5/AI 的 ESP32-S3 托管模板、协议文档和 TiRTC SDK 已打包在独立的 ESP32 Device Kit 中，安装时会自动下载并校验。ESP32 示例源码由本仓库的 `kit-src/` 维护；设备互呼或微信 VoIP 的移植可参考其中的独立示例。ESP32-P4 使用独立发布的 `tirtc-esp32p4-kit`（小钛 P4 参考固件：hosted C6 Wi-Fi + LVGL UI + 摄像头 + P4 SDK 2.5.0），通过生成器 `--target esp32p4` 复制生成，不能复用 S3 预编译库。
 
@@ -44,7 +45,11 @@ npm --version
 
 `node --version` 应输出 `v18.x` 或更高版本。如果终端提示找不到 `node` 或 `npm`，先从 [Node.js 官方下载页](https://nodejs.org/en/download) 安装受支持版本，再打开一个新终端。
 
-### 2. 安装并检查开发环境
+### 2. 安装对应平台的 Skill
+
+#### ESP32
+
+ESP32 使用托管安装，它会同时准备 Skill、Device Kit、ESP-IDF 和工具链：
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install
@@ -77,13 +82,43 @@ Start a new Codex session, then ask it to use tirtc-esp32-builder.
 
 如果看到 `OVERALL: NEEDS_SETUP`、`MISS` 或 `FAIL`，先看[常见问题](#常见问题)。
 
+#### Beken
+
+BK7258/BK7259 安装 `tirtc-beken-builder`：
+
+```bash
+npx --yes tirtc-device-builder@latest install beken
+```
+
+默认安装到 Codex。其他客户端使用同一个 `--client` 参数，例如：
+
+```bash
+npx --yes tirtc-device-builder@latest install beken --client qwen-code
+```
+
+Beken 当前没有 `setup beken` 托管环境命令，也没有公开的独立 BK Device
+Kit；上面的命令只安装 Skill。SDK、工具链和板级工程仍由目标项目准备。
+安装后可用固定的官方 SDK checkout 做只读检查：
+
+```bash
+npx --yes tirtc-device-builder@latest doctor beken \
+  --sdk-root /absolute/path/to/bk_avdk_smp
+```
+
+其中 BK7258 的公开基准应是 `release/v3.1.1.8`、commit
+`1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`。
+
 ### 3. 重新打开 Agent 客户端
 
 Skill 通常在 Agent 会话启动时被发现。安装完成后，关闭当前会话，再打开一个新会话。
 
 ### 4. 把板卡和目标告诉 Agent
 
-把你已经掌握的信息填进下面的提示词即可，不用先查齐所有硬件参数。先指定工作区根目录，本地路径尽量相对工作区填写；不确定的内容写“未知”。可直接复制的版本见[开发板接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
+不用先查齐所有硬件参数。先选平台，再把已经掌握的信息交给 Agent；本地路径尽量相对工作区填写，不确定的内容写“未知”。
+
+#### ESP32 接入提示词
+
+完整模板见 [ESP32 开发板接入提示词](skills/tirtc-esp32-builder/assets/developer-intake-prompt.md)。
 
 ```text
 请使用 tirtc-esp32-builder Skill 完成这块开发板的 TiRTC 移植。
@@ -124,6 +159,30 @@ H5 对讲和 AI 双向对讲。
 
 只有型号时，Skill 会先调查公开资料并列出缺口，不会猜测 GPIO、器件或媒体能力。要进入代码移植，通常还需要准确的板卡版本、原理图，以及能在实物上运行的 BSP 或外设示例。
 
+#### Beken 接入提示词
+
+完整模板见 [Beken 开发板接入提示词](skills/tirtc-beken-builder/assets/developer-intake-prompt.md)。下面这段可以直接作为起点：
+
+```text
+请使用 tirtc-beken-builder Skill 诊断并接入这块开发板。
+
+- 厂商、完整型号、PCB 丝印/版本：<填写>
+- SoC：<BK7258/BK7259/未知>
+- 官方 SDK/BSP 路径与 revision：<填写>
+- 原理图、BOM、屏幕/触摸/音频资料：<路径或链接>
+- 已验证的 LCD、触摸、录音、播放示例：<填写>
+- 小钛目标功能：<H5 音视频/对讲、AI 对话、设备互呼、微信 VoIP>
+- 输出工程目录：<填写>
+
+请先核验 SDK 基线，再实现并运行只读或低风险的程序探测，输出
+probe-report.json。分别记录 BSP 声明、运行时检出和主动实测结果；检查
+Flash、RAM/PSRAM、显示与触摸、麦克风、扬声器、采集格式、全双工回采
+和 AEC。未知项不要猜。根据探测结果裁剪小钛功能，再完成可安全执行的
+移植和构建。本轮不烧录、不擦除、不改写工厂分区。
+```
+
+Beken 的屏幕尺寸通常不能只靠总线扫描可靠识别。Skill 会结合固定 SDK/BSP、驱动清单和主动色块测试；触摸、录音、播放和 AEC 则需要各自的运行时测试。探测结果用于决定 UI 是触摸、按键还是无屏模式，以及哪些小钛能力可以启用。
+
 ### 示例对话
 
 新板卡、先做资料评审：
@@ -153,9 +212,11 @@ Codex：只有 exact identity 且 safe_registered_reuse=true 才复用板级包�
        会话切换和重连；旧固件的 HIL 结果不会继承给新固件。
 ```
 
-## 工作范围
+## 两个平台的工作流程
 
-整个流程从板卡资料核对开始，以分层验收报告结束：
+两种平台都遵循“先取证、再实现、最后实机验收”，但产物和工具链不同。
+
+### ESP32
 
 ```text
 开发板型号、原理图、BSP、数据手册
@@ -201,6 +262,26 @@ Skill 负责：
 - 需要用于 AI 会话的实体按键或其他触发方式。
 
 编译成功只代表构建层通过。只有拿到浏览器画面、实体扬声器声音和双向 AI 音频的实测证据，报告才能把对应能力标为 `PASS`。
+
+### Beken
+
+```text
+板卡、原理图、BSP 和固定 SDK revision
+                    │
+                    ▼
+      诊断固件 → probe-report.json
+                    │
+                    ▼
+ 显示/触摸/音频/Flash/RAM 能力矩阵
+                    │
+                    ▼
+       小钛功能裁剪与 Beken 工程适配
+                    │
+                    ▼
+          构建 → 授权烧录 → HIL
+```
+
+Beken Skill 先核验 SDK 来源，再把文档声明和实机探测分开记录。独立诊断固件通过后，还要在最终业务固件中复测资源余量和外设共存；单独示例能运行，不代表小钛业务合入后仍然成立。`probe-report.json`、SDK revision、固件哈希、能力结论和剩余阻塞项共同构成交付证据。
 
 ## 准备板卡资料
 
@@ -281,7 +362,7 @@ board-materials/
 
 ## 依赖和支持范围
 
-### 当前版本基线
+### ESP32 基线
 
 | 项目 | 当前要求 |
 |---|---|
@@ -299,9 +380,21 @@ board-materials/
 
 从本仓库 `kit-src/` 直接生成或打包时使用 TiRTC 2.5.0；`setup esp32` 安装固定的 Kit 版本，其 SDK 版本以该 Kit 的 `manifest.json` 为准。
 
+### Beken 基线
+
+| 项目 | 当前要求 |
+|---|---|
+| 芯片 | BK7258 / BK7259，具体型号必须由板卡资料或运行时证据确认 |
+| BK7258 SDK | Beken 官方 Gitee `bk_avdk_smp` `release/v3.1.1.8`，commit `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7` |
+| BK7259 SDK | 按官方支持矩阵选择匹配的正式 release；不复用 BK7258 的 BSP、分区或二进制 |
+| 安装范围 | npm 命令安装 Skill；SDK、工具链和板级工程由目标项目准备 |
+| 诊断产物 | `probe-report.json`，包含来源、探测方式、原始值、置信度和能力判定 |
+
+同名的本机目录或厂商交付包可能含有私有组件和补丁，不能据此声称它等同于公开 tag。确实要基于改版 SDK 开发时，应把它的远端、commit 和差异清单单独记录，并以官方 Gitee 基线作为比较对象。
+
 ### 本机软件
 
-`setup esp32 --install` 会检查以下基础命令：
+ESP32 的 `setup esp32 --install` 会检查以下基础命令：
 
 | 命令 | 用途 |
 |---|---|
@@ -311,6 +404,8 @@ board-materials/
 | `tar` | 解包并验证 Device Kit |
 
 Doctor 还会检查 `cmake`、`ninja`、`idf.py` 和 `xtensa-esp32s3-elf-gcc`。安装器不会调用系统包管理器；缺少基础命令时，需要开发者按当前操作系统安装。
+
+Beken Doctor 会检查 `python3`、`git`、`make`、`cmake`、`ninja`、SDK 必需目录和 Git revision。厂商交叉编译器及其环境变量仍以所选 SDK 的正式文档和目标工程为准；`install beken` 不会替开发者安装这些组件。
 
 Ubuntu、Debian 或 WSL 可以参考：
 
@@ -326,6 +421,7 @@ sudo apt-get install -y git python3 python3-venv bash tar
 - npm 官方 Registry，用于取得 `tirtc-device-builder`；
 - GitHub Release，用于下载 ESP32 Device Kit；
 - Espressif 的 GitHub 仓库和工具下载地址，用于安装 ESP-IDF 与工具链。
+- Beken 官方 Gitee/GitHub 和文档站，用于取得并核验 Beken SDK 与芯片资料。
 
 H5 和 AI 的端到端验收还需要可访问的 ThingConnect 服务、可用账号、设备绑定条件、浏览器和外网。缺少其中一项，不影响工程生成和编译，但对应验收层要记录为 `SKIP`。
 
@@ -340,16 +436,22 @@ ThingConnect 平台和 Web 播放端支持 MJPEG、H.264、H.265；具体开发�
 ### 推荐：用 npx 一次检查并安装
 
 ```bash
+# ESP32：Skill + Device Kit + ESP-IDF + 工具链
 npx --yes tirtc-device-builder@latest setup esp32 --install
+
+# BK7258/BK7259：安装 Skill
+npx --yes tirtc-device-builder@latest install beken
 ```
 
-`npx` 会临时取得最新 CLI 并运行，不要求全局安装。它适合这种低频的安装和诊断工具，也避免用户机器里长期保留旧版本命令。
+`npx` 会临时取得最新 CLI 并运行，不要求全局安装。`setup` 当前只支持
+ESP32；Beken 使用 `install beken`，不会自动下载 SDK 或工具链。
 
 ### 也可以全局安装
 
 ```bash
 npm install --global tirtc-device-builder@latest
 tirtc-device-builder setup esp32 --install
+tirtc-device-builder install beken
 ```
 
 安装命令是 `npm install`，不要写成 `npm --install`。
@@ -365,13 +467,17 @@ tirtc-device-builder setup esp32 --install
 ```bash
 npx --yes tirtc-device-builder@latest install esp32
 npx --yes tirtc-device-builder@latest install esp32 --client gemini
+npx --yes tirtc-device-builder@latest install beken
+npx --yes tirtc-device-builder@latest install bk7258 --client gemini
 ```
 
-这条命令不安装 ESP-IDF，也不下载 Device Kit。完整的新用户环境仍建议使用 `setup esp32 --install`。
+`beken`、`bk`、`bk7258`、`bk7259` 和 `tirtc-beken-builder` 都会解析为同一
+个 Beken Skill。`install` 不安装 SDK、工具链或 Device Kit。ESP32 的完整
+新用户环境仍建议使用 `setup esp32 --install`。
 
 ### 支持的 Agent 客户端
 
-同一个 `tirtc-esp32-builder` Skill 会完整复制到所选客户端的原生目录，不维护客户端专用的内容副本。先用下面的命令查看当前机器解析出的目录：
+所选平台的完整 Skill 会复制到客户端的原生目录，不维护客户端专用的内容副本。先用下面的命令查看当前机器解析出的目录：
 
 ```bash
 npx --yes tirtc-device-builder@latest clients
@@ -399,7 +505,8 @@ Cline 当前还需要在 `Settings → Features → Enable Skills` 中启用实�
 
 | 内容 | 默认位置 |
 |---|---|
-| Agent Skill | 上表中所选目录下的 `tirtc-esp32-builder` |
+| ESP32 Agent Skill | 上表中所选目录下的 `tirtc-esp32-builder` |
+| Beken Agent Skill | 上表中所选目录下的 `tirtc-beken-builder` |
 | 托管根目录 | `~/.tirtc-device-builder` |
 | Device Kit | `~/.tirtc-device-builder/kits/esp32s3/1.1.7` |
 | ESP-IDF | `~/.tirtc-device-builder/esp-idf-v5.5.4` |
@@ -456,10 +563,14 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 默认安装不会覆盖已有 Skill，以免丢失本地修改。确认这些修改不需要保留后，可用最新 npm 包替换：
 
 ```bash
+# ESP32
 npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
+
+# Beken
+npx --yes tirtc-device-builder@latest install beken --force
 ```
 
-该命令只替换 Skill；同版本且已通过校验的 Device Kit 和 ESP-IDF 会继续复用。自定义脚本或规则请提前备份。
+这两条命令都只替换对应 Skill。ESP32 已通过校验的 Device Kit 和 ESP-IDF 会继续复用；Beken 的 SDK 和工程不会被改动。自定义脚本或规则请提前备份。
 
 ## 常用检查和开发命令
 
@@ -480,9 +591,24 @@ npx --yes tirtc-device-builder@latest --help
 npx --yes tirtc-device-builder@latest list
 npx --yes tirtc-device-builder@latest clients
 npx --yes tirtc-device-builder@latest setup esp32 --help
+npx --yes tirtc-device-builder@latest doctor beken --help
 ```
 
 ### 生成工程前运行 Doctor
+
+Beken 使用已准备好的固定 SDK checkout：
+
+```bash
+npx --yes tirtc-device-builder@latest doctor beken \
+  --sdk-root /absolute/path/to/bk_avdk_smp
+```
+
+输出中的基础工具、SDK 必需路径和 `sdk-revision` 均应为 `PASS`。BK7258
+应另外核对 revision 为
+`1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`。Doctor 是只读检查，不会下载
+SDK、修改工程或烧录设备。
+
+ESP32 使用托管环境：
 
 ```bash
 source ~/.tirtc-device-builder/env.sh
@@ -756,20 +882,31 @@ npm view tirtc-device-builder version
 
 ### `npm login` 提示无法打开浏览器
 
-普通使用者不需要登录 npm。直接执行：
+普通使用者不需要登录 npm。按平台直接执行：
 
 ```bash
+# ESP32
 npx --yes tirtc-device-builder@latest setup esp32 --install
+
+# Beken
+npx --yes tirtc-device-builder@latest install beken
 ```
 
 `npm login` 只供维护者发布包，与安装公开包无关。
 
 ### 输出 `OVERALL: NEEDS_SETUP`
 
-这表示只读检查发现环境尚未准备完整。按输出提示执行安装：
+ESP32 出现这个结果，表示只读检查发现托管环境尚未准备完整。按输出提示执行安装：
 
 ```bash
 npx --yes tirtc-device-builder@latest setup esp32 --install
+```
+
+Beken 没有托管环境安装。先按 Doctor 输出补齐基础工具、SDK 或工程路径，再重新检查：
+
+```bash
+npx --yes tirtc-device-builder@latest doctor beken \
+  --sdk-root /absolute/path/to/bk_avdk_smp
 ```
 
 ### 提示缺少 `python3`、`git`、`bash` 或 `tar`
@@ -809,6 +946,7 @@ npx --yes tirtc-device-builder@latest setup esp32 --install \
 ```bash
 npx --yes tirtc-device-builder@latest clients
 ls -l <skills-dir>/tirtc-esp32-builder/SKILL.md
+ls -l <skills-dir>/tirtc-beken-builder/SKILL.md
 ```
 
 确认安装和启动的是同一个客户端，例如 Qwen Code 要使用 `--client qwen-code`。设置过 `CODEX_HOME`、`XDG_CONFIG_HOME` 或 `--skills-dir` 时，要检查对应目录。项目级目录由客户端自身规则决定，可以用 `--skills-dir` 显式指定。
@@ -818,10 +956,26 @@ ls -l <skills-dir>/tirtc-esp32-builder/SKILL.md
 安装器检测到本地已有 Skill，因此没有直接覆盖。确认可以替换后执行：
 
 ```bash
+# ESP32 托管安装
 npx --yes tirtc-device-builder@latest setup esp32 --install --force-skill
+
+# ESP32 或 Beken 仅替换 Skill
+npx --yes tirtc-device-builder@latest install esp32 --force
+npx --yes tirtc-device-builder@latest install beken --force
 ```
 
-如果只使用 `install esp32` 子命令，对应选项是 `--force`。
+替换前先确认本地 Skill 没有需要保留的修改。
+
+### Beken Skill 已安装，但 Doctor 仍未通过
+
+这是两个不同阶段。`install beken` 只把 Skill 放进 Agent 客户端，不下载 Beken SDK，也不配置厂商工具链。请先准备官方 SDK checkout，再运行：
+
+```bash
+npx --yes tirtc-device-builder@latest doctor beken \
+  --sdk-root /absolute/path/to/bk_avdk_smp
+```
+
+BK7258 应以官方 Gitee `release/v3.1.1.8`、commit `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7` 为公开基线。如果当前工程来自厂商交付包，应保留差异，但要把它标成改版工程，不能当作官方基准。
 
 ### Device Kit 下载失败
 
@@ -911,7 +1065,11 @@ Skill、Device Kit 和 ESP-IDF 会写到 npm 包目录之外，也可能占用�
 
 ### 能支持 ESP32 之外的芯片吗？
 
-仓库允许每个平台使用独立 Skill。当前公开 Skill 覆盖 ESP32-S3，并支持在证据完整的已有工程上移植 ESP32-P4；托管一键生成仍是 S3。泰芯或其他平台需要新增 `skills/<platform-skill>/`，并分别维护 SDK、工具链、板级 adapter 和验收约束。
+可以。当前公开提供 `tirtc-beken-builder`，覆盖 BK7258/BK7259 的硬件诊断、
+能力判定和小钛移植；安装命令是
+`npx --yes tirtc-device-builder@latest install beken`。Beken 当前只提供
+Skill，没有 `setup beken` 托管环境或公开 BK Device Kit。ESP32-S3 提供
+托管一键生成，ESP32-P4 支持在证据完整的已有工程上移植。
 
 ## 给仓库维护者
 

@@ -26,6 +26,7 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(ROOT, "bin", "tirtc-device-builder.js");
 const PACKAGE = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+const README = readFileSync(join(ROOT, "README.md"), "utf8");
 
 function run(args, environment = {}) {
   return spawnSync(process.execPath, [CLI, ...args], {
@@ -121,6 +122,22 @@ test("install copies the Beken skill", async () => {
     );
     assert.match(result.stdout, /Installed tirtc-beken-builder/);
   });
+});
+
+test("README documents the Beken install and Doctor flow", () => {
+  assert.match(
+    README,
+    /npx --yes tirtc-device-builder@latest install beken/,
+  );
+  assert.match(
+    README,
+    /npx --yes tirtc-device-builder@latest doctor beken[\s\\]+--sdk-root/,
+  );
+  assert.match(README, /Beken 当前没有 `setup beken`/);
+  assert.match(
+    README,
+    /1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7/,
+  );
 });
 
 test("clients lists every supported Agent client", () => {
