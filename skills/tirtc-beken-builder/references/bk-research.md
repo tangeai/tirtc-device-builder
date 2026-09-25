@@ -22,10 +22,19 @@ Beken 官方 `bk_idk` README 要求使用 release 分支/tag，而不是随意�
 
 本次直接核对了：
 
-- BK7258：`bk_avdk_smp release/v3.1.1`，提交 `993df5647f084551a677a2bc741b200cfd75d5f2`；
+- BK7258 Kit 的公开复现基准：官方 Gitee `bk_avdk_smp`
+  `release/v3.1.1.8`，提交
+  `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`；下文固定到
+  `993df5647f084551a677a2bc741b200cfd75d5f2` 的链接是早期
+  `release/v3.1.1` API 调研证据，不能替代 Kit 的版本基准；
 - BK7259：`bk_avdk_smp release/v4.0.1`，提交 `584b947920c414230f9909375f008e7d6a2c6c6b`，该提交包含 `bk7259_ap` SoC/BSP、BK7259 音频库、显示与触控实现，可作为公开可复现基线。[BK7259 defconfig](https://github.com/bekencorp/bk_avdk_smp/blob/584b947920c414230f9909375f008e7d6a2c6c6b/ap/middleware/soc/bk7259_ap/bk7259_ap.defconfig) [BK7259 音频能力头](https://github.com/bekencorp/bk_avdk_smp/blob/584b947920c414230f9909375f008e7d6a2c6c6b/ap/include/soc/bk7259/aud_cap.h)
 
-因此建议 skill 把 SDK baseline 固定为 tag/commit，并为 BK7258 v3.1.1 与 BK7259 v4.0.1 分设 adapter。不要假定两个版本的目录和显示 API 完全相同：v4 已把 panel 注册进一步改为 linker-section 模式。
+本机名为 `bk_avdk_smp_v3.1.1.8_20260605` 的 GitLab 交付目录含私有
+Tange 组件及音频、DVP、H.264、lwIP、编译选项和工程配置差异，只作为
+问题案例参考，不能作为公开基准或声称与 Gitee 标签等同。因此 skill 把
+SDK baseline 固定为 tag/commit，并为 BK7258 v3.1.1.8 与 BK7259 v4.0.1
+分设 adapter。不要假定两个版本的目录和显示 API 完全相同：v4 已把
+panel 注册进一步改为 linker-section 模式。
 
 ## 已确认的可探测能力
 
@@ -127,7 +136,9 @@ skill 流程：识别 SDK/tag 与 target → 导入/生成 board profile → 构
 
 ## 推荐落地顺序
 
-1. 首版支持两条固定基线：BK7258 `v3.1.1.x`、BK7259 `v4.0.1.x`；
+1. 首版支持两条固定基线：BK7258 官方 Gitee `release/v3.1.1.8`
+   (`1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`) 与 BK7259
+   `release/v4.0.1`；
 2. 先实现 Flash/heap/PSRAM/touch 与 manifest，因这些已有明确官方 API；
 3. 再实现 profile 驱动的 LCD ID/readback + test pattern；
 4. 实现 audio format sweep、录音统计与安全声学回环；

@@ -5,11 +5,13 @@ SDK/BSP project.
 
 ## SDK baseline
 
-For BK7258 multimedia work, start with Beken's `bk_avdk_smp`. Prefer the highest
-formal `release/v3.1.1.x` tag compatible with the product solution; the moving
-`release/v3.1.1` branch contains unreleased maintenance work. Keep an upper-layer
-solution and SDK on matching tags. Confirm BK7259 against its own published
-support matrix and release line rather than assuming BK7258 compatibility.
+For BK7258 multimedia work, start with Beken's official Gitee `bk_avdk_smp`
+tag `release/v3.1.1.8`, commit
+`1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`. Do not substitute the locally
+delivered `3.1.1.8-20260605` tree: it contains product/private modifications and
+is reference evidence only. Keep an upper-layer solution and SDK on matching
+tags. Confirm BK7259 against its own published support matrix and release line
+rather than assuming BK7258 compatibility.
 
 ## Output contract
 

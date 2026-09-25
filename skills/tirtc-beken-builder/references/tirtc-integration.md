@@ -1,6 +1,8 @@
 # TiRTC integration on Beken
 
 Use this reference when moving from hardware diagnosis to XiaoTai business code.
+For BK7258, also read the artifact-derived
+[LCKFB lessons](lckfb-bk7258-lessons.md) and apply its release gates.
 
 ## Compatibility gate
 
@@ -9,6 +11,10 @@ build contract matching the exact CPU ABI, compiler, C library, RTOS, TLS/networ
 stack and required callbacks. Record their versions and hashes. An ESP32 library
 is not portable evidence. When a compatible package is unavailable, hardware
 diagnosis can finish but business integration is `BLOCKED_SDK_ABI`.
+
+Compatibility includes TLS dependencies. Record the Mbed TLS ABI expected by
+the TiRTC archive and the exact archive/headers selected by the platform build;
+a successful static link still requires a device DTLS/WHIP handshake.
 
 ## Stable/application boundary
 
@@ -42,5 +48,20 @@ screen widget own a second session state machine.
 7. Re-run the probe/resource snapshot in the final firmware and bind HIL results
    to its SHA-256.
 
+Lock exact HTTP method/body semantics, option-length conventions, callback
+object lifetimes and unusual SDK return values in host contract tests. Measure
+internal free/minimum/largest heap during connect; PSRAM totals alone do not
+clear the resource gate.
+
 Use the exact selected TiRTC header for lifecycle and callback details; public
 documentation is context, not a substitute for the binary's build contract.
+
+## Logging contract
+
+Use `ERROR` for failed operations that cannot continue, `WARN` for degraded or
+recoverable behavior, `INFO` for lifecycle/state summaries, and `DEBUG` for wire
+diagnostics. Default product builds to INFO. At DEBUG, log complete HTTP method,
+URL, headers, body and response; MQTT connect/subscribe/publish/receive fields and
+payloads; and TiRTC/WHIP descriptors, authorization values, callback results and
+generation identifiers. At INFO and above, do not print those complete network
+inputs or responses. Lock both sides of this rule in host contract tests.

@@ -2,6 +2,19 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.1
+
+- Pin the BK7258 public baseline to the official Gitee
+  `release/v3.1.1.8` tag at commit
+  `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`; explicitly classify the local
+  `3.1.1.8-20260605` GitLab delivery as modified reference material only.
+- Add artifact-derived LCKFB BK7258 XiaoTai gates for ABI/TLS identity,
+  AP/CP cache provenance, internal-memory budgets, asynchronous credential
+  lifetime, protocol exactness, media truthfulness and hardware acceptance.
+- Define conventional ERROR/WARN/INFO/DEBUG logging: release builds default to
+  INFO without complete wire payloads, while controlled DEBUG builds expose
+  complete HTTP, MQTT and TiRTC/WHIP inputs and results for integration work.
+
 ## 0.11.0
 
 - Add the `tirtc-beken-builder` Skill and CLI platform aliases for BK7258 and

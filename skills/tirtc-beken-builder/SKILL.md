@@ -14,6 +14,10 @@ Read [architecture](references/architecture.md) when planning a new product or
 explaining the platform split and delivery stages.
 Read [BK probe research](references/bk-research.md) when selecting an SDK line,
 implementing a probe, or checking the primary-source basis for an API.
+Read [LCKFB BK7258 lessons](references/lckfb-bk7258-lessons.md) before porting
+XiaoTai/TiRTC to BK7258, reviewing a BK7258 product project, or accepting its
+build. Apply the gates to the target's evidence; copy the case-study constants
+only when its board, SDK and binary identities match.
 
 ## 1. Establish the target
 
@@ -29,8 +33,12 @@ implementing a probe, or checking the primary-source basis for an API.
    authorizes changing them.
 4. Inspect the selected SDK headers and examples before naming APIs. Beken SDK
    branches differ; source-visible symbols in the pinned checkout outrank prose
-   and this Skill. Start discovery from <https://docs.bekencorp.com/> and
-   <https://github.com/bekencorp/>, then pin the concrete page and revision.
+   and this Skill. Start discovery from <https://docs.bekencorp.com/>,
+   <https://github.com/bekencorp/> and the official Gitee mirror. For the
+   reproducible BK7258 Kit baseline, use official Gitee tag
+   `release/v3.1.1.8` at commit
+   `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`. A locally delivered
+   `3.1.1.8-20260605` tree is modified reference material, not that baseline.
 
 Run the read-only environment check when a checkout is available:
 
@@ -103,6 +111,12 @@ when it is available. Then bind the pinned Beken TiRTC library/header and build
 contract. If no compatible Beken TiRTC binary exists, report `BLOCKED_SDK_ABI`;
 do not substitute an ESP32 archive or claim source compatibility.
 
+For BK7258 TiRTC product work, run the case-study gates for AP/CP ownership,
+toolchain and TLS ABI identity, clock/signing order, exact HTTP methods,
+asynchronous credential lifetime, failed-connection draining, internal-SRAM
+headroom and capability-report truthfulness. A successful link is not an ABI or
+runtime-media pass.
+
 ## 5. Build and verify
 
 Build with the exact vendor toolchain and board project. Record the application
@@ -120,9 +134,15 @@ matrix, integration changes, exact artifact identity, HIL results, and remaining
 blockers. Promote a board profile for reuse only after the exact PCB revision
 and its required active probes pass.
 
-## Security boundary
+## Security and logging boundary
 
 Keep device keys, Wi-Fi passwords, MQTT/WHIP tokens, certificates, calibration
-data, MAC-derived identifiers and captured user audio outside source and reports.
-Redact logs. Downloads, account access, flashing, erasing, factory-partition
-changes and publishing a reusable board profile retain separate authorization.
+data, MAC-derived identifiers, captured user audio and captured logs outside
+source control and generated reports. Use the conventional `ERROR`, `WARN`,
+`INFO`, `DEBUG` levels. Product/release firmware defaults to `INFO` and does not
+print complete network request or response payloads. A deliberately enabled
+`DEBUG` build may print complete HTTP, MQTT and TiRTC/WHIP inputs and results,
+including authorization values, for controlled integration work; handle that
+output as sensitive development data and return the build to `INFO` before
+release. Downloads, account access, flashing, erasing, factory-partition changes
+and publishing a reusable board profile retain separate authorization.
