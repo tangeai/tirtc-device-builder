@@ -59,6 +59,11 @@ const required = [
   "skills/tirtc-beken-builder/scripts/bk_probe_report.py",
   "skills/tirtc-beken-builder/scripts/doctor.py",
   "skills/tirtc-beken-builder/assets/bk-avdk-smp-v3.1.1/tirtc_bk_probe.c",
+  "skills/tirtc-project-docs/SKILL.md",
+  "skills/tirtc-project-docs/VERSION",
+  "skills/tirtc-project-docs/references/document-architecture.md",
+  "skills/tirtc-project-docs/references/evidence.md",
+  "skills/tirtc-project-docs/references/bilingual.md",
 ];
 const allowedTopLevel = new Set([
   ".codex-plugin",

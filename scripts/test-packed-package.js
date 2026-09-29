@@ -137,6 +137,7 @@ try {
   const platforms = run(process.execPath, [cli, "list"]);
   assert.match(platforms.stdout, /esp32\s+tirtc-esp32-builder/);
   assert.match(platforms.stdout, /beken\s+tirtc-beken-builder/);
+  assert.match(platforms.stdout, /docs\s+tirtc-project-docs/);
 
   const clients = run(process.execPath, [cli, "clients"]);
   for (const client of [
@@ -196,6 +197,30 @@ try {
         "tirtc-beken-builder",
         "scripts",
         "bk_probe_report.py",
+      ),
+    ),
+    true,
+  );
+
+  const docsSkillsDir = join(temporary, "docs-skills");
+  run(process.execPath, [
+    cli,
+    "install",
+    "docs",
+    "--skills-dir",
+    docsSkillsDir,
+  ]);
+  assert.equal(
+    existsSync(join(docsSkillsDir, "tirtc-project-docs", "SKILL.md")),
+    true,
+  );
+  assert.equal(
+    existsSync(
+      join(
+        docsSkillsDir,
+        "tirtc-project-docs",
+        "references",
+        "bilingual.md",
       ),
     ),
     true,

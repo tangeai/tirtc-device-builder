@@ -2,6 +2,15 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.5
+
+- Add the `tirtc-project-docs` Skill for designing and reviewing public
+  documentation in multi-board TiRTC and XiaoTai repositories.
+- Define stable roles for quick-start, architecture, contribution, board and
+  media documents, with evidence grading and approval-first bilingual output.
+- Add `install docs` support and package tests for installing the documentation
+  Skill across supported Agent clients.
+
 ## 0.11.4
 
 - Add artifact-bound BK7258 H5, AI and WeChat VoIP media lessons: directional

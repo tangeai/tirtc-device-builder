@@ -1,0 +1,4 @@
+interface:
+  display_name: "TiRTC Project Docs"
+  short_description: "维护 TiRTC 多开发板项目的中英文文档与证据边界"
+  default_prompt: "Use $tirtc-project-docs to design or audit my TiRTC project documentation, write and verify the Chinese source first, and generate English only after Chinese approval."

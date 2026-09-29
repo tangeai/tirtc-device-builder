@@ -2,12 +2,13 @@
 
 TiRTC Device Builder 用于把 ESP32-S3/ESP32-P4 和 BK7258/BK7259 开发板接入 TiRTC。输入可以只有开发板型号，也可以包含原理图、BSP、引脚表和外设示例。安装后的 Agent Skill 会先检查环境、整理有依据的硬件事实，再生成或移植独立工程并完成板级适配和编译。烧录和实机验证只有在开发者明确给出目标串口并授权后才会执行。
 
-当前仓库提供两个平台 Skill：
+当前仓库提供两个平台 Skill 和一个项目文档 Skill：
 
 | Skill | 平台 | 主要用途 |
 |---|---|---|
 | `tirtc-esp32-builder` | ESP32-S3 / ESP32-P4、ESP-IDF 5.5.x | 板型识别、Hardware IR、工程生成/移植、H5/AI/设备互呼/微信 VoIP、AEC 门禁、编译烧录和分层验收 |
 | `tirtc-beken-builder` | BK7258 / BK7259、Beken Armino | 运行时硬件探测、显示/触摸/音频/内存能力判定、小钛业务移植与实机验收 |
+| `tirtc-project-docs` | TiRTC / 小钛多开发板项目 | 快速体验、架构、贡献、板卡、构建烧录和音视频参数文档；中文版确认后同步英文版 |
 
 BK7258 多媒体项目固定从 Beken 官方 Gitee `bk_avdk_smp` 的
 `release/v3.1.1.8` tag、commit
@@ -107,6 +108,19 @@ npx --yes tirtc-device-builder@latest doctor beken \
 
 其中 BK7258 的公开基准应是 `release/v3.1.1.8`、commit
 `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`。
+
+#### 项目文档
+
+需要建立、检查或维护 TiRTC/小钛项目文档时，安装
+`tirtc-project-docs`：
+
+```bash
+npx --yes tirtc-device-builder@latest install docs
+```
+
+该 Skill 会先按仓库事实整理中文版，检查根文档导航、板卡目录、构建烧录说明、
+媒体参数和证据等级。只有中文版确认通过后，才同步生成英文版。它不会把日期型排障
+记录或迁移历史混入对外使用手册。
 
 ### 3. 重新打开 Agent 客户端
 

@@ -105,6 +105,35 @@ test("list exposes every platform skill", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /esp32\s+tirtc-esp32-builder/);
   assert.match(result.stdout, /beken\s+tirtc-beken-builder/);
+  assert.match(result.stdout, /docs\s+tirtc-project-docs/);
+});
+
+test("install copies the project documentation skill", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const skillsDir = join(directory, "skills");
+    const result = run(["install", "docs", "--skills-dir", skillsDir]);
+    const target = join(skillsDir, "tirtc-project-docs");
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(join(target, "SKILL.md")), true);
+    assert.equal(
+      existsSync(join(target, "references", "document-architecture.md")),
+      true,
+    );
+    assert.equal(
+      readFileSync(join(target, "VERSION"), "utf8").trim(),
+      PACKAGE.version,
+    );
+    assert.match(result.stdout, /Installed tirtc-project-docs/);
+  });
+});
+
+test("documentation target rejects platform-only commands", () => {
+  for (const command of ["doctor", "boards", "setup"]) {
+    const result = run([command, "docs"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /not available for (target|platform): docs/);
+  }
 });
 
 test("install copies the Beken skill", async () => {

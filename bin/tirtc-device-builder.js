@@ -48,6 +48,14 @@ const PLATFORMS = new Map([
       summary: "BK7258 / BK7259 / Beken Armino",
     },
   ],
+  [
+    "docs",
+    {
+      aliases: new Set(["docs", "documentation", "tirtc-project-docs"]),
+      skill: "tirtc-project-docs",
+      summary: "TiRTC / XiaoTai project documentation",
+    },
+  ],
 ]);
 
 function printHelp() {
@@ -56,19 +64,21 @@ function printHelp() {
 Usage:
   tirtc-device-builder list
   tirtc-device-builder clients
-  tirtc-device-builder install <platform> [--client <name>] [--skills-dir <path>] [--force]
+  tirtc-device-builder install <target> [--client <name>] [--skills-dir <path>] [--force]
   tirtc-device-builder setup <platform> [setup options]
   tirtc-device-builder doctor <platform> [doctor options]
   tirtc-device-builder boards <platform> <list|validate|match|init-identity|candidate> [options]
   tirtc-device-builder --version
 
-Platforms:
+Install targets:
   esp32       ESP32-S3 / ESP-IDF 5.5.x
   beken       BK7258 / BK7259 / Beken Armino
+  docs        TiRTC / XiaoTai project documentation
 
 Examples:
   npx tirtc-device-builder install esp32
   npx tirtc-device-builder install beken
+  npx tirtc-device-builder install docs
   npx tirtc-device-builder install esp32 --client qwen-code
   npx tirtc-device-builder setup esp32
   npx tirtc-device-builder setup esp32 --install --client gemini
@@ -274,9 +284,15 @@ function main(args) {
   }
 
   if (command === "doctor") {
+    if (platform.name === "docs") {
+      return fail("doctor is not available for target: docs");
+    }
     return runDoctor(platform, rest);
   }
   if (command === "boards") {
+    if (platform.name === "docs") {
+      return fail("boards is not available for target: docs");
+    }
     return runBoardRegistry(platform, rest);
   }
   if (command === "setup") {
