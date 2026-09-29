@@ -1,7 +1,7 @@
 # LCKFB BK7258 XiaoTai lessons
 
 Use this case study for BK7258 XiaoTai/TiRTC ports and reviews. It distils the
-failures fixed in `lckfb-bk7258-xiaotai` through source commit `8a156ff`. These
+failures fixed in `lckfb-bk7258-xiaotai` through source commit `05d3180`. These
 are gates, not a generic board profile: retain the decisions, but use the exact
 numbers only when the target matches the identity below.
 
@@ -14,9 +14,11 @@ The reproducible public SDK baseline is:
   `release/v3.1.1.8`, commit
   `1cfd56af09a3cb6470f35f1e0c604035ed1b6ee7`;
 - GCC Arm None EABI 10.3.1, Cortex-M33, hard-float;
-- TiRTC-Nano 2.3.0 `mini`, BK7258 hard-float archive;
-- TiRTC build metadata reporting Mbed TLS 2.25.0, linked with the project's
-  BK7258 Mbed TLS 2.28.5 compatibility archive;
+- TiRTC-Nano 2.5.0 `mini`, BK7258 hard-float archive, SHA-256
+  `47e26827ca2419084163e3656dca4d6e508e433381784e9c03f232d3dbaa4171`;
+- TiRTC SSL and DTLS disabled for the validated deployment, with remaining
+  crypto references resolved by the SDK PSA Mbed TLS 3.5.2 component and no
+  application-vendored compatibility archive;
 - AP + CP + bootloader package and 16 MiB PSRAM.
 
 The locally delivered folder named `bk_avdk_smp_v3.1.1.8_20260605` contains a
@@ -25,11 +27,13 @@ project configuration. It is useful only as implementation and fault-history
 evidence. Do not identify it as the public tag, use it for SDK checksums, or make
 it the default Kit source.
 
-Hash the TiRTC and compatibility archives and record the SDK commit, compiler,
+Hash every TiRTC or compatibility archive actually linked and record the SDK commit, compiler,
 float ABI, libc/RTOS and partition maps. AP-only or CP-only output is diagnostic;
 the deliverable is the combined package. A different value makes a new artifact
-that must pass link, DTLS/WHIP and hardware validation again. Disable the SMP
-SDK's ABI-incompatible PSA Mbed TLS 3 path when using this TiRTC package.
+that must pass link, signaling/WHIP and hardware validation again. Do not infer
+a TLS recipe from the version name: the older 2.3.0 artifact required a separate
+compatibility choice, while this validated 2.5.0 artifact uses the SDK PSA path
+with TiRTC SSL/DTLS disabled.
 Treat the AP and CP CMake caches as part of the SDK identity: both the cached
 toolchain path and `beken-armino_SOURCE_DIR` must point inside the selected
 official checkout. Reject or clean a cache created by the local modified SDK;
@@ -91,8 +95,8 @@ hardware:
   `webclient_post(..., NULL, 0)` also requires explicit response handling;
 - configure the send buffer before `TiRtcInit`, initialize/start one TiRTC
   process, and pass SDK option string lengths with the exact convention used by
-  the matching headers/reference. For TiRTC 2.3.0 here, string lengths exclude
-  the trailing NUL;
+  the matching headers/reference; lock the convention with the selected archive
+  instead of carrying a value from an older delivery;
 - treat a positive `TIRTC_OPT_TGTRP_POLL_TIMEOUT` return as the applied timeout,
   not a failure. A false retry loop repeatedly initialized/uninitialized SDK
   task state;
@@ -110,10 +114,51 @@ it. Do not generalize this case study into a universal plain-transport rule.
 
 ## Media and capability gate
 
-The demonstrated audio contract is 8 kHz, 16-bit mono PCM with 20 ms TiRTC
-G.711 A-law packets; the board path may capture/play in larger chunks. SDK
-callbacks enqueue bounded copies and return. A camera-start failure degrades
-video while leaving an otherwise valid audio session active.
+Build an explicit matrix per product mode. The 2026-09-29 validated BK7258
+contract is:
+
+| Mode | Device uplink | Device downlink/subscription | Codec | Uplink gate |
+|---|---|---|---|---|
+| H5 STREAM | audio 10, video 11 | audio 14, video 15 | G.711 A-law, 8 kHz mono | local uplink subscription state |
+| AI | audio 1 | audio 1 | Opus, 16 kHz mono, 20 ms/320 samples | accepted `start_session` |
+| WeChat VoIP | audio 0, video 1 | audio 0, video 1 | G.711 A-law, 8 kHz mono; video not advertised here | protocol call-active state |
+
+These stream IDs are a product/platform contract, not universal TiRTC defaults.
+Verify them against the live profile API and official protocol before reuse.
+Report the complete directional snapshot with `POST /v1/device/profile` before
+sessions and after authenticated reconnect. Sending the locally advertised
+stream does not imply subscribing to that same number: H5 publishes audio 10
+but subscribes to browser talkback audio 14. VoIP publishes and receives audio
+0 and must not wait for an optional H5-style subscription callback once the
+business protocol has entered call-active state.
+
+Treat TiRTC media and subscription API return values as negative-on-failure
+unless the pinned API explicitly documents stricter semantics. Positive returns
+were valid success values in this integration; checking `rc != 0` produced
+false failures and muted paths.
+
+SDK callbacks enqueue bounded copies and return. Prewarm the Opus codec,
+playback, capture and queues before AI `start_session`, but gate microphone
+uplink until the matching acceptance. Retain asynchronous peer descriptors and
+tokens until callbacks complete.
+
+AEC is a PCM pipeline property, not an Opus-only feature. Enable it for every
+speakerphone full-duplex mode that has a playback reference. Feed the
+post-volume PCM actually written to DAC into a bounded reference FIFO and
+process aligned 20 ms microphone blocks. Validate far-end-only, near-end-only
+and double-talk cases; reference underruns or overruns are release evidence,
+not harmless counters. On this BK7258 port Opus encode/decode UsageFaults were
+eliminated only after placing measured 40 KiB task stacks in PSRAM; carry the
+stack size and high-water evidence rather than the number alone.
+
+For one-way audio or echo, add bounded diagnostic logs that correlate mode,
+generation, actual/expected stream ID, packet cadence, mic/reference/output
+energy, AEC residual ratio and reference FIFO under/overruns. Reject or count
+unexpected streams explicitly. Do not tune AEC until routing and reference
+continuity are proven.
+
+A camera-start failure degrades video while leaving an otherwise valid audio
+session active.
 
 BK7258 provides H.264 encoding but no demonstrated H.264 hardware decoder. The
 AVDK virtual H.264 decoder is NAL inspection/logging, not decoded video. The
@@ -134,12 +179,17 @@ Require a host contract test plus artifact-bound HIL. At minimum verify:
 - exact archive hashes, ABI/config/partition invariants and AP-only TiRTC
   ownership;
 - provisioning, binding, clock, signed login and one complete capability report;
-- first uplink/downlink audio frames and first H.264 frame;
+- the exact mode matrix in the reported profile plus actual/expected stream
+  diagnostics; first uplink/downlink audio frames and first H.264 frame;
+- H5 full duplex on 10/14, AI Opus full duplex on 1, and VoIP full duplex on 0;
+- far-end-only, near-end-only and double-talk AEC evidence using the real DAC
+  reference, with bounded underrun/overrun counts;
 - ten AI enter/exit cycles after background polling starts, with no UsageFault,
   HardFault, reboot, leaked media owner or permanent busy state;
 - camera failure with audio preserved, two consecutive remote-view sessions,
   connect/confirmation timeouts and late-callback rejection;
-- minimum/largest internal heap during DTLS, camera and full-duplex overlap.
+- minimum/largest internal heap and task stack high-water during signaling,
+  Opus/AEC, camera and full-duplex overlap.
 
 Use conventional `ERROR`, `WARN`, `INFO`, `DEBUG` levels. The checked-in
 development configuration defaults to `DEBUG` and prints complete HTTP, MQTT

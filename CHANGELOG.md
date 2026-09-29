@@ -2,6 +2,18 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.4
+
+- Add artifact-bound BK7258 H5, AI and WeChat VoIP media lessons: directional
+  capability reporting, 10/11 versus 14/15 STREAM routing, VoIP stream 0,
+  AI stream 1 with 16 kHz Opus, negative-on-failure SDK return semantics and
+  mode-specific uplink readiness gates.
+- Require PCM-domain AEC from the real post-volume DAC reference for all
+  speakerphone full-duplex modes, plus routing/AEC diagnostics, double-talk HIL,
+  reference FIFO health and measured codec-task stack headroom.
+- Update the validated BK7258 identity to the TiRTC-Nano 2.5.0 artifact and add
+  package validation that prevents these media invariants disappearing.
+
 ## 0.11.3
 
 - Add a complete Beken onboarding path to the public README: Skill installation,

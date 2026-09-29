@@ -225,9 +225,25 @@ def validate_skills(errors: list[str]) -> None:
                 "references/probe-porting.md",
                 "references/capability-rules.md",
                 "references/tirtc-integration.md",
+                "references/lckfb-bk7258-lessons.md",
             ):
                 if not (skill_dir / relative).is_file():
                     error(errors, f"{skill_dir.relative_to(ROOT)} is missing {relative}")
+            lessons = (skill_dir / "references/lckfb-bk7258-lessons.md").read_text(
+                encoding="utf-8"
+            )
+            for fragment in (
+                "POST /v1/device/profile",
+                "audio 10, video 11",
+                "audio 14, video 15",
+                "audio 0, video 1",
+                "Opus, 16 kHz mono, 20 ms/320 samples",
+                "negative-on-failure",
+                "post-volume PCM actually written to DAC",
+                "far-end-only, near-end-only and double-talk",
+            ):
+                if fragment not in lessons:
+                    error(errors, f"BK7258 media lessons are missing {fragment!r}")
 
 
 def validate_repository_files(errors: list[str]) -> None:
