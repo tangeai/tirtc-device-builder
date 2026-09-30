@@ -2,6 +2,14 @@
 
 This project follows Semantic Versioning.
 
+## 0.11.6
+
+- Add field-log triage gates for Beken HTTP business failures, generation-bound
+  remote closes, AI tail-audio ordering, worker exit versus processor faults,
+  FT6336 input faults, room-leave evidence and contact-shortcut intent.
+- Improve the project-documentation Skill with reader-task section ordering and
+  small, decision-focused diagram guidance.
+
 ## 0.11.5
 
 - Add the `tirtc-project-docs` Skill for designing and reviewing public

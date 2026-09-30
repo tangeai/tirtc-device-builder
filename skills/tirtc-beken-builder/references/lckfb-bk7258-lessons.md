@@ -1,7 +1,7 @@
 # LCKFB BK7258 XiaoTai lessons
 
 Use this case study for BK7258 XiaoTai/TiRTC ports and reviews. It distils the
-failures fixed in `lckfb-bk7258-xiaotai` through source commit `05d3180`. These
+failures fixed in `lckfb-bk7258-xiaotai` through source commit `6ec080f`. These
 are gates, not a generic board profile: retain the decisions, but use the exact
 numbers only when the target matches the identity below.
 
@@ -199,3 +199,36 @@ state transitions but not complete network inputs or responses.
 Contract tests must keep those full-payload format strings behind `BK_LOGD` or
 an equivalent DEBUG guard and reject them at INFO/WARN/ERROR. Treat DEBUG logs as
 sensitive development artifacts and keep them out of source control.
+
+## Field-log triage gate
+
+Reconstruct a failure by monotonic device time and session generation. Terminal
+receive timestamps can batch output and do not establish firmware ordering.
+Separate these layers before changing code:
+
+- transport success from business success: HTTP 200 can still carry a rejected
+  business code such as an offline target;
+- semantic completion from connection closure: TiRTC `-40008` is normal only
+  for the same generation after an explicit hangup or `end_session`; otherwise
+  retain it as an error;
+- locally buffered AI tail from unsent platform audio: after `end_session`, gate
+  uplink and drain queued playback before teardown. If the platform closes in
+  less than one negotiated audio-frame interval, firmware cannot recover audio
+  that never arrived. Require the platform to send the complete final utterance
+  before the end command and transport close;
+- worker cleanup text from a processor crash: an SDK thread-exit warning alone
+  is not reboot evidence. Require a Fault/watchdog record or a new boot sequence;
+- touch-controller I/O failures from media faults: diagnose FT6336 read errors,
+  invalid touch IDs and missing UP events at the board adapter. Submit dangerous
+  tap actions once on DOWN and preserve DOWN/UP pairing for PTT.
+
+For room exit, require all three observable results: the leave API succeeds,
+local media closes, and the refreshed assignment is absent. A page transition
+alone does not prove that the device left the room. For contact shortcuts,
+verify the selected contact class as well as list position; a touch-home WeChat
+shortcut and a physical `contacts[0]` shortcut are distinct product intents.
+
+Lock each corrected business rule in the platform-neutral product tests and the
+adapter ordering in a board contract test. Use the repository's documented
+test entrypoint after locating it; do not invent a generic
+`tools/run_host_tests.sh` path across projects.

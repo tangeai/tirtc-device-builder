@@ -25,6 +25,10 @@ area when the repository defines one.
 4. Map every technical claim to a source. Read
    [evidence and technical claims](references/evidence.md) when the work covers
    hardware, media, tools, builds, releases, or validation status.
+5. State the primary reader task for every entry document before drafting its
+   sections. Read [readability and diagrams](references/readability-and-diagrams.md)
+   for root entrypoints, long guides, workflow documents, or any proposed
+   visualization.
 
 ## Select the document layer
 
@@ -56,6 +60,19 @@ interfaces, responsibilities, commands, and decision points over source-tree
 tourism. Explain an unavoidable acronym on first use. Keep one topic per
 paragraph and make commands, warnings, status, and next actions easy to scan.
 
+Order sections by the reader's next decision, not by the order in which facts
+were discovered. A quick-start normally moves from board/artifact choice to
+flashing, first experience, and only then source development. An architecture
+guide moves from product scope to layers, runtime flows, contracts, extension,
+and verification. A contribution guide moves from prerequisites to change
+classification, applicable constraints, tests, and submission.
+
+Use a diagram only when it makes a multi-step flow, hierarchy, or branching
+decision materially easier to understand. Keep it small, introduce it in prose,
+and retain critical constraints in nearby text. Do not repeat the same complete
+sequence as both a numbered list and a diagram. Keep complex architecture out
+of the quick-start README unless it is necessary to complete the first run.
+
 Use available specialist Skills when they materially apply:
 
 - `research` for facts that require official external sources and citations;
@@ -78,9 +95,10 @@ repository's documentation, manifest, and host-test gates. A passing structure
 test does not upgrade build evidence into hardware proof.
 
 Review the Chinese documents for facts, terminology, navigation, paragraph
-shape, and duplicated sources of truth. Present the Chinese result for approval
-when requested. Completion for this phase means all requested Chinese documents
-and checks are complete, with English files still untouched.
+shape, section order, diagram purpose, and duplicated sources of truth. Present
+the Chinese result for approval when requested. Completion for this phase means
+all requested Chinese documents and checks are complete, with English files
+still untouched.
 
 ## Synchronize English after approval
 

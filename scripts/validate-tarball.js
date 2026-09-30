@@ -63,6 +63,7 @@ const required = [
   "skills/tirtc-project-docs/VERSION",
   "skills/tirtc-project-docs/references/document-architecture.md",
   "skills/tirtc-project-docs/references/evidence.md",
+  "skills/tirtc-project-docs/references/readability-and-diagrams.md",
   "skills/tirtc-project-docs/references/bilingual.md",
 ];
 const allowedTopLevel = new Set([
